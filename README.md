@@ -4,7 +4,7 @@ SVE Website Backend
 
 ## Deploying
 
-- Check app.deploy.version in pom.xml is correct
+First, check app.deploy.version in pom.xml is correct and everything works. Then:
 
 ```bash
  mvn clean package appengine:deploy
