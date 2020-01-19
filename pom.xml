@@ -12,7 +12,9 @@
 		<exec.mainClass>de.sve.backend.Application</exec.mainClass>
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
+		
 		<app.deploy.version>1</app.deploy.version>
+
 		<jetty.version>9.4.26.v20200117</jetty.version>
 		<jersey.version>2.30</jersey.version>
 	</properties>
