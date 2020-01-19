@@ -12,23 +12,23 @@ public class Application {
 
 	private static final Logger LOG = Logger.getLogger(Application.class.getName());
 
-	public static void main(String[] args) {
+	public static void main(final String[] args) {
 		// Create an instance of HttpServer bound to port defined by the
 		// PORT environment variable when present, otherwise on 8080.
-		int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080")); //$NON-NLS-1$ //$NON-NLS-2$
-		Server server = new Server(port);
-		ServletContextHandler ctx = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
+		final int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080")); //$NON-NLS-1$ //$NON-NLS-2$
+		final Server server = new Server(port);
+		final ServletContextHandler ctx = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
 		ctx.setContextPath("/"); //$NON-NLS-1$
 		server.setHandler(ctx);
-		
-		ServletHolder serHol = ctx.addServlet(ServletContainer.class, "/api/*"); //$NON-NLS-1$
+
+		final ServletHolder serHol = ctx.addServlet(ServletContainer.class, "/api/*"); //$NON-NLS-1$
 		serHol.setInitOrder(1);
 		serHol.setInitParameter("jersey.config.server.provider.packages", "de.sve.backend.api"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		try {
 			server.start();
 			server.join();
-		} catch (Exception ex) {
+		} catch (final Exception ex) {
 			LOG.log(Level.SEVERE, null, ex);
 		} finally {
 			server.destroy();
