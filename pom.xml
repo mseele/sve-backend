@@ -18,6 +18,7 @@
 		<jetty.version>9.4.26.v20200117</jetty.version>
 		<jersey.version>2.30</jersey.version>
 		<auto-value.version>1.7</auto-value.version>
+		<auto-value-gson.version>1.3.0</auto-value-gson.version>
 	</properties>
 
 	<dependencies>
@@ -70,6 +71,11 @@
 			<groupId>com.google.auto.value</groupId>
 			<artifactId>auto-value-annotations</artifactId>
 			<version>${auto-value.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.ryanharter.auto.value</groupId>
+			<artifactId>auto-value-gson-runtime</artifactId>
+			<version>${auto-value-gson.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.guava</groupId>
@@ -146,17 +152,47 @@
 					<artifactId>maven-compiler-plugin</artifactId>
 					<configuration>
 						<encoding>UTF-8</encoding>
-						<compilerArgs>
-							<arg>-parameters</arg>
-						</compilerArgs>
-						<annotationProcessorPaths>
-							<path>
+						<dependencies>
+							<dependency>
 								<groupId>com.google.auto.value</groupId>
 								<artifactId>auto-value</artifactId>
 								<version>${auto-value.version}</version>
-							</path>
-						</annotationProcessorPaths>
+							</dependency>
+							<dependency>
+								<groupId>com.ryanharter.auto.value</groupId>
+								<artifactId>auto-value-gson-extension</artifactId>
+								<version>${auto-value-gson.version}</version>
+							</dependency>
+							<dependency>
+								<groupId>com.ryanharter.auto.value</groupId>
+								<artifactId> auto-value-gson-factory</artifactId>
+								<version>${auto-value-gson.version}</version>
+							</dependency>
+						</dependencies>
 					</configuration>
+				</plugin>
+				<plugin>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<encoding>UTF-8</encoding>
+					</configuration>
+					<dependencies>
+						<dependency>
+							<groupId>com.google.auto.value</groupId>
+							<artifactId>auto-value</artifactId>
+							<version>${auto-value.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>com.ryanharter.auto.value</groupId>
+							<artifactId>auto-value-gson-extension</artifactId>
+							<version>${auto-value-gson.version}</version>
+						</dependency>
+						<dependency>
+							<groupId>com.ryanharter.auto.value</groupId>
+							<artifactId> auto-value-gson-factory</artifactId>
+							<version>${auto-value-gson.version}</version>
+						</dependency>
+					</dependencies>
 				</plugin>
 			</plugins>
 		</pluginManagement>
