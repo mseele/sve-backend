@@ -12,11 +12,12 @@
 		<exec.mainClass>de.sve.backend.Application</exec.mainClass>
 		<maven.compiler.target>11</maven.compiler.target>
 		<maven.compiler.source>11</maven.compiler.source>
-		
+
 		<app.deploy.version>1</app.deploy.version>
 
 		<jetty.version>9.4.26.v20200117</jetty.version>
 		<jersey.version>2.30</jersey.version>
+		<auto-value.version>1.7</auto-value.version>
 	</properties>
 
 	<dependencies>
@@ -56,9 +57,19 @@
 			<version>${jersey.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>jakarta.xml.bind</groupId>
+			<artifactId>jakarta.xml.bind-api</artifactId>
+			<version>2.3.2</version>
+		</dependency>
+		<dependency>
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
 			<version>2.8.6</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.auto.value</groupId>
+			<artifactId>auto-value-annotations</artifactId>
+			<version>${auto-value.version}</version>
 		</dependency>
 	</dependencies>
 
@@ -119,5 +130,26 @@
 			</plugin>
 		</plugins>
 
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<configuration>
+						<encoding>UTF-8</encoding>
+						<compilerArgs>
+							<arg>-parameters</arg>
+						</compilerArgs>
+						<annotationProcessorPaths>
+							<path>
+								<groupId>com.google.auto.value</groupId>
+								<artifactId>auto-value</artifactId>
+								<version>${auto-value.version}</version>
+							</path>
+						</annotationProcessorPaths>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 	</build>
+
 </project>

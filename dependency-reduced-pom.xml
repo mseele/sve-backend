@@ -5,6 +5,26 @@
   <artifactId>sve-backend</artifactId>
   <version>0.1</version>
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <configuration>
+            <encoding>UTF-8</encoding>
+            <compilerArgs>
+              <arg>-parameters</arg>
+            </compilerArgs>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>com.google.auto.value</groupId>
+                <artifactId>auto-value</artifactId>
+                <version>${auto-value.version}</version>
+              </path>
+            </annotationProcessorPaths>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
@@ -13,7 +33,7 @@
         <configuration>
           <deploy.projectId>sve-backend</deploy.projectId>
           <deploy.promote>false</deploy.promote>
-          <deploy.version>1</deploy.version>
+          <deploy.version>${app.deploy.version}</deploy.version>
         </configuration>
       </plugin>
       <plugin>
@@ -59,10 +79,12 @@
     </plugins>
   </build>
   <properties>
+    <auto-value.version>1.7</auto-value.version>
     <exec.mainClass>de.sve.backend.Application</exec.mainClass>
     <maven.compiler.target>11</maven.compiler.target>
     <maven.compiler.source>11</maven.compiler.source>
     <jersey.version>2.30</jersey.version>
+    <app.deploy.version>1</app.deploy.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jetty.version>9.4.26.v20200117</jetty.version>
   </properties>
