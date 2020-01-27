@@ -71,6 +71,23 @@
         <version>3.8.1</version>
         <configuration>
           <encoding>UTF-8</encoding>
+          <annotationProcessorPaths>
+            <annotationProcessorPath>
+              <groupId>com.google.auto.value</groupId>
+              <artifactId>auto-value</artifactId>
+              <version>${auto-value.version}</version>
+            </annotationProcessorPath>
+            <annotationProcessorPath>
+              <groupId>com.ryanharter.auto.value</groupId>
+              <artifactId>auto-value-gson-extension</artifactId>
+              <version>${auto-value-gson.version}</version>
+            </annotationProcessorPath>
+            <annotationProcessorPath>
+              <groupId>com.ryanharter.auto.value</groupId>
+              <artifactId>auto-value-gson-factory</artifactId>
+              <version>${auto-value-gson.version}</version>
+            </annotationProcessorPath>
+          </annotationProcessorPaths>
         </configuration>
       </plugin>
     </plugins>
