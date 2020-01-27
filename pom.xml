@@ -170,34 +170,11 @@
 							</dependency>
 							<dependency>
 								<groupId>com.ryanharter.auto.value</groupId>
-								<artifactId> auto-value-gson-factory</artifactId>
+								<artifactId>auto-value-gson-factory</artifactId>
 								<version>${auto-value-gson.version}</version>
 							</dependency>
 						</dependencies>
 					</configuration>
-				</plugin>
-				<plugin>
-					<artifactId>maven-compiler-plugin</artifactId>
-					<configuration>
-						<encoding>UTF-8</encoding>
-					</configuration>
-					<dependencies>
-						<dependency>
-							<groupId>com.google.auto.value</groupId>
-							<artifactId>auto-value</artifactId>
-							<version>${auto-value.version}</version>
-						</dependency>
-						<dependency>
-							<groupId>com.ryanharter.auto.value</groupId>
-							<artifactId>auto-value-gson-extension</artifactId>
-							<version>${auto-value-gson.version}</version>
-						</dependency>
-						<dependency>
-							<groupId>com.ryanharter.auto.value</groupId>
-							<artifactId> auto-value-gson-factory</artifactId>
-							<version>${auto-value-gson.version}</version>
-						</dependency>
-					</dependencies>
 				</plugin>
 			</plugins>
 		</pluginManagement>
