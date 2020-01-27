@@ -14,10 +14,10 @@ import com.ryanharter.auto.value.gson.GenerateTypeAdapter;
 @GenerateTypeAdapter
 public abstract class Event {
 
-	public static Event create(String id, String sheetId, Long gid, EventType type, String shortName, String name, Long sortIndex, Boolean visible, String shortDescription, String description,
-			String image, String titleColor, List<LocalDateTime> dates, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember, Long waitingList,
-			Long maxWaitingList, String location, String bookingTemplate, String waitingTemplate) {
-		return new AutoValue_Event(id, sheetId, gid, type, shortName, name, sortIndex, visible, shortDescription, description, image, titleColor, dates, durationInMinutes, maxSubscribers, subscribers,
+	public static Event create(String id, String sheetId, Long gid, EventType type, String name, Long sortIndex, Boolean visible, String shortDescription, String description, String image,
+			String titleColor, List<LocalDateTime> dates, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember, Long waitingList, Long maxWaitingList,
+			String location, String bookingTemplate, String waitingTemplate) {
+		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, shortDescription, description, image, titleColor, dates, durationInMinutes, maxSubscribers, subscribers,
 				costMember, costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate);
 	}
 
@@ -31,9 +31,6 @@ public abstract class Event {
 
 	@Nullable
 	public abstract EventType type();
-
-	@Nullable
-	public abstract String shortName();
 
 	@Nullable
 	public abstract String name();
@@ -98,7 +95,6 @@ public abstract class Event {
 					  firstNonNull(event.sheetId(), sheetId()),
 					  firstNonNull(event.gid(), gid()),
 					  firstNonNull(event.type(), type()),
-					  firstNonNull(event.shortName(), shortName()),
 					  firstNonNull(event.name(), name()),
 					  firstNonNull(event.sortIndex(), sortIndex()),
 					  firstNonNull(event.visible(), visible()),

@@ -31,7 +31,6 @@ public class EventsStore {
 									document.getString("sheetId"), //$NON-NLS-1$
 									document.getLong("gid"), //$NON-NLS-1$
 									EventType.valueOf(document.getString("type")), //$NON-NLS-1$
-									document.getString("shortName"), //$NON-NLS-1$
 									document.getString("name"), //$NON-NLS-1$
 									document.getLong("sortIndex"), //$NON-NLS-1$
 									document.getBoolean("visible"), //$NON-NLS-1$
@@ -63,7 +62,6 @@ public class EventsStore {
 		data.put("sheetId", event.sheetId()); //$NON-NLS-1$
 		data.put("gid", event.gid()); //$NON-NLS-1$
 		data.put("type", event.type().name()); //$NON-NLS-1$
-		data.put("shortName", event.shortName()); //$NON-NLS-1$
 		data.put("name",event.name()); //$NON-NLS-1$
 		data.put("sortIndex", event.sortIndex()); //$NON-NLS-1$
 		data.put("visible", event.visible()); //$NON-NLS-1$
