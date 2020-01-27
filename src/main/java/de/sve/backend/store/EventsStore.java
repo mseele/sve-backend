@@ -26,7 +26,7 @@ public class EventsStore {
 		QuerySnapshot querySnapshot = query.get();
 		for (QueryDocumentSnapshot document : querySnapshot.getDocuments()) {
 			@SuppressWarnings("unchecked")
-			List<String> dates = document.get("dates", List.class); //$NON-NLS-1$
+			List<String> dates = (List<String>) document.get("dates"); //$NON-NLS-1$
 			events.add(Event.create(document.getId(),
 									document.getString("sheetId"), //$NON-NLS-1$
 									document.getLong("gid"), //$NON-NLS-1$
