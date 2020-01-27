@@ -146,7 +146,12 @@ public class Events {
 	public Response update(Event update) {
 		try {
 			Event event = DataStore.event(update.id());
-			DataStore.save(event.update(update));
+			if (event != null) {
+				event = event.update(update);
+			} else {
+				event = update;
+			}
+			DataStore.save(event);
 			LOG.log(Level.INFO, "Event (" + event.id() + ") has been updated"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).entity(Utils.gson().toJson(event)).build();
 		} catch (Throwable t) {
