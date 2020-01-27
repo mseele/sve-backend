@@ -5,33 +5,6 @@
   <artifactId>sve-backend</artifactId>
   <version>0.1</version>
   <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <configuration>
-            <encoding>UTF-8</encoding>
-            <dependencies>
-              <dependency>
-                <groupId>com.google.auto.value</groupId>
-                <artifactId>auto-value</artifactId>
-                <version>${auto-value.version}</version>
-              </dependency>
-              <dependency>
-                <groupId>com.ryanharter.auto.value</groupId>
-                <artifactId>auto-value-gson-extension</artifactId>
-                <version>${auto-value-gson.version}</version>
-              </dependency>
-              <dependency>
-                <groupId>com.ryanharter.auto.value</groupId>
-                <artifactId>auto-value-gson-factory</artifactId>
-                <version>${auto-value-gson.version}</version>
-              </dependency>
-            </dependencies>
-          </configuration>
-        </plugin>
-      </plugins>
-    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>com.google.cloud.tools</groupId>
@@ -53,6 +26,16 @@
               <goal>shade</goal>
             </goals>
             <configuration>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
               <transformers>
                 <transformer>
                   <mainClass>${exec.mainClass}</mainClass>
@@ -82,6 +65,13 @@
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.22.2</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.1</version>
+        <configuration>
+          <encoding>UTF-8</encoding>
+        </configuration>
       </plugin>
     </plugins>
   </build>
