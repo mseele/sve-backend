@@ -89,6 +89,10 @@ public abstract class Event {
 	@Nullable
 	public abstract String waitingTemplate();
 
+	public boolean isBookedUp() {
+		return subscribers() >= maxSubscribers() && waitingList() >= maxWaitingList();
+	}
+
 	public Event update(Event event) {
 		return create(id(),
 					  firstNonNull(event.sheetId(), sheetId()),
