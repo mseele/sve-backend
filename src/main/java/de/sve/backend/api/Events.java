@@ -1,7 +1,6 @@
 package de.sve.backend.api;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -143,14 +142,8 @@ public class Events {
 	@Path("/update")
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
-	public Response update(Event update) {
+	public Response update(Event event) {
 		try {
-			Event event = DataStore.event(update.id());
-			if (event != null) {
-				event = event.update(update);
-			} else {
-				event = update;
-			}
 			DataStore.save(event);
 			LOG.log(Level.INFO, "Event (" + event.id() + ") has been updated"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).entity(Utils.gson().toJson(event)).build();
@@ -174,11 +167,11 @@ public class Events {
 		}
 	}
 
-	public static List<Event> events() throws InterruptedException, ExecutionException {
+	public static List<Event> events() throws Exception {
 		return events(null);
 	}
 
-	public static List<Event> events(EventType type) throws InterruptedException, ExecutionException {
+	public static List<Event> events(EventType type) throws Exception {
 		return DataStore.events()
 				.stream()
 		 		.filter(e -> e.visible() && (type == null || type == e.type()))

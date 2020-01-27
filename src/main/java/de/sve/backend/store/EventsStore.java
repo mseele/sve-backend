@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.CollectionReference;
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
@@ -18,42 +19,34 @@ import com.google.cloud.firestore.QuerySnapshot;
 import de.sve.backend.model.Event;
 import de.sve.backend.model.EventType;
 
-public class EventsStore {
+public class EventsStore implements AutoCloseable {
 
-	protected static List<Event> loadEvents() throws InterruptedException, ExecutionException {
+	private Firestore fService;
+
+	protected EventsStore() {
+		this.fService = FirestoreOptions.getDefaultInstance().getService();
+	}
+
+	protected List<Event> loadEvents() throws InterruptedException, ExecutionException {
+		ApiFuture<QuerySnapshot> future = collection().get();
+		QuerySnapshot querySnapshot = future.get();
 		List<Event> events = new ArrayList<>();
-		ApiFuture<QuerySnapshot> query = collection().get();
-		QuerySnapshot querySnapshot = query.get();
 		for (QueryDocumentSnapshot document : querySnapshot.getDocuments()) {
-			@SuppressWarnings("unchecked")
-			List<String> dates = (List<String>) document.get("dates"); //$NON-NLS-1$
-			events.add(Event.create(document.getId(),
-									document.getString("sheetId"), //$NON-NLS-1$
-									document.getLong("gid"), //$NON-NLS-1$
-									EventType.valueOf(document.getString("type")), //$NON-NLS-1$
-									document.getString("name"), //$NON-NLS-1$
-									document.getLong("sortIndex"), //$NON-NLS-1$
-									document.getBoolean("visible"), //$NON-NLS-1$
-									document.getString("shortDescription"), //$NON-NLS-1$
-									document.getString("description"), //$NON-NLS-1$
-									document.getString("image"), //$NON-NLS-1$
-									document.getString("titleColor"), //$NON-NLS-1$
-									dates.stream().map(LocalDateTime::parse).collect(Collectors.toList()),
-									document.getLong("durationInMinutes"), //$NON-NLS-1$
-									document.getLong("maxSubscribers"), //$NON-NLS-1$
-									document.getLong("subscribers"), //$NON-NLS-1$
-									document.getDouble("costMember"), //$NON-NLS-1$
-									document.getDouble("costNonMember"), //$NON-NLS-1$
-									document.getLong("waitingList"), //$NON-NLS-1$
-									document.getLong("maxWaitingList"), //$NON-NLS-1$
-									document.getString("location"), //$NON-NLS-1$
-									document.getString("bookingTemplate"), //$NON-NLS-1$
-									document.getString("waitingTemplate"))); //$NON-NLS-1$
+			events.add(create(document));
 		}
 		return events;
 	}
 
-	protected static void saveEvent(Event event) throws InterruptedException, ExecutionException {
+	protected Event loadEvent(String id) throws InterruptedException, ExecutionException {
+		ApiFuture<DocumentSnapshot> future = collection().document(id).get();
+		DocumentSnapshot document = future.get();
+		if (document.exists()) {
+			return create(document);
+		}
+		return null;
+	}
+
+	protected void saveEvent(Event event) throws InterruptedException, ExecutionException {
 		List<String> dates = event.dates()
 								  .stream()
 								  .map(LocalDateTime::toString)
@@ -83,16 +76,44 @@ public class EventsStore {
 		collection().document(event.id()).set(data).get();
 	}
 
-	protected static void deleteEvent(Event event) throws InterruptedException, ExecutionException {
+	protected void deleteEvent(Event event) throws InterruptedException, ExecutionException {
 		collection().document(event.id()).delete().get();
 	}
 
-	private static CollectionReference collection() {
-		return db().collection("events"); //$NON-NLS-1$
+	private CollectionReference collection() {
+		return this.fService.collection("events"); //$NON-NLS-1$
 	}
 
-	private static Firestore db() {
-		return FirestoreOptions.getDefaultInstance().getService();
+	@Override
+	public void close() throws Exception {
+		this.fService.close();
+	}
+
+	private static final Event create(DocumentSnapshot document) {
+		@SuppressWarnings("unchecked")
+		List<String> dates = (List<String>) document.get("dates"); //$NON-NLS-1$
+		return Event.create(document.getId(),
+							document.getString("sheetId"), //$NON-NLS-1$
+							document.getLong("gid"), //$NON-NLS-1$
+							EventType.valueOf(document.getString("type")), //$NON-NLS-1$
+							document.getString("name"), //$NON-NLS-1$
+							document.getLong("sortIndex"), //$NON-NLS-1$
+							document.getBoolean("visible"), //$NON-NLS-1$
+							document.getString("shortDescription"), //$NON-NLS-1$
+							document.getString("description"), //$NON-NLS-1$
+							document.getString("image"), //$NON-NLS-1$
+							document.getString("titleColor"), //$NON-NLS-1$
+							dates.stream().map(LocalDateTime::parse).collect(Collectors.toList()),
+							document.getLong("durationInMinutes"), //$NON-NLS-1$
+							document.getLong("maxSubscribers"), //$NON-NLS-1$
+							document.getLong("subscribers"), //$NON-NLS-1$
+							document.getDouble("costMember"), //$NON-NLS-1$
+							document.getDouble("costNonMember"), //$NON-NLS-1$
+							document.getLong("waitingList"), //$NON-NLS-1$
+							document.getLong("maxWaitingList"), //$NON-NLS-1$
+							document.getString("location"), //$NON-NLS-1$
+							document.getString("bookingTemplate"), //$NON-NLS-1$
+							document.getString("waitingTemplate")); //$NON-NLS-1$
 	}
 
 }
