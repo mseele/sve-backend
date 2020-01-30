@@ -38,10 +38,10 @@ public class Events {
 		}
 	}
 
-	@Path("/counters")
+	@Path("/counter")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public List<EventCounter> getCounters() throws BackendException {
+	public List<EventCounter> getEventsCounter() throws BackendException {
 		try {
 			return events().stream()
 						   .map(EventCounter::create)
