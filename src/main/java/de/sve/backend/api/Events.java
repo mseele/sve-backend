@@ -17,6 +17,7 @@ import javax.ws.rs.core.Response.Status;
 import de.sve.backend.Utils;
 import de.sve.backend.api.utils.BackendException;
 import de.sve.backend.model.Event;
+import de.sve.backend.model.EventCounter;
 import de.sve.backend.model.EventType;
 import de.sve.backend.store.DataStore;
 
@@ -30,6 +31,21 @@ public class Events {
 	public List<Event> getEvents() throws BackendException {
 		try {
 			return events();
+		} catch (Throwable t) {
+			String message = "Error while loading events"; //$NON-NLS-1$
+			LOG.log(Level.SEVERE, message, t);
+			throw new BackendException(message, t);
+		}
+	}
+
+	@Path("/counters")
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public List<EventCounter> getCounters() throws BackendException {
+		try {
+			return events().stream()
+						   .map(EventCounter::create)
+						   .collect(Collectors.toList());
 		} catch (Throwable t) {
 			String message = "Error while loading events"; //$NON-NLS-1$
 			LOG.log(Level.SEVERE, message, t);
