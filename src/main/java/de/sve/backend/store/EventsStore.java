@@ -61,7 +61,7 @@ public class EventsStore implements AutoCloseable {
 		data.put("shortDescription", event.shortDescription()); //$NON-NLS-1$
 		data.put("description", event.description()); //$NON-NLS-1$
 		data.put("image", event.image()); //$NON-NLS-1$
-		data.put("titleColor", event.titleColor()); //$NON-NLS-1$
+		data.put("light", event.light()); //$NON-NLS-1$
 		data.put("dates", dates); //$NON-NLS-1$
 		data.put("durationInMinutes", event.durationInMinutes()); //$NON-NLS-1$
 		data.put("maxSubscribers", event.maxSubscribers()); //$NON-NLS-1$
@@ -102,7 +102,7 @@ public class EventsStore implements AutoCloseable {
 							document.getString("shortDescription"), //$NON-NLS-1$
 							document.getString("description"), //$NON-NLS-1$
 							document.getString("image"), //$NON-NLS-1$
-							document.getString("titleColor"), //$NON-NLS-1$
+							document.getBoolean("light"), //$NON-NLS-1$
 							dates.stream().map(LocalDateTime::parse).collect(Collectors.toList()),
 							document.getLong("durationInMinutes"), //$NON-NLS-1$
 							document.getLong("maxSubscribers"), //$NON-NLS-1$

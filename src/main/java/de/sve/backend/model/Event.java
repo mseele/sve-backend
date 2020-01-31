@@ -15,10 +15,10 @@ import com.ryanharter.auto.value.gson.GenerateTypeAdapter;
 public abstract class Event {
 
 	public static Event create(String id, String sheetId, Long gid, EventType type, String name, Long sortIndex, Boolean visible, String shortDescription, String description, String image,
-			String titleColor, List<LocalDateTime> dates, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember, Long waitingList, Long maxWaitingList,
+			Boolean light, List<LocalDateTime> dates, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember, Long waitingList, Long maxWaitingList,
 			String location, String bookingTemplate, String waitingTemplate) {
-		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, shortDescription, description, image, titleColor, dates, durationInMinutes, maxSubscribers, subscribers,
-				costMember, costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate);
+		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, shortDescription, description, image, light, dates, durationInMinutes, maxSubscribers, subscribers, costMember,
+				costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate);
 	}
 
 	public abstract String id();
@@ -51,7 +51,7 @@ public abstract class Event {
 	public abstract String image();
 
 	@Nullable
-	public abstract String titleColor();
+	public abstract Boolean light();
 
 	@Nullable
 	public abstract List<LocalDateTime> dates();
@@ -101,7 +101,7 @@ public abstract class Event {
 					  firstNonNull(event.shortDescription(), shortDescription()),
 					  firstNonNull(event.description(), description()),
 					  firstNonNull(event.image(), image()),
-					  firstNonNull(event.titleColor(), titleColor()),
+					  firstNonNull(event.light(), light()),
 					  firstNonNull(event.dates(), dates()),
 					  firstNonNull(event.durationInMinutes(), durationInMinutes()),
 					  firstNonNull(event.maxSubscribers(), maxSubscribers()),
