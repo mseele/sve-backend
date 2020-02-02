@@ -27,4 +27,16 @@ public abstract class EventBooking {
 
 	public abstract String comments();
 
+	public boolean isMember() {
+		return member() != null ? member().booleanValue() : false;
+	}
+
+	public Double cost(Event event) {
+		return isMember() ? event.costMember() : event.costNonMember();
+	}
+
+	public boolean subscribeUpdates() {
+		return updates() != null ? updates().booleanValue() : false;
+	}
+
 }

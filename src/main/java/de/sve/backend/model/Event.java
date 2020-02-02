@@ -90,6 +90,18 @@ public abstract class Event {
 		return subscribers() >= maxSubscribers() && waitingList() >= maxWaitingList();
 	}
 
+	public Event bookEvent() {
+		Long subscribers = subscribers();
+		Long waitingList = waitingList();
+		if (subscribers() < maxSubscribers()) {
+			subscribers = Long.valueOf(subscribers.longValue() + 1);
+		} else if (waitingList < maxWaitingList()) {
+			waitingList = Long.valueOf(waitingList.longValue() + 1);
+		}
+		return create(id(), sheetId(), gid(), type(), name(), sortIndex(), visible(), shortDescription(), description(), image(), light(), dates(), durationInMinutes(), maxSubscribers(), subscribers,
+				costMember(), costNonMember(), waitingList, maxWaitingList(), location(), bookingTemplate(), waitingTemplate());
+	}
+
 	public Event update(Event event) {
 		return create(id(),
 					  firstNonNull(event.sheetId(), sheetId()),
