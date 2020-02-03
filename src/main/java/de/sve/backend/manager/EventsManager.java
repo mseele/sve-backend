@@ -96,7 +96,8 @@ public class EventsManager {
 	private static void sendMail(EventBooking booking, Event event, boolean isBooking) throws Throwable {
 		try {
 			EventType type = event.type();
-			Mail.Builder builder = Mail.via(MailAccount.of(type));
+			MailAccount account = MailAccount.of(type);
+			Mail.Builder builder = Mail.via(account);
 			String template;
 			if (isBooking) {
 				builder.subject("[Events@SVE] Bestätigung Buchung"); //$NON-NLS-1$
@@ -139,6 +140,10 @@ public class EventsManager {
 					    .addParameter("email", booking.email()) //$NON-NLS-1$
 					    .toString());
 			}
+			builder.content(content.toString())
+				   .to(booking.email())
+				   .bcc(account.email())
+				   .send();
 
 			LOG.info("Booking email was send successfully"); //$NON-NLS-1$
 		} catch (Throwable e) {
