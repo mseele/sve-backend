@@ -16,8 +16,8 @@ import com.google.cloud.firestore.FirestoreOptions;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
 
-import de.sve.backend.model.Event;
-import de.sve.backend.model.EventType;
+import de.sve.backend.model.events.Event;
+import de.sve.backend.model.events.EventType;
 
 public class EventsStore implements AutoCloseable {
 

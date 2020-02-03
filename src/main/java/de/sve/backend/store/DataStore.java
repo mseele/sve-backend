@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
-import de.sve.backend.model.Event;
+import de.sve.backend.model.events.Event;
 
 public class DataStore {
 

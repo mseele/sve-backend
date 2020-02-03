@@ -1,4 +1,4 @@
-package de.sve.backend.model;
+package de.sve.backend.model.events;
 
 import com.google.auto.value.AutoValue;
 import com.ryanharter.auto.value.gson.GenerateTypeAdapter;

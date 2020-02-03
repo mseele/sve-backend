@@ -1,4 +1,4 @@
-package de.sve.backend.model;
+package de.sve.backend.model.events;
 
 import java.util.Collections;
 import java.util.List;

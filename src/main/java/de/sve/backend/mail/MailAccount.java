@@ -5,7 +5,7 @@ import java.util.Base64;
 
 import com.google.auto.value.AutoValue;
 
-import de.sve.backend.model.EventType;
+import de.sve.backend.model.events.EventType;
 
 /**
  * Different SVE mail accounts (possible sender).

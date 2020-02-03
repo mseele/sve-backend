@@ -29,8 +29,8 @@ import com.google.api.services.sheets.v4.model.ValueRange;
 import com.google.appengine.api.appidentity.AppIdentityService;
 import com.google.appengine.api.appidentity.AppIdentityServiceFactory;
 
-import de.sve.backend.model.Event;
-import de.sve.backend.model.EventBooking;
+import de.sve.backend.model.events.Event;
+import de.sve.backend.model.events.EventBooking;
 
 public class SheetController {
 

@@ -14,11 +14,11 @@ import com.google.gson.Gson;
 import de.sve.backend.Utils;
 import de.sve.backend.mail.Mail;
 import de.sve.backend.mail.MailAccount;
-import de.sve.backend.model.BookingResponse;
-import de.sve.backend.model.Event;
-import de.sve.backend.model.EventBooking;
-import de.sve.backend.model.EventCounter;
-import de.sve.backend.model.EventType;
+import de.sve.backend.model.events.BookingResponse;
+import de.sve.backend.model.events.Event;
+import de.sve.backend.model.events.EventBooking;
+import de.sve.backend.model.events.EventCounter;
+import de.sve.backend.model.events.EventType;
 import de.sve.backend.sheets.SheetController;
 import de.sve.backend.store.DataStore;
 

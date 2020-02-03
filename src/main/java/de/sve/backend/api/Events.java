@@ -16,10 +16,10 @@ import javax.ws.rs.core.Response.Status;
 import de.sve.backend.Utils;
 import de.sve.backend.api.utils.BackendException;
 import de.sve.backend.manager.EventsManager;
-import de.sve.backend.model.BookingResponse;
-import de.sve.backend.model.Event;
-import de.sve.backend.model.EventBooking;
-import de.sve.backend.model.EventCounter;
+import de.sve.backend.model.events.BookingResponse;
+import de.sve.backend.model.events.Event;
+import de.sve.backend.model.events.EventBooking;
+import de.sve.backend.model.events.EventCounter;
 
 @Path("/events")
 public class Events {

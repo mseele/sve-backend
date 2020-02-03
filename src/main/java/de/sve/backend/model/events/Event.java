@@ -1,4 +1,4 @@
-package de.sve.backend.model;
+package de.sve.backend.model.events;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 
