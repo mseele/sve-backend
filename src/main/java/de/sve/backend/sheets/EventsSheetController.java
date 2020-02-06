@@ -18,9 +18,6 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.Sheets.Spreadsheets.Values.Update;
-import com.google.api.services.sheets.v4.model.Sheet;
-import com.google.api.services.sheets.v4.model.SheetProperties;
-import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
 import com.google.api.services.sheets.v4.model.ValueRange;
 
@@ -43,17 +40,6 @@ public class EventsSheetController extends AbstractSheetController {
 		String sheetTitle = getSheetTitle(sheets, spreadsheetId, sheetId);
 		int rowIndex = getRowIndex(sheets, spreadsheetId, sheetTitle);
 		return insert(sheets, spreadsheetId, sheetTitle, rowIndex, booking, event);
-	}
-
-	private static String getSheetTitle(Sheets sheets, String spreadsheetId, Integer sheetId) throws IOException {
-		Spreadsheet spreadsheet = sheets.spreadsheets().get(spreadsheetId).setFields("sheets(properties(sheetId,title))").execute(); //$NON-NLS-1$
-		for (Sheet sheet : spreadsheet.getSheets()) {
-			SheetProperties properties = sheet.getProperties();
-			if (sheetId.equals(properties.getSheetId())) {
-				return properties.getTitle();
-			}
-		}
-		throw new IOException("Sheet with sheetId '" + sheetId + "' does not exist in spreadsheet '" + spreadsheetId + "'."); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 	}
 
 	private static int getRowIndex(Sheets sheets, String spreadsheetId, String sheetTitle) throws IOException {
