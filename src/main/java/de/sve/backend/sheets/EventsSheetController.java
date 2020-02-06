@@ -7,34 +7,27 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringEscapeUtils;
 
-import com.google.api.client.auth.oauth2.BearerToken;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.Sheets.Spreadsheets.Values.Update;
-import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.Sheet;
 import com.google.api.services.sheets.v4.model.SheetProperties;
 import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
 import com.google.api.services.sheets.v4.model.ValueRange;
-import com.google.appengine.api.appidentity.AppIdentityService;
-import com.google.appengine.api.appidentity.AppIdentityServiceFactory;
 
 import de.sve.backend.model.events.Event;
 import de.sve.backend.model.events.EventBooking;
 
-public class SheetController {
-
-	private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
+public class EventsSheetController extends AbstractSheetController {
 
 	private static DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"); //$NON-NLS-1$
 
@@ -105,14 +98,6 @@ public class SheetController {
 			   content.stream()
 					  .map(o -> StringEscapeUtils.escapeHtml4(String.valueOf(o)))
 					  .collect(Collectors.joining("</br>- ", "- ", "")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-	}
-
-	private static Credential authorize() {
-		AppIdentityService appIdentity = AppIdentityServiceFactory.getAppIdentityService();
-		AppIdentityService.GetAccessTokenResult accessToken = appIdentity.getAccessToken(SCOPES);
-		Credential creds = new Credential(BearerToken.authorizationHeaderAccessMethod());
-		creds.setAccessToken(accessToken.getAccessToken());
-		return creds;
 	}
 
 }

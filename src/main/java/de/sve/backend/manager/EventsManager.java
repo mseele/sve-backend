@@ -19,7 +19,7 @@ import de.sve.backend.model.events.Event;
 import de.sve.backend.model.events.EventBooking;
 import de.sve.backend.model.events.EventCounter;
 import de.sve.backend.model.events.EventType;
-import de.sve.backend.sheets.SheetController;
+import de.sve.backend.sheets.EventsSheetController;
 import de.sve.backend.store.DataStore;
 
 public class EventsManager {
@@ -76,7 +76,7 @@ public class EventsManager {
 	}
 
 	private static BookingResponse successfullBooking(EventBooking booking, Event event, boolean isBooking) throws Throwable {
-		String result = SheetController.saveBooking(booking, event);
+		String result = EventsSheetController.saveBooking(booking, event);
 		sendMail(booking, event, isBooking);
 		DataStore.save(event);
 		LOG.log(Level.INFO, "Booking of Event (" + event.id() + ") was successfull: " + result); //$NON-NLS-1$ //$NON-NLS-2$
