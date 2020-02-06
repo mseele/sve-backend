@@ -65,7 +65,7 @@ public abstract class AbstractSheetController {
 		return -1; // never should be here
 	}
 
-	protected static Credential authorize() {
+	private static Credential authorize() {
 		AppIdentityService appIdentity = AppIdentityServiceFactory.getAppIdentityService();
 		AppIdentityService.GetAccessTokenResult accessToken = appIdentity.getAccessToken(SCOPES);
 		Credential creds = new Credential(BearerToken.authorizationHeaderAccessMethod());
