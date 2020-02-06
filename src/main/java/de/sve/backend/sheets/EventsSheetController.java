@@ -13,10 +13,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringEscapeUtils;
 
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.Sheets.Spreadsheets.Values.Update;
 import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
 import com.google.api.services.sheets.v4.model.ValueRange;
@@ -31,34 +27,22 @@ public class EventsSheetController extends AbstractSheetController {
 	private static NumberFormat PRICE_FORMAT = NumberFormat.getCurrencyInstance(Locale.GERMANY);
 
 	public static String saveBooking(EventBooking booking, Event event) throws GeneralSecurityException, IOException {
-		Credential credential = authorize();
-		Sheets sheets = new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), credential).build();
-		
-		String spreadsheetId = event.sheetId();
+		return new EventsSheetController(event.sheetId()).save(booking, event);
+	}
+	
+	public EventsSheetController(String spreadsheetId) throws GeneralSecurityException, IOException {
+		super(spreadsheetId);
+	}
+
+	private String save(EventBooking booking, Event event) throws IOException {
 		Integer sheetId = Integer.valueOf(event.gid().intValue());
-		
-		String sheetTitle = getSheetTitle(sheets, spreadsheetId, sheetId);
-		int rowIndex = getRowIndex(sheets, spreadsheetId, sheetTitle);
-		return insert(sheets, spreadsheetId, sheetTitle, rowIndex, booking, event);
+
+		String sheetTitle = getSheetTitle(sheetId);
+		int rowIndex = getFirstEmptyRow(sheetTitle, "B", 2); //$NON-NLS-1$
+		return insert(sheetTitle, rowIndex, booking, event);
 	}
 
-	private static int getRowIndex(Sheets sheets, String spreadsheetId, String sheetTitle) throws IOException {
-		String range = "'" + sheetTitle + "'!B2:B100"; //$NON-NLS-1$ //$NON-NLS-2$
-		ValueRange response = sheets.spreadsheets().values().get(spreadsheetId, range).execute();
-		int index = 2;
-		List<List<Object>> values = response.getValues();
-		if (values != null) {
-			for (List<Object> row : values) {
-				if (row.get(0) == null) {
-					break;
-				}
-				index++;
-			}
-		}
-		return index;
-	}
-
-	private static String insert(Sheets sheets, String spreadsheetId, String sheetTitle, int rowIndex, EventBooking booking, Event event) throws IOException {
+	private String insert(String sheetTitle, int rowIndex, EventBooking booking, Event event) throws IOException {
 		String range = "'" + sheetTitle + "'!B" + rowIndex + ":L" + rowIndex; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 
 		List<Object> content = Arrays.asList(
@@ -76,7 +60,7 @@ public class EventsSheetController extends AbstractSheetController {
         ); 
 		List<List<Object>> values = Arrays.asList(content);
 		ValueRange body = new ValueRange().setValues(values);
-		Update request = sheets.spreadsheets().values().update(spreadsheetId, range, body);
+		Update request = this.fSheets.spreadsheets().values().update(this.fSpreadsheetId, range, body);
 		request.setValueInputOption("USER_ENTERED"); //$NON-NLS-1$
 		UpdateValuesResponse result = request.execute();
 		return result.getUpdatedCells() +
