@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
 import de.sve.backend.model.events.Event;
+import de.sve.backend.model.news.Subscription;
 
 public class DataStore {
 
@@ -48,6 +49,32 @@ public class DataStore {
 		try (EventsStore store = new EventsStore()) {
 			store.deleteEvent(event);
 			reloadCache(store);
+		}
+	}
+
+	public static void subscribe(Subscription data) throws Exception {
+		try (NewsStore store = new NewsStore()) {
+			Subscription subscription = store.loadSubscription(data);
+			if (subscription != null) {
+				subscription = subscription.add(data);
+			} else {
+				subscription = data;
+			}
+			store.saveSubscription(subscription);
+		}
+	}
+
+	public static void unsubscribe(Subscription data) throws Exception {
+		try (NewsStore store = new NewsStore()) {
+			Subscription subscription = store.loadSubscription(data);
+			if (subscription != null) {
+				subscription = subscription.remove(data);
+				if (subscription.types().size() > 0) {
+					store.saveSubscription(subscription);
+				} else {
+					store.deleteSubsription(subscription);
+				}
+			}
 		}
 	}
 

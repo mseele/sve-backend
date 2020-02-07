@@ -19,6 +19,8 @@ import de.sve.backend.model.events.Event;
 import de.sve.backend.model.events.EventBooking;
 import de.sve.backend.model.events.EventCounter;
 import de.sve.backend.model.events.EventType;
+import de.sve.backend.model.news.NewsType;
+import de.sve.backend.model.news.Subscription;
 import de.sve.backend.sheets.EventsSheetController;
 import de.sve.backend.store.DataStore;
 
@@ -77,13 +79,14 @@ public class EventsManager {
 
 	private static BookingResponse successfullBooking(EventBooking booking, Event event, boolean isBooking) throws Throwable {
 		String result = EventsSheetController.saveBooking(booking, event);
+		if (booking.subscribeUpdates()) {
+			NewsType type = event.type() == EventType.Events ? NewsType.Events : NewsType.Fitness;
+			Subscription subscription = Subscription.create(booking.email(), type);
+			NewsManager.subscribe(subscription, false);
+		}
 		sendMail(booking, event, isBooking);
 		DataStore.save(event);
 		LOG.log(Level.INFO, "Booking of Event (" + event.id() + ") was successfull: " + result); //$NON-NLS-1$ //$NON-NLS-2$
-		if (booking.subscribeUpdates()) {
-			// TODO
-//			Mailjet.subscribe(booking.email);
-		}
 		String message;
 		if (isBooking) {
 			message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail."; //$NON-NLS-1$
