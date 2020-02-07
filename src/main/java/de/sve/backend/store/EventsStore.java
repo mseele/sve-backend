@@ -73,6 +73,7 @@ public class EventsStore implements AutoCloseable {
 		data.put("location", event.location()); //$NON-NLS-1$
 		data.put("bookingTemplate", event.bookingTemplate()); //$NON-NLS-1$
 		data.put("waitingTemplate", event.waitingTemplate()); //$NON-NLS-1$
+		data.put("externalOperator", event.externalOperator()); //$NON-NLS-1$
 		collection().document(event.id()).set(data).get();
 	}
 
@@ -113,7 +114,8 @@ public class EventsStore implements AutoCloseable {
 							document.getLong("maxWaitingList"), //$NON-NLS-1$
 							document.getString("location"), //$NON-NLS-1$
 							document.getString("bookingTemplate"), //$NON-NLS-1$
-							document.getString("waitingTemplate")); //$NON-NLS-1$
+							document.getString("waitingTemplate"), //$NON-NLS-1$
+							document.getBoolean("externalOperator")); //$NON-NLS-1$
 	}
 
 }

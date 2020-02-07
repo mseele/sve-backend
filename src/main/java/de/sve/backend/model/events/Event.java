@@ -16,9 +16,9 @@ public abstract class Event {
 
 	public static Event create(String id, String sheetId, Long gid, EventType type, String name, Long sortIndex, Boolean visible, String shortDescription, String description, String image,
 			Boolean light, List<LocalDateTime> dates, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember, Long waitingList, Long maxWaitingList,
-			String location, String bookingTemplate, String waitingTemplate) {
+			String location, String bookingTemplate, String waitingTemplate, Boolean externalOperator) {
 		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, shortDescription, description, image, light, dates, durationInMinutes, maxSubscribers, subscribers, costMember,
-				costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate);
+				costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate, externalOperator);
 	}
 
 	public abstract String id();
@@ -86,6 +86,9 @@ public abstract class Event {
 	@Nullable
 	public abstract String waitingTemplate();
 
+	@Nullable
+	public abstract Boolean externalOperator();
+
 	public boolean isBookedUp() {
 		return subscribers() >= maxSubscribers() && waitingList() >= maxWaitingList();
 	}
@@ -99,7 +102,7 @@ public abstract class Event {
 			waitingList = Long.valueOf(waitingList.longValue() + 1);
 		}
 		return create(id(), sheetId(), gid(), type(), name(), sortIndex(), visible(), shortDescription(), description(), image(), light(), dates(), durationInMinutes(), maxSubscribers(), subscribers,
-				costMember(), costNonMember(), waitingList, maxWaitingList(), location(), bookingTemplate(), waitingTemplate());
+				costMember(), costNonMember(), waitingList, maxWaitingList(), location(), bookingTemplate(), waitingTemplate(), externalOperator());
 	}
 
 	public Event update(Event event) {
@@ -124,7 +127,8 @@ public abstract class Event {
 					  firstNonNull(event.maxWaitingList(), maxWaitingList()),
 					  firstNonNull(event.location(), location()),
 					  firstNonNull(event.bookingTemplate(), bookingTemplate()),
-					  firstNonNull(event.waitingTemplate(), waitingTemplate()));
+					  firstNonNull(event.waitingTemplate(), waitingTemplate()),
+					  firstNonNull(event.externalOperator(), externalOperator()));
 	}
 
 }
