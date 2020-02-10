@@ -54,7 +54,7 @@ public class CORSFilter implements ContainerRequestFilter, ContainerResponseFilt
 			// Whatever other non-standard/safe headers (see list above)
 			// you want the client to be able to send to the server,
 			// put it in this list. And remove the ones you don't want.
-			response.getHeaders().add("Access-Control-Allow-Headers", "X-Requested-With, Authorization, Accept-Version, Content-MD5, CSRF-Token"); //$NON-NLS-1$ //$NON-NLS-2$
+			response.getHeaders().add("Access-Control-Allow-Headers", "*"); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 
 		// Cross origin requests can be either simple requests
