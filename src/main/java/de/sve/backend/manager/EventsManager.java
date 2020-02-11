@@ -5,9 +5,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.gson.Gson;
 
@@ -26,7 +27,7 @@ import de.sve.backend.store.DataStore;
 
 public class EventsManager {
 
-	private static final Logger LOG = Logger.getLogger(EventsManager.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(EventsManager.class);
 
 	private static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("E., dd. MMM yyyy, HH:mm"); //$NON-NLS-1$
 
@@ -67,11 +68,11 @@ public class EventsManager {
 			} else if (event.waitingList() < event.maxWaitingList()) {
 				return successfullBooking(booking, event.bookEvent(), false);
 			}
-			LOG.log(Level.SEVERE, "Booking failed because Event (" + event.id() + ") was overbooked."); //$NON-NLS-1$ //$NON-NLS-2$
+			LOG.error("Booking failed because Event (" + event.id() + ") was overbooked."); //$NON-NLS-1$ //$NON-NLS-2$
 			String message = "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal."; //$NON-NLS-1$
 			return BookingResponse.failure(message);
 		} catch (Throwable t) {
-			LOG.log(Level.SEVERE, "Booking failed", t); //$NON-NLS-1$
+			LOG.error("Booking failed", t); //$NON-NLS-1$
 			String message = "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal."; //$NON-NLS-1$
 			return BookingResponse.failure(message);
 		}
@@ -86,7 +87,7 @@ public class EventsManager {
 		}
 		sendMail(booking, event, isBooking);
 		DataStore.save(event);
-		LOG.log(Level.INFO, "Booking of Event (" + event.id() + ") was successfull: " + result); //$NON-NLS-1$ //$NON-NLS-2$
+		LOG.info("Booking of Event (" + event.id() + ") was successfull: " + result); //$NON-NLS-1$ //$NON-NLS-2$
 		String message;
 		if (isBooking) {
 			message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail."; //$NON-NLS-1$
@@ -152,7 +153,7 @@ public class EventsManager {
 		} catch (Throwable e) {
 			Gson gson = Utils.gson();
 			String message = "Error while sending mail for booking (" + gson.toJson(booking) + ") of event (" + gson.toJson(event) + ")."; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-			LOG.log(Level.SEVERE, message, e);
+			LOG.error(message, e);
 			throw e;
 		}
 	}

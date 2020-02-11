@@ -1,8 +1,6 @@
 package de.sve.backend.mail;
 
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.mail.Address;
 import javax.mail.Authenticator;
@@ -14,6 +12,9 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Resposible for sending emails.
  * 
@@ -21,7 +22,7 @@ import javax.mail.internet.MimeMessage;
  */
 public class Postman {
 
-	private static final Logger LOG = Logger.getLogger(Postman.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(Postman.class);
 
 	protected static boolean deliver(Mail mail) {
 		MailAccount account = mail.sender();
@@ -59,7 +60,7 @@ public class Postman {
 			Transport.send(message);
 			return true;
 		} catch (MessagingException e) {
-			LOG.log(Level.SEVERE, "Error while trying to send email", e); //$NON-NLS-1$
+			LOG.error("Error while trying to send email", e); //$NON-NLS-1$
 			return false;
 		}
 	}

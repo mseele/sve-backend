@@ -1,8 +1,6 @@
 package de.sve.backend.api;
 
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -12,6 +10,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import de.sve.backend.Utils;
 import de.sve.backend.api.utils.BackendException;
@@ -24,7 +25,7 @@ import de.sve.backend.model.events.EventCounter;
 @Path("/events")
 public class Events {
 
-	private static final Logger LOG = Logger.getLogger(Events.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(Events.class);
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
@@ -33,7 +34,7 @@ public class Events {
 			return EventsManager.events();
 		} catch (Throwable t) {
 			String message = "Error while loading events"; //$NON-NLS-1$
-			LOG.log(Level.SEVERE, message, t);
+			LOG.error(message, t);
 			throw new BackendException(message, t);
 		}
 	}
@@ -46,7 +47,7 @@ public class Events {
 			return EventsManager.eventsCounter();
 		} catch (Throwable t) {
 			String message = "Error while loading events"; //$NON-NLS-1$
-			LOG.log(Level.SEVERE, message, t);
+			LOG.error(message, t);
 			throw new BackendException(message, t);
 		}
 	}
@@ -65,10 +66,10 @@ public class Events {
 	public Response update(Event event) {
 		try {
 			EventsManager.update(event);
-			LOG.log(Level.INFO, "Event (" + event.id() + ") has been updated"); //$NON-NLS-1$ //$NON-NLS-2$
+			LOG.info( "Event (" + event.id() + ") has been updated"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).entity(Utils.gson().toJson(event)).build();
 		} catch (Throwable t) {
-			LOG.log(Level.SEVERE, "Could not save new event", t); //$NON-NLS-1$
+			LOG.error("Could not save new event", t); //$NON-NLS-1$
 			return Response.status(Status.BAD_REQUEST).entity(t).build();
 		}
 	}
@@ -79,10 +80,10 @@ public class Events {
 	public Response delete(Event event) {
 		try {
 			EventsManager.delete(event);
-			LOG.log(Level.INFO, "Event (" + event.id() + ") has been deleted"); //$NON-NLS-1$ //$NON-NLS-2$
+			LOG.info("Event (" + event.id() + ") has been deleted"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).build();
 		} catch (Throwable t) {
-			LOG.log(Level.SEVERE, "Could not save new event", t); //$NON-NLS-1$
+			LOG.error("Could not save new event", t); //$NON-NLS-1$
 			return Response.status(Status.BAD_REQUEST).entity(t).build();
 		}
 	}
