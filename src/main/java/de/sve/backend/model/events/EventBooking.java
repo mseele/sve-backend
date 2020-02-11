@@ -1,5 +1,7 @@
 package de.sve.backend.model.events;
 
+import javax.annotation.Nullable;
+
 import com.google.auto.value.AutoValue;
 import com.ryanharter.auto.value.gson.GenerateTypeAdapter;
 
@@ -19,12 +21,16 @@ public abstract class EventBooking {
 
 	public abstract String email();
 
+	@Nullable
 	public abstract String phone();
 
+	@Nullable
 	public abstract Boolean member();
 
+	@Nullable
 	public abstract Boolean updates();
 
+	@Nullable
 	public abstract String comments();
 
 	public boolean isMember() {
