@@ -1,16 +1,15 @@
 package de.sve.backend;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.glassfish.jersey.servlet.ServletContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Application {
 
-	private static final Logger LOG = Logger.getLogger(Application.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(Application.class);
 
 	public static void main(final String[] args) {
 		// Create an instance of HttpServer bound to port defined by the
@@ -29,7 +28,7 @@ public class Application {
 			server.start();
 			server.join();
 		} catch (final Exception ex) {
-			LOG.log(Level.SEVERE, null, ex);
+			LOG.error("Startup failed", ex); //$NON-NLS-1$
 		} finally {
 			server.destroy();
 		}

@@ -112,6 +112,11 @@
 			<artifactId>commons-text</artifactId>
 			<version>1.7</version>
 		</dependency>
+		<dependency>
+			<groupId>com.google.cloud</groupId>
+			<artifactId>google-cloud-logging-logback</artifactId>
+			<version>0.116.0-alpha</version>
+		</dependency>
 	</dependencies>
 
 	<build>

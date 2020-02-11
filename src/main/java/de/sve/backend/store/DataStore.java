@@ -4,14 +4,16 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import de.sve.backend.model.events.Event;
 import de.sve.backend.model.news.Subscription;
 
 public class DataStore {
 
-	private static final Logger LOG = Logger.getLogger(DataStore.class.getName());
+	private static final Logger LOG = LoggerFactory.getLogger(DataStore.class);
 
 	private static List<Event> EVENT_CACHE;
 
