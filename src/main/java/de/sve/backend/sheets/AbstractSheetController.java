@@ -2,7 +2,6 @@ package de.sve.backend.sheets;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.util.Collections;
 import java.util.List;
 
 import com.google.api.client.auth.oauth2.BearerToken;
@@ -10,25 +9,21 @@ import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.sheets.v4.Sheets;
-import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.Sheet;
 import com.google.api.services.sheets.v4.model.SheetProperties;
 import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.ValueRange;
-import com.google.appengine.api.appidentity.AppIdentityService;
-import com.google.appengine.api.appidentity.AppIdentityServiceFactory;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 
 public abstract class AbstractSheetController {
-
-	private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
 
 	protected Sheets fSheets;
 	
 	protected String fSpreadsheetId;
 
 	public AbstractSheetController(String spreadsheetId) throws GeneralSecurityException, IOException {
-		Credential credential = authorize();
-		this.fSheets = new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), credential).build();
+		this.fSheets = new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), credentials()).build();
 		this.fSpreadsheetId = spreadsheetId;
 	}
 
@@ -65,11 +60,12 @@ public abstract class AbstractSheetController {
 		return -1; // never should be here
 	}
 
-	private static Credential authorize() {
-		AppIdentityService appIdentity = AppIdentityServiceFactory.getAppIdentityService();
-		AppIdentityService.GetAccessTokenResult accessToken = appIdentity.getAccessToken(SCOPES);
+	private static Credential credentials() throws IOException {
+		GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+		credentials.refreshIfExpired();
+		AccessToken token = credentials.getAccessToken();
 		Credential creds = new Credential(BearerToken.authorizationHeaderAccessMethod());
-		creds.setAccessToken(accessToken.getAccessToken());
+		creds.setAccessToken(token.getTokenValue());
 		return creds;
 	}
 
