@@ -125,6 +125,9 @@ public class EventsManager {
 				dates.append(" Uhr"); //$NON-NLS-1$
 				if (payday == null) {
 					payday = date.minusDays(14);
+					if (payday.isAfter(LocalDateTime.now())) {
+						payday = LocalDateTime.now();
+					}
 				}
 			}
 			template = template.replace("${dates}", dates.toString()); //$NON-NLS-1$
