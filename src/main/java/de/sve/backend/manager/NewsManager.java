@@ -83,33 +83,29 @@ public class NewsManager {
 				default:
 					break;
 			}
-			if (!builder.send()) {
-				throw new Exception("Error while sending email"); //$NON-NLS-1$
-			}
+			builder.send();
 		} else {
 			String types = subscription.types()
 									   .stream()
 									   .map(NewsType::displayName)
 									   .collect(Collectors.joining(", ")); //$NON-NLS-1$
 			MailAccount mailAccount = MailAccount.INFO;
-			if (!Mail.via(mailAccount)
-					 .to(subscription.email())
-					 .bcc(mailAccount.email())
-					 .subject("[Infos@SVE] Bestätigung Newsletter Anmeldung") //$NON-NLS-1$
-					 .content("Hallo,\n" + //$NON-NLS-1$
-							  "\n" + //$NON-NLS-1$
-							  "vielen Dank für Dein Interesse an News rund um den SVE.\n" + //$NON-NLS-1$
-							  "\n" + //$NON-NLS-1$
-							  "Ab sofort erhältst Du automatisch eine E-Mail zu folgenden Themen: " + types + ".\n" + //$NON-NLS-1$ //$NON-NLS-2$
-							  "\n" + //$NON-NLS-1$
-							  "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier abmelden:\n" + //$NON-NLS-1$
-							  UNSUBSCRIBE_URL + "\n" + //$NON-NLS-1$
-							  "\n" + //$NON-NLS-1$
-							  "Herzliche Grüße\n" + //$NON-NLS-1$
-							 "SV Eutingen") //$NON-NLS-1$
-					 .send()) {
-				throw new Exception("Error while sending email"); //$NON-NLS-1$
-			}			
+			Mail.via(mailAccount)
+				.to(subscription.email())
+				.bcc(mailAccount.email())
+				.subject("[Infos@SVE] Bestätigung Newsletter Anmeldung") //$NON-NLS-1$
+				.content("Hallo,\n" + //$NON-NLS-1$
+						 "\n" + //$NON-NLS-1$
+						 "vielen Dank für Dein Interesse an News rund um den SVE.\n" + //$NON-NLS-1$
+						 "\n" + //$NON-NLS-1$
+						 "Ab sofort erhältst Du automatisch eine E-Mail zu folgenden Themen: " + types + ".\n" + //$NON-NLS-1$ //$NON-NLS-2$
+						 "\n" + //$NON-NLS-1$
+						 "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier abmelden:\n" + //$NON-NLS-1$
+						 UNSUBSCRIBE_URL + "\n" + //$NON-NLS-1$
+						 "\n" + //$NON-NLS-1$
+						 "Herzliche Grüße\n" + //$NON-NLS-1$
+						 "SV Eutingen") //$NON-NLS-1$
+				.send();		
 		}
 	}
 
