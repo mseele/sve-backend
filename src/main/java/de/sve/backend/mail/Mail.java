@@ -15,7 +15,7 @@ import com.google.common.collect.ImmutableSet;
 public abstract class Mail {
 
 	public static Builder via(MailAccount account) {
-		return new AutoValue_Mail.Builder().sender(account);
+		return new AutoValue_Mail.Builder().bcc().sender(account);
 	}
 
 	public abstract MailAccount sender();
