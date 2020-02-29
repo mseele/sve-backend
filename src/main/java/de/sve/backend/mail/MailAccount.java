@@ -21,6 +21,8 @@ public abstract class MailAccount {
 
 	public static MailAccount INFO = MailAccount.create("info@sv-eutingen.de", "WkIhOmN1e28qcm0mYl0yUFpwaUxmeTNEQ1tEbT5MWFksQjhtOC9ncyxpbT1eL2w3YT0wJiQ7czUqTDhxW2gwbzhTITdxXFd7SCx1SX1qVGguPGg4P2ozSUhkbTQ6diw8SCh6ag=="); //$NON-NLS-1$ //$NON-NLS-2$
 
+	public static MailAccount KUNSTRASEN = MailAccount.create("kunstrasen@sv-eutingen.de", "eDM2JWMmeSQxUzJa"); //$NON-NLS-1$ //$NON-NLS-2$
+
 	public static MailAccount of(EventType type) {
 		switch (type) {
 			case Events:
