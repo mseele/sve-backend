@@ -12,9 +12,6 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Resposible for sending emails.
  * 
@@ -22,9 +19,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Postman {
 
-	private static final Logger LOG = LoggerFactory.getLogger(Postman.class);
-
-	protected static boolean deliver(Mail mail) {
+	protected static void deliver(Mail mail) throws MessagingException {
 		MailAccount account = mail.sender();
 		// smtp properties
 		Properties properties = System.getProperties();
@@ -39,30 +34,24 @@ public class Postman {
 				return new PasswordAuthentication(account.userName(), account.password());
 			}
 		});
-		try {
-			MimeMessage message = new MimeMessage(session);
-			// email addresses
-			message.setFrom(new InternetAddress(account.email()));
-			for (String recipient : mail.to()) {
-				message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient));
-			}
-			for (String recipient : mail.bcc()) {
-				message.addRecipient(Message.RecipientType.BCC, new InternetAddress(recipient));
-			}
-			String replyTo = mail.replyTo();
-			if (replyTo != null) {
-				message.setReplyTo(new Address[] { new InternetAddress(replyTo) });
-			}
-			// subject & content
-			message.setSubject(mail.subject());
-			message.setText(mail.content());
-			// Send message
-			Transport.send(message);
-			return true;
-		} catch (MessagingException e) {
-			LOG.error("Error while trying to send email", e); //$NON-NLS-1$
-			return false;
+		MimeMessage message = new MimeMessage(session);
+		// email addresses
+		message.setFrom(new InternetAddress(account.email()));
+		for (String recipient : mail.to()) {
+			message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient));
 		}
+		for (String recipient : mail.bcc()) {
+			message.addRecipient(Message.RecipientType.BCC, new InternetAddress(recipient));
+		}
+		String replyTo = mail.replyTo();
+		if (replyTo != null) {
+			message.setReplyTo(new Address[] { new InternetAddress(replyTo) });
+		}
+		// subject & content
+		message.setSubject(mail.subject());
+		message.setText(mail.content());
+		// Send message
+		Transport.send(message);
 	}
 
 }

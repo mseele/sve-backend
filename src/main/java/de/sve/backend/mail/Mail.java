@@ -1,6 +1,7 @@
 package de.sve.backend.mail;
 
 import javax.annotation.Nullable;
+import javax.mail.MessagingException;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableSet;
@@ -47,8 +48,8 @@ public abstract class Mail {
 
 		abstract Mail build();
 
-		public boolean send() {
-			return Postman.deliver(build());
+		public void send() throws MessagingException {
+			Postman.deliver(build());
 		}
 
 	}
