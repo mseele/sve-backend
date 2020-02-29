@@ -13,7 +13,7 @@ public class ContactManager {
 	public static void message(Message message) throws Exception {
 		Mail.Builder mail = Mail.via(message.type().mailAccount());
 		// subject
-		mail.subject("Kontakt Nachricht von " + message.name()); //$NON-NLS-1$
+		mail.subject("[Kontakt@Web] Nachricht von " + message.name()); //$NON-NLS-1$
 		// content
 		StringBuilder content = new StringBuilder();
 		content.append("\nVor- und Nachname: "); //$NON-NLS-1$
