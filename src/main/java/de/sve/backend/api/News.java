@@ -13,6 +13,7 @@ import de.sve.backend.manager.NewsManager;
 import de.sve.backend.model.news.Subscription;
 
 @Path("/news")
+@SuppressWarnings("static-method")
 public class News {
 
 	private static final Logger LOG = LoggerFactory.getLogger(News.class);

@@ -23,6 +23,7 @@ import de.sve.backend.model.events.EventBooking;
 import de.sve.backend.model.events.EventCounter;
 
 @Path("/events")
+@SuppressWarnings("static-method")
 public class Events {
 
 	private static final Logger LOG = LoggerFactory.getLogger(Events.class);
