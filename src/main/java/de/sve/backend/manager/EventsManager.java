@@ -99,6 +99,12 @@ public class EventsManager {
 		return BookingResponse.success(message, eventsCounter());
 	}
 
+	public static void main(String[] args) {
+		LocalDateTime payday = LocalDateTime.now().plusDays(30);
+		
+		payday.isBefore(LocalDateTime.now());
+	}
+	
 	private static void sendMail(EventBooking booking, Event event, boolean isBooking) throws Throwable {
 		try {
 			EventType type = event.type();
@@ -140,7 +146,7 @@ public class EventsManager {
 				dates.append(" Uhr"); //$NON-NLS-1$
 				if (payday == null) {
 					payday = date.minusDays(14);
-					if (payday.isAfter(LocalDateTime.now())) {
+					if (payday.isBefore(LocalDateTime.now())) {
 						payday = LocalDateTime.now();
 					}
 				}
