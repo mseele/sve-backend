@@ -64,10 +64,10 @@ public class EventsSheetController extends AbstractSheetController {
 		request.setValueInputOption("USER_ENTERED"); //$NON-NLS-1$
 		UpdateValuesResponse result = request.execute();
 		return result.getUpdatedCells() +
-			   " cells updated:</br></br>" + //$NON-NLS-1$
+			   " in " + range + " updated:" + //$NON-NLS-1$ //$NON-NLS-2$
 			   content.stream()
 					  .map(o -> StringEscapeUtils.escapeHtml4(String.valueOf(o)))
-					  .collect(Collectors.joining("</br>- ", "- ", "")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+					  .collect(Collectors.joining(" | ")); //$NON-NLS-1$
 	}
 
 }
