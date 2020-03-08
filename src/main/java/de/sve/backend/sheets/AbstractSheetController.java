@@ -54,10 +54,13 @@ public abstract class AbstractSheetController {
 			if (values != null) {
 				int index = i;
 				for (List<Object> row : values) {
-					if (row.get(0) == null) {
+					if (row == null || row.isEmpty() || row.get(0) == null) {
 						return index;
 					}
 					index++;
+				}
+				if (values.size() < batch) {
+					return index;
 				}
 			} else {
 				return i;
