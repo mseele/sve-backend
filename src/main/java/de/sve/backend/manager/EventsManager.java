@@ -126,6 +126,7 @@ public class EventsManager {
 			}
 
 			template = template.replace("${firstname}", booking.firstName().trim()); //$NON-NLS-1$
+			template = template.replace("${lastname}", booking.lastName().trim()); //$NON-NLS-1$
 			template = template.replace("${name}", event.name().trim()); //$NON-NLS-1$
 			template = template.replace("${location}", event.location()); //$NON-NLS-1$
 			StringBuilder dates = new StringBuilder();
