@@ -31,7 +31,7 @@ public class EventsManager {
 
 	private static final Locale DE = Locale.GERMANY;
 
-	private static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("E., dd. MMM yyyy, HH:mm", DE); //$NON-NLS-1$
+	private static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("E, dd. MMM yyyy, HH:mm", DE); //$NON-NLS-1$
 
 	private static DateTimeFormatter PAYDAY_FORMAT = DateTimeFormatter.ofPattern("dd. MMMM", DE); //$NON-NLS-1$
 
