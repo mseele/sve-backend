@@ -104,12 +104,24 @@ public class EventsManager {
 			EventType type = event.type();
 			MailAccount account = MailAccount.of(type);
 			Mail.Builder builder = Mail.via(account);
+			String subjectPrefix;
+			switch (type) {
+				case Fitness:
+					subjectPrefix = "[Fitness"; //$NON-NLS-1$
+					break;
+				case Events:
+					subjectPrefix = "[Events"; //$NON-NLS-1$
+					break;
+				default:
+					throw new IllegalArgumentException("Type '" + type + "' is not supported");  //$NON-NLS-1$//$NON-NLS-2$
+			}
+			subjectPrefix += "@SVE]"; //$NON-NLS-1$
 			String template;
 			if (isBooking) {
-				builder.subject("[Events@SVE] Bestätigung Buchung"); //$NON-NLS-1$
+				builder.subject(subjectPrefix + " Bestätigung Buchung"); //$NON-NLS-1$
 				template = event.bookingTemplate();
 			} else {
-				builder.subject("[Events@SVE] Bestätigung Warteliste"); //$NON-NLS-1$
+				builder.subject(subjectPrefix + " Bestätigung Warteliste"); //$NON-NLS-1$
 				template = event.waitingTemplate();
 			}
 
