@@ -29,11 +29,13 @@ public class EventsManager {
 
 	private static final Logger LOG = LoggerFactory.getLogger(EventsManager.class);
 
-	private static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("E., dd. MMM yyyy, HH:mm"); //$NON-NLS-1$
+	private static final Locale DE = Locale.GERMANY;
 
-	private static DateTimeFormatter PAYDAY_FORMAT = DateTimeFormatter.ofPattern("dd. MMMM"); //$NON-NLS-1$
+	private static DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("E., dd. MMM yyyy, HH:mm", DE); //$NON-NLS-1$
 
-	private static NumberFormat PRICE_FORMAT = NumberFormat.getCurrencyInstance(Locale.GERMANY);
+	private static DateTimeFormatter PAYDAY_FORMAT = DateTimeFormatter.ofPattern("dd. MMMM", DE); //$NON-NLS-1$
+
+	private static NumberFormat PRICE_FORMAT = NumberFormat.getCurrencyInstance(DE);
 
 	public static List<Event> events() throws Exception {
 		return events(null);
