@@ -99,12 +99,6 @@ public class EventsManager {
 		return BookingResponse.success(message, eventsCounter());
 	}
 
-	public static void main(String[] args) {
-		LocalDateTime payday = LocalDateTime.now().plusDays(30);
-		
-		payday.isBefore(LocalDateTime.now());
-	}
-	
 	private static void sendMail(EventBooking booking, Event event, boolean isBooking) throws Throwable {
 		try {
 			EventType type = event.type();
