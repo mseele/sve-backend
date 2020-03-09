@@ -64,9 +64,9 @@ public class Events {
 	@Path("/update")
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
-	public Response update(Event event) {
+	public Response update(Event update) {
 		try {
-			EventsManager.update(event);
+			Event event = EventsManager.update(update);
 			LOG.info( "Event (" + event.id() + ") has been updated"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).entity(Utils.gson().toJson(event)).build();
 		} catch (Throwable t) {
