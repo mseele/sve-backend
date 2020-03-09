@@ -37,14 +37,14 @@ public class EventsManager {
 
 	private static NumberFormat PRICE_FORMAT = NumberFormat.getCurrencyInstance(DE);
 
-	public static List<Event> events() throws Exception {
-		return events(null);
+	public static List<Event> events(boolean beta) throws Exception {
+		return events(beta, null);
 	}
 
-	public static List<Event> events(EventType type) throws Exception {
+	public static List<Event> events(Boolean beta, EventType type) throws Exception {
 		return DataStore.events()
 				.stream()
-		 		.filter(e -> e.visible() && (type == null || type == e.type()))
+		 		.filter(e -> e.visible() && (type == null || type == e.type()) && (beta == null || beta.booleanValue() == e.beta()))
 		 		.sorted((event1, event2) -> {
 					 if (event1.isBookedUp() == event2.isBookedUp()) {
 						 return event1.sortIndex().compareTo(event2.sortIndex());
@@ -57,9 +57,9 @@ public class EventsManager {
 	}
 
 	public static List<EventCounter> eventsCounter() throws Exception {
-		return events().stream()
-					   .map(EventCounter::create)
-					   .collect(Collectors.toList());
+		return events(null, null).stream()
+					   			 .map(EventCounter::create)
+					   			 .collect(Collectors.toList());
 	}
 
 	public static BookingResponse booking(EventBooking booking) {
