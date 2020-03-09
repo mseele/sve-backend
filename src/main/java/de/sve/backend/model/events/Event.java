@@ -14,10 +14,10 @@ import com.ryanharter.auto.value.gson.GenerateTypeAdapter;
 @GenerateTypeAdapter
 public abstract class Event {
 
-	public static Event create(String id, String sheetId, Long gid, EventType type, String name, Long sortIndex, Boolean visible, String shortDescription, String description, String image,
+	public static Event create(String id, String sheetId, Long gid, EventType type, String name, Long sortIndex, Boolean visible, Boolean beta, String shortDescription, String description, String image,
 			Boolean light, List<LocalDateTime> dates, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember, Long waitingList, Long maxWaitingList,
 			String location, String bookingTemplate, String waitingTemplate, Boolean externalOperator) {
-		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, shortDescription, description, image, light, dates, durationInMinutes, maxSubscribers, subscribers, costMember,
+		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, beta, shortDescription, description, image, light, dates, durationInMinutes, maxSubscribers, subscribers, costMember,
 				costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate, externalOperator);
 	}
 
@@ -40,6 +40,9 @@ public abstract class Event {
 
 	@Nullable
 	public abstract Boolean visible();
+
+	@Nullable
+	public abstract Boolean beta();
 
 	@Nullable
 	public abstract String shortDescription();
@@ -101,7 +104,7 @@ public abstract class Event {
 		} else if (waitingList < maxWaitingList()) {
 			waitingList = Long.valueOf(waitingList.longValue() + 1);
 		}
-		return create(id(), sheetId(), gid(), type(), name(), sortIndex(), visible(), shortDescription(), description(), image(), light(), dates(), durationInMinutes(), maxSubscribers(), subscribers,
+		return create(id(), sheetId(), gid(), type(), name(), sortIndex(), visible(), beta(), shortDescription(), description(), image(), light(), dates(), durationInMinutes(), maxSubscribers(), subscribers,
 				costMember(), costNonMember(), waitingList, maxWaitingList(), location(), bookingTemplate(), waitingTemplate(), externalOperator());
 	}
 
@@ -113,6 +116,7 @@ public abstract class Event {
 					  firstNonNull(event.name(), name()),
 					  firstNonNull(event.sortIndex(), sortIndex()),
 					  firstNonNull(event.visible(), visible()),
+					  firstNonNull(event.beta(), beta()),
 					  firstNonNull(event.shortDescription(), shortDescription()),
 					  firstNonNull(event.description(), description()),
 					  firstNonNull(event.image(), image()),

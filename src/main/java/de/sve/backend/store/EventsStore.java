@@ -58,6 +58,7 @@ public class EventsStore implements AutoCloseable {
 		data.put("name",event.name()); //$NON-NLS-1$
 		data.put("sortIndex", event.sortIndex()); //$NON-NLS-1$
 		data.put("visible", event.visible()); //$NON-NLS-1$
+		data.put("beta", event.beta()); //$NON-NLS-1$
 		data.put("shortDescription", event.shortDescription()); //$NON-NLS-1$
 		data.put("description", event.description()); //$NON-NLS-1$
 		data.put("image", event.image()); //$NON-NLS-1$
@@ -100,6 +101,7 @@ public class EventsStore implements AutoCloseable {
 							document.getString("name"), //$NON-NLS-1$
 							document.getLong("sortIndex"), //$NON-NLS-1$
 							document.getBoolean("visible"), //$NON-NLS-1$
+							document.getBoolean("beta"), //$NON-NLS-1$
 							document.getString("shortDescription"), //$NON-NLS-1$
 							document.getString("description"), //$NON-NLS-1$
 							document.getString("image"), //$NON-NLS-1$

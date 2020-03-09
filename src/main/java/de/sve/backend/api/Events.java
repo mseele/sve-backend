@@ -7,6 +7,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -30,9 +31,9 @@ public class Events {
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public List<Event> getEvents() throws BackendException {
+	public List<Event> getEvents(@QueryParam("beta") boolean beta) throws BackendException {
 		try {
-			return EventsManager.events();
+			return EventsManager.events(beta);
 		} catch (Throwable t) {
 			String message = "Error while loading events"; //$NON-NLS-1$
 			LOG.error(message, t);
