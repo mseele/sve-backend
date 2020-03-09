@@ -1,5 +1,10 @@
 package de.sve.backend.manager;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import de.sve.backend.Utils;
@@ -107,6 +112,22 @@ public class NewsManager {
 						 "SV Eutingen") //$NON-NLS-1$
 				.send();		
 		}
+	}
+
+	public static Map<NewsType, Set<String>> subscriptions() throws Exception {
+		Map<NewsType, Set<String>> map = new HashMap<>();
+		List<Subscription> subscriptions = DataStore.subscriptions();
+		for (Subscription subscription : subscriptions) {
+			for (NewsType type : subscription.types()) {
+				Set<String> set = map.get(type);
+				if (set == null) {
+					set = new HashSet<>();
+					map.put(type, set);
+				}
+				set.add(subscription.email());
+			}
+		}
+		return map;
 	}
 
 }

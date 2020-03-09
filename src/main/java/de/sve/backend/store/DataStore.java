@@ -80,6 +80,12 @@ public class DataStore {
 		}
 	}
 
+	public static List<Subscription> subscriptions() throws Exception {
+		try (NewsStore store = new NewsStore()) {
+			return store.loadSubscriptions();
+		}
+	}
+
 	private static void lazyLoad() throws Exception {
 		if (LAST_REFRESH == null || LAST_REFRESH.isBefore(LAST_REFRESH.minusMinutes(60))) {
 			reloadCache();
