@@ -176,8 +176,9 @@ public class EventsManager {
 		}
 	}
 
-	public static void update(Event event) throws Exception {
+	public static Event update(Event event) throws Exception {
 		DataStore.save(event);
+		return DataStore.event(event.id());
 	}
 
 	public static void delete(Event event) throws Exception {
