@@ -24,7 +24,7 @@ public class EventsSheetController extends AbstractSheetController {
 
 	private static DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"); //$NON-NLS-1$
 
-	private static NumberFormat PRICE_FORMAT = NumberFormat.getCurrencyInstance(Locale.GERMANY);
+	private static NumberFormat PRICE_FORMAT = NumberFormat.getInstance(Locale.GERMANY);
 
 	public static String saveBooking(EventBooking booking, Event event) throws GeneralSecurityException, IOException {
 		return new EventsSheetController(event.sheetId()).save(booking, event);
