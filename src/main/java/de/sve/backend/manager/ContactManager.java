@@ -1,9 +1,16 @@
 package de.sve.backend.manager;
 
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import de.sve.backend.mail.Attachment;
 import de.sve.backend.mail.Mail;
+import de.sve.backend.model.contact.Email;
 import de.sve.backend.model.contact.Message;
 
 public class ContactManager {
@@ -33,6 +40,22 @@ public class ContactManager {
 			.replyTo(email)
 			.send();
 		LOG.info("Info message has been send successfully"); //$NON-NLS-1$
+	}
+
+	public static void email(Email email) throws Exception {
+		List<Email.Attachment> attachments = email.attachments();
+		if (attachments == null) {
+			attachments = Collections.emptyList();
+		}
+		Mail.via(email.type().mailAccount())
+			.to(email.to())
+			.subject(email.subject())
+			.content(email.content())
+			.attachments(attachments.stream()
+							  		.map(a -> Attachment.create(a.name(), Base64.getDecoder().decode(a.data()), a.mimeType()))
+							  		.collect(Collectors.toList()))
+			.send();
+		LOG.info("Email has been send successfully"); //$NON-NLS-1$
 	}
 
 }

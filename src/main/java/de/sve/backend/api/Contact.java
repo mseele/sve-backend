@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import de.sve.backend.api.utils.BackendException;
 import de.sve.backend.manager.ContactManager;
+import de.sve.backend.model.contact.Email;
 import de.sve.backend.model.contact.Message;
 
 @Path("/contact")
@@ -26,6 +27,19 @@ public class Contact {
 			ContactManager.message(message);
 		} catch (Throwable t) {
 			String msg = "Error while sending message"; //$NON-NLS-1$
+			LOG.error(msg, t);
+			throw new BackendException(msg, t);
+		}
+	}
+
+	@Path("/email")
+	@POST
+	@Produces(MediaType.APPLICATION_JSON)
+	public void email(Email email) throws BackendException {
+		try {
+			ContactManager.email(email);
+		} catch (Throwable t) {
+			String msg = "Error while sending email"; //$NON-NLS-1$
 			LOG.error(msg, t);
 			throw new BackendException(msg, t);
 		}

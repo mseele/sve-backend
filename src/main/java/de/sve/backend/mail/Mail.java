@@ -1,9 +1,12 @@
 package de.sve.backend.mail;
 
+import java.util.List;
+
 import javax.annotation.Nullable;
 import javax.mail.MessagingException;
 
 import com.google.auto.value.AutoValue;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 /**
@@ -15,7 +18,9 @@ import com.google.common.collect.ImmutableSet;
 public abstract class Mail {
 
 	public static Builder via(MailAccount account) {
-		return new AutoValue_Mail.Builder().bcc().sender(account);
+		return new AutoValue_Mail.Builder().sender(account)
+										   .bcc()
+										   .attachments();
 	}
 
 	public abstract MailAccount sender();
@@ -31,6 +36,8 @@ public abstract class Mail {
 
 	public abstract String content();
 
+	public abstract ImmutableList<Attachment> attachments();
+
 	@AutoValue.Builder
 	public abstract static class Builder {
 
@@ -45,6 +52,10 @@ public abstract class Mail {
 		public abstract Builder subject(String value);
 
 		public abstract Builder content(String value);
+
+		public abstract Builder attachments(List<Attachment> value);
+
+		public abstract Builder attachments(Attachment... value);
 
 		abstract Mail build();
 
