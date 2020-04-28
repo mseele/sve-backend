@@ -146,7 +146,9 @@ public class EventsManager {
 				}
 			}
 			template = template.replace("${dates}", dates.toString()); //$NON-NLS-1$
-			template = template.replace("${payday}", PAYDAY_FORMAT.format(payday)); //$NON-NLS-1$
+			if (payday != null) {
+				template = template.replace("${payday}", PAYDAY_FORMAT.format(payday)); //$NON-NLS-1$
+			}
 			Double cost = booking.cost(event);
 			String price = PRICE_FORMAT.format(cost);
 			template = template.replace("${price}", price); //$NON-NLS-1$
