@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNullElse;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import javax.annotation.Nullable;
 
@@ -128,7 +129,7 @@ public abstract class Event {
 					  requireNonNullElse(event.image(), image()),
 					  requireNonNullElse(event.light(), light()),
 					  requireNonNullElse(event.dates(), dates()),
-					  requireNonNullElse(event.customDate(), customDate()),
+					  Optional.ofNullable(event.customDate()).orElse(customDate()),
 					  requireNonNullElse(event.durationInMinutes(), durationInMinutes()),
 					  requireNonNullElse(event.maxSubscribers(), maxSubscribers()),
 					  requireNonNullElse(event.subscribers(), subscribers()),
