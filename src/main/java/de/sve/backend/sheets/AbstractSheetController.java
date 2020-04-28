@@ -1,6 +1,7 @@
 package de.sve.backend.sheets;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
 import java.util.List;
@@ -70,8 +71,10 @@ public abstract class AbstractSheetController {
 	}
 
 	private static HttpCredentialsAdapter credentials() throws IOException {
-		return new HttpCredentialsAdapter(GoogleCredentials.fromStream(AbstractSheetController.class.getResourceAsStream(CREDENTIALS_FILE_PATH))
-				 										   .createScoped(SCOPES));
+		try (InputStream inputStream = AbstractSheetController.class.getResourceAsStream(CREDENTIALS_FILE_PATH)) {
+			return new HttpCredentialsAdapter(GoogleCredentials.fromStream(inputStream)
+					 										   .createScoped(SCOPES));
+		}
 	}
 
 }
