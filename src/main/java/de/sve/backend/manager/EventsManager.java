@@ -65,7 +65,7 @@ public class EventsManager {
 	public static BookingResponse booking(EventBooking booking) {
 		try {
 			Event event = DataStore.event(booking.eventId());
-			if (event.subscribers() < event.maxSubscribers()) {
+			if (event.maxSubscribers() == -1 || event.subscribers() < event.maxSubscribers()) {
 				return successfullBooking(booking, event.bookEvent(), true);
 			} else if (event.waitingList() < event.maxWaitingList()) {
 				return successfullBooking(booking, event.bookEvent(), false);
