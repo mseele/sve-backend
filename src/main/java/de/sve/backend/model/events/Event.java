@@ -1,6 +1,6 @@
 package de.sve.backend.model.events;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
+import static java.util.Objects.requireNonNullElse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -116,30 +116,30 @@ public abstract class Event {
 
 	public Event update(Event event) {
 		return create(id(),
-					  firstNonNull(event.sheetId(), sheetId()),
-					  firstNonNull(event.gid(), gid()),
-					  firstNonNull(event.type(), type()),
-					  firstNonNull(event.name(), name()),
-					  firstNonNull(event.sortIndex(), sortIndex()),
-					  firstNonNull(event.visible(), visible()),
-					  firstNonNull(event.beta(), beta()),
-					  firstNonNull(event.shortDescription(), shortDescription()),
-					  firstNonNull(event.description(), description()),
-					  firstNonNull(event.image(), image()),
-					  firstNonNull(event.light(), light()),
-					  firstNonNull(event.dates(), dates()),
-					  firstNonNull(event.customDate(), customDate()),
-					  firstNonNull(event.durationInMinutes(), durationInMinutes()),
-					  firstNonNull(event.maxSubscribers(), maxSubscribers()),
-					  firstNonNull(event.subscribers(), subscribers()),
-					  firstNonNull(event.costMember(), costMember()),
-					  firstNonNull(event.costNonMember(), costNonMember()),
-					  firstNonNull(event.waitingList(), waitingList()),
-					  firstNonNull(event.maxWaitingList(), maxWaitingList()),
-					  firstNonNull(event.location(), location()),
-					  firstNonNull(event.bookingTemplate(), bookingTemplate()),
-					  firstNonNull(event.waitingTemplate(), waitingTemplate()),
-					  firstNonNull(event.externalOperator(), externalOperator()));
+					  requireNonNullElse(event.sheetId(), sheetId()),
+					  requireNonNullElse(event.gid(), gid()),
+					  requireNonNullElse(event.type(), type()),
+					  requireNonNullElse(event.name(), name()),
+					  requireNonNullElse(event.sortIndex(), sortIndex()),
+					  requireNonNullElse(event.visible(), visible()),
+					  requireNonNullElse(event.beta(), beta()),
+					  requireNonNullElse(event.shortDescription(), shortDescription()),
+					  requireNonNullElse(event.description(), description()),
+					  requireNonNullElse(event.image(), image()),
+					  requireNonNullElse(event.light(), light()),
+					  requireNonNullElse(event.dates(), dates()),
+					  requireNonNullElse(event.customDate(), customDate()),
+					  requireNonNullElse(event.durationInMinutes(), durationInMinutes()),
+					  requireNonNullElse(event.maxSubscribers(), maxSubscribers()),
+					  requireNonNullElse(event.subscribers(), subscribers()),
+					  requireNonNullElse(event.costMember(), costMember()),
+					  requireNonNullElse(event.costNonMember(), costNonMember()),
+					  requireNonNullElse(event.waitingList(), waitingList()),
+					  requireNonNullElse(event.maxWaitingList(), maxWaitingList()),
+					  requireNonNullElse(event.location(), location()),
+					  requireNonNullElse(event.bookingTemplate(), bookingTemplate()),
+					  requireNonNullElse(event.waitingTemplate(), waitingTemplate()),
+					  requireNonNullElse(event.externalOperator(), externalOperator()));
 	}
 
 }
