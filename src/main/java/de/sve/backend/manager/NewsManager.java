@@ -45,7 +45,7 @@ public class NewsManager {
 			switch (type) {
 				case Events:
 					builder.subject("[Events@SVE] Bestätigung Event-News Anmeldung") //$NON-NLS-1$
-						   .content("Hallo,\n" + //$NON-NLS-1$
+						   .content("Lieber Interessent/In,\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
 									"vielen Dank für Dein Interesse an unseren Events.\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
@@ -58,7 +58,7 @@ public class NewsManager {
 					break;
 				case Fitness:
 					builder.subject("[Fitness@SVE] Bestätigung Fitness-News Anmeldung") //$NON-NLS-1$
-						   .content("Hallo,\n" + //$NON-NLS-1$
+						   .content("Lieber Interessent/In,\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
 									"vielen Dank für Dein Interesse an unseren Fitnesskursen.\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
@@ -71,7 +71,7 @@ public class NewsManager {
 					break;
 				case General:
 					builder.subject("[Infos@SVE] Bestätigung Newsletter Anmeldung") //$NON-NLS-1$
-						   .content("Hallo,\n" + //$NON-NLS-1$
+						   .content("Lieber Interessent/In,\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
 									"vielen Dank für Dein Interesse an News rund um den SVE.\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
@@ -96,7 +96,7 @@ public class NewsManager {
 				.to(subscription.email())
 				.bcc(mailAccount.email())
 				.subject("[Infos@SVE] Bestätigung Newsletter Anmeldung") //$NON-NLS-1$
-				.content("Hallo,\n" + //$NON-NLS-1$
+				.content("Lieber Interessent/In,\n" + //$NON-NLS-1$
 						 "\n" + //$NON-NLS-1$
 						 "vielen Dank für Dein Interesse an News rund um den SVE.\n" + //$NON-NLS-1$
 						 "\n" + //$NON-NLS-1$
