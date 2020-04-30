@@ -157,12 +157,7 @@ public class EventsManager {
 				String typeName = type == EventType.Events ? "Events" : "Kursangebote"; //$NON-NLS-1$ //$NON-NLS-2$
 				content.append("\n\nPS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue " + typeName + " online sind.\n" + //$NON-NLS-1$ //$NON-NLS-2$
 							   "\n" + //$NON-NLS-1$
-							   "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich ganz einfach von diesem Angebot abmelden. \n" + //$NON-NLS-1$
-							"Klicke hierzu einfach auf folgenden Link:\n"); //$NON-NLS-1$
-				content.append(Utils.urlBuilder()
-					    .addParameter("unsubscribe", type.toString()) //$NON-NLS-1$
-					    .addParameter("email", booking.email()) //$NON-NLS-1$
-					    .toString());
+							   NewsManager.unsubscribeAppendix());
 			}
 			builder.content(content.toString())
 				   .to(booking.email())

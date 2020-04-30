@@ -51,8 +51,7 @@ public class NewsManager {
 									"\n" + //$NON-NLS-1$
 									"Ab sofort erhältst Du automatisch eine E-Mail, sobald neue Events online sind.\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
-									"Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:\n" + //$NON-NLS-1$
-									UNSUBSCRIBE_URL + "\n" + //$NON-NLS-1$
+									unsubscribeAppendix() +
 									"\n" + //$NON-NLS-1$
 									"Herzliche Grüße\n" + //$NON-NLS-1$
 									"Team Events@SVE"); //$NON-NLS-1$
@@ -65,8 +64,7 @@ public class NewsManager {
 									"\n" + //$NON-NLS-1$
 									"Ab sofort erhältst Du automatisch eine E-Mail, sobald neue Kurse online sind.\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
-									"Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:\n" + //$NON-NLS-1$
-									UNSUBSCRIBE_URL + "\n" + //$NON-NLS-1$
+									unsubscribeAppendix() +
 									"\n" + //$NON-NLS-1$
 									"Herzliche Grüße\n" + //$NON-NLS-1$
 									"Team Fitness@SVE"); //$NON-NLS-1$
@@ -79,8 +77,7 @@ public class NewsManager {
 									"\n" + //$NON-NLS-1$
 									"Ab sofort erhältst Du automatisch eine E-Mail, sobald es etwas neues gibt.\n" + //$NON-NLS-1$
 									"\n" + //$NON-NLS-1$
-									"Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:\n" + //$NON-NLS-1$
-									UNSUBSCRIBE_URL + "\n" + //$NON-NLS-1$
+									unsubscribeAppendix() +
 									"\n" + //$NON-NLS-1$
 									"Herzliche Grüße\n" + //$NON-NLS-1$
 									"SV Eutingen"); //$NON-NLS-1$
@@ -105,8 +102,7 @@ public class NewsManager {
 						 "\n" + //$NON-NLS-1$
 						 "Ab sofort erhältst Du automatisch eine E-Mail zu folgenden Themen: " + types + ".\n" + //$NON-NLS-1$ //$NON-NLS-2$
 						 "\n" + //$NON-NLS-1$
-						 "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier abmelden:\n" + //$NON-NLS-1$
-						 UNSUBSCRIBE_URL + "\n" + //$NON-NLS-1$
+						 unsubscribeAppendix() +
 						 "\n" + //$NON-NLS-1$
 						 "Herzliche Grüße\n" + //$NON-NLS-1$
 						 "SV Eutingen") //$NON-NLS-1$
@@ -128,6 +124,11 @@ public class NewsManager {
 			}
 		}
 		return map;
+	}
+
+	public static String unsubscribeAppendix() {
+		return "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:\n" + //$NON-NLS-1$
+			   UNSUBSCRIBE_URL + "\n"; //$NON-NLS-1$
 	}
 
 }
