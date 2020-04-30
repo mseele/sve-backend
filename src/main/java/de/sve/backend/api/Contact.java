@@ -27,7 +27,7 @@ public class Contact {
 			ContactManager.message(message);
 		} catch (Throwable t) {
 			String msg = "Error while sending message"; //$NON-NLS-1$
-			LOG.error(msg, t);
+			LOG.error(msg + ": " + message, t); //$NON-NLS-1$
 			throw new BackendException(msg, t);
 		}
 	}
@@ -40,7 +40,7 @@ public class Contact {
 			ContactManager.email(email);
 		} catch (Throwable t) {
 			String msg = "Error while sending email"; //$NON-NLS-1$
-			LOG.error(msg, t);
+			LOG.error(msg + ": " + email, t); //$NON-NLS-1$
 			throw new BackendException(msg, t);
 		}
 	}

@@ -33,7 +33,7 @@ public class News {
 		try {
 			NewsManager.subscribe(subscription);
 		} catch (Throwable t) {
-			String message = "Error while subscribe to news"; //$NON-NLS-1$
+			String message = "Error while subscribe to news: " + subscription; //$NON-NLS-1$
 			LOG.error(message, t);
 			throw new BackendException(message, t);
 		}
@@ -46,7 +46,7 @@ public class News {
 		try {
 			NewsManager.unsubscribe(subscription);
 		} catch (Throwable t) {
-			String message = "Error while unsubscribe from news"; //$NON-NLS-1$
+			String message = "Error while unsubscribe from news: " + subscription; //$NON-NLS-1$
 			LOG.error(message, t);
 			throw new BackendException(message, t);
 		}

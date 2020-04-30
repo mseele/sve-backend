@@ -71,7 +71,7 @@ public class Events {
 			LOG.info( "Event (" + event.id() + ") has been updated"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).entity(Utils.gson().toJson(event)).build();
 		} catch (Throwable t) {
-			LOG.error("Could not save new event", t); //$NON-NLS-1$
+			LOG.error("Could not save new event: " + update, t); //$NON-NLS-1$
 			return Response.status(Status.BAD_REQUEST).entity(t).build();
 		}
 	}
@@ -85,7 +85,7 @@ public class Events {
 			LOG.info("Event (" + event.id() + ") has been deleted"); //$NON-NLS-1$ //$NON-NLS-2$
 			return Response.status(Status.OK).build();
 		} catch (Throwable t) {
-			LOG.error("Could not save new event", t); //$NON-NLS-1$
+			LOG.error("Could not save new event: " + event, t); //$NON-NLS-1$
 			return Response.status(Status.BAD_REQUEST).entity(t).build();
 		}
 	}
