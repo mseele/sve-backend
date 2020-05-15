@@ -20,6 +20,10 @@ public class Application {
 		ctx.setContextPath("/"); //$NON-NLS-1$
 		server.setHandler(ctx);
 
+		// warm-up handler
+		ctx.addServlet(Warmup.class, "/_ah/warmup"); //$NON-NLS-1$
+
+		// jersy handler
 		final ServletHolder serHol = ctx.addServlet(ServletContainer.class, "/api/*"); //$NON-NLS-1$
 		serHol.setInitOrder(1);
 		serHol.setInitParameter("jersey.config.server.provider.packages", "de.sve.backend.api"); //$NON-NLS-1$ //$NON-NLS-2$
