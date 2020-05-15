@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -36,6 +38,8 @@ public class EventsManager {
 	private static DateTimeFormatter PAYDAY_FORMAT = DateTimeFormatter.ofPattern("dd. MMMM", DE); //$NON-NLS-1$
 
 	private static NumberFormat PRICE_FORMAT = NumberFormat.getCurrencyInstance(DE);
+
+	private static Pattern PAYDAY_PATTERN = Pattern.compile("\\Q${payday:\\E(?<days>\\d+)\\Q}\\E"); //$NON-NLS-1$
 
 	public static List<Event> events(boolean beta) throws Exception {
 		return events(beta, null);
@@ -125,34 +129,7 @@ public class EventsManager {
 				template = event.waitingTemplate();
 			}
 
-			template = template.replace("${firstname}", booking.firstName().trim()); //$NON-NLS-1$
-			template = template.replace("${lastname}", booking.lastName().trim()); //$NON-NLS-1$
-			template = template.replace("${name}", event.name().trim()); //$NON-NLS-1$
-			template = template.replace("${location}", event.location()); //$NON-NLS-1$
-			StringBuilder dates = new StringBuilder();
-			LocalDateTime payday = null;
-			for (LocalDateTime date : event.dates()) {
-				if (dates.length() > 0) {
-					dates.append("\n"); //$NON-NLS-1$
-				}
-				dates.append("- "); //$NON-NLS-1$
-				dates.append(DATE_FORMAT.format(date));
-				dates.append(" Uhr"); //$NON-NLS-1$
-				if (payday == null) {
-					payday = date.minusDays(14);
-					if (payday.isBefore(LocalDateTime.now())) {
-						payday = LocalDateTime.now();
-					}
-				}
-			}
-			template = template.replace("${dates}", dates.toString()); //$NON-NLS-1$
-			if (payday != null) {
-				template = template.replace("${payday}", PAYDAY_FORMAT.format(payday)); //$NON-NLS-1$
-			}
-			Double cost = booking.cost(event);
-			String price = PRICE_FORMAT.format(cost);
-			template = template.replace("${price}", price); //$NON-NLS-1$
-			StringBuilder content = new StringBuilder(template);
+			StringBuilder content = new StringBuilder(replace(template, booking, event));
 			if (booking.subscribeUpdates()) {
 				String typeName = type == EventType.Events ? "Events" : "Kursangebote"; //$NON-NLS-1$ //$NON-NLS-2$
 				content.append("\n\nPS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue " + typeName + " online sind.\n" + //$NON-NLS-1$ //$NON-NLS-2$
@@ -171,6 +148,43 @@ public class EventsManager {
 			LOG.error(message, e);
 			throw e;
 		}
+	}
+
+	private static final String replace(String template, EventBooking booking, Event event) {
+		String content = template.replace("${firstname}", booking.firstName().trim()); //$NON-NLS-1$
+		content = content.replace("${lastname}", booking.lastName().trim()); //$NON-NLS-1$
+		content = content.replace("${name}", event.name().trim()); //$NON-NLS-1$
+		content = content.replace("${location}", event.location()); //$NON-NLS-1$
+		StringBuilder dates = new StringBuilder();
+		String paydayToReplace = "${payday}"; //$NON-NLS-1$
+		int days = 14;
+		Matcher matcher = PAYDAY_PATTERN.matcher(content);
+		if (matcher.find()) {
+			paydayToReplace = content.substring(matcher.start(), matcher.end());
+			days = Integer.parseInt(matcher.group("days")); //$NON-NLS-1$
+		}
+		LocalDateTime payday = null;
+		for (LocalDateTime date : event.dates()) {
+			if (dates.length() > 0) {
+				dates.append("\n"); //$NON-NLS-1$
+			}
+			dates.append("- "); //$NON-NLS-1$
+			dates.append(DATE_FORMAT.format(date));
+			dates.append(" Uhr"); //$NON-NLS-1$
+			if (payday == null) {
+				payday = date.minusDays(days);
+				if (payday.isBefore(LocalDateTime.now())) {
+					payday = LocalDateTime.now();
+				}
+			}
+		}
+		content = content.replace("${dates}", dates.toString()); //$NON-NLS-1$
+		if (payday != null) {
+			content = content.replace(paydayToReplace, PAYDAY_FORMAT.format(payday));
+		}
+		Double cost = booking.cost(event);
+		String price = PRICE_FORMAT.format(cost);
+		return content.replace("${price}", price); //$NON-NLS-1$
 	}
 
 	public static Event update(Event event) throws Exception {
