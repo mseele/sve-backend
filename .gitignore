@@ -4,4 +4,3 @@ bin
 .apt_generated
 .apt_generated_tests
 /node_modules/
-src/main/webapp/tools
