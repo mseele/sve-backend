@@ -62,6 +62,14 @@ public class Events {
 		return EventsManager.booking(booking);
 	}
 
+	@Path("/prebooking")
+	@POST
+	@Consumes(MediaType.TEXT_PLAIN)
+	@Produces(MediaType.APPLICATION_JSON)
+	public BookingResponse prebooking(String hash) {
+		return EventsManager.prebooking(hash);
+	}
+
 	@Path("/update")
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
