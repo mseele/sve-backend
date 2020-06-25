@@ -41,6 +41,8 @@ public class EventsManager {
 
 	private static Pattern PAYDAY_PATTERN = Pattern.compile("\\Q${payday:\\E(?<days>\\d+)\\Q}\\E"); //$NON-NLS-1$
 
+	private static String MESSAGE_FAIL = "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal."; //$NON-NLS-1$
+
 	public static List<Event> events(boolean beta) throws Exception {
 		return events(beta, null);
 	}
@@ -75,12 +77,10 @@ public class EventsManager {
 				return successfullBooking(booking, event.bookEvent(), false);
 			}
 			LOG.error("Booking failed because Event (" + event.id() + ") was overbooked."); //$NON-NLS-1$ //$NON-NLS-2$
-			String message = "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal."; //$NON-NLS-1$
-			return BookingResponse.failure(message);
+			return BookingResponse.failure(MESSAGE_FAIL);
 		} catch (Throwable t) {
 			LOG.error("Booking failed", t); //$NON-NLS-1$
-			String message = "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal."; //$NON-NLS-1$
-			return BookingResponse.failure(message);
+			return BookingResponse.failure(MESSAGE_FAIL);
 		}
 	}
 
