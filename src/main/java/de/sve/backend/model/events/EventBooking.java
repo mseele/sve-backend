@@ -9,6 +9,10 @@ import com.ryanharter.auto.value.gson.GenerateTypeAdapter;
 @GenerateTypeAdapter
 public abstract class EventBooking {
 
+	public static EventBooking create(String eventId, String firstName, String lastName, String street, String city, String email, String phone, Boolean member, Boolean updates, String comment) {
+		return new AutoValue_EventBooking(eventId, firstName, lastName, street, city, email, phone, member, updates, comment);
+	}
+
 	public abstract String eventId();
 
 	public abstract String firstName();

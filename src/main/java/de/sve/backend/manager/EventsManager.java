@@ -1,8 +1,11 @@
 package de.sve.backend.manager;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -66,6 +69,26 @@ public class EventsManager {
 		return events(null, null).stream()
 					   			 .map(EventCounter::create)
 					   			 .collect(Collectors.toList());
+	}
+
+	public static BookingResponse prebooking(String hash) {
+		Charset chartset = StandardCharsets.UTF_8;
+		String decoded = new String(Base64.getDecoder().decode(hash.getBytes(chartset)), chartset);
+		String[] splitted = decoded.split("#"); //$NON-NLS-1$
+		if (splitted.length == 8) {
+			return booking(EventBooking.create(splitted[0],
+					   						   splitted[1],
+					   						   splitted[2],
+					   						   splitted[3],
+					   						   splitted[4],
+					   						   splitted[5],
+					   						   splitted[6],
+					   						   Boolean.valueOf("J".equals(splitted[7])), //$NON-NLS-1$
+					   						   Boolean.FALSE,
+											   "Pre-Booking")); //$NON-NLS-1$
+		}
+		LOG.error("Booking failed beacuse spitted prebooking hash (" + decoded + ") has an invalid length:" + splitted); //$NON-NLS-1$ //$NON-NLS-2$
+		return BookingResponse.failure(MESSAGE_FAIL);
 	}
 
 	public static BookingResponse booking(EventBooking booking) {
