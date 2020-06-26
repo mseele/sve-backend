@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.1](https://github.com/mseele/sve-backend/compare/v1.5.0...v1.5.1) (2020-06-26)
+
+
+### Bug Fixes
+
+* improve error logging ([0669a55](https://github.com/mseele/sve-backend/commit/0669a55c983bdc4f00e8290e7406c17ef69d4443))
+
 ## [1.5.0](https://github.com/mseele/sve-backend/compare/v1.4.2...v1.5.0) (2020-06-26)
 
 
