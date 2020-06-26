@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -87,7 +88,7 @@ public class EventsManager {
 					   						   Boolean.FALSE,
 											   "Pre-Booking")); //$NON-NLS-1$
 		}
-		LOG.error("Booking failed beacuse spitted prebooking hash (" + decoded + ") has an invalid length:" + splitted); //$NON-NLS-1$ //$NON-NLS-2$
+		LOG.error("Booking failed beacuse spitted prebooking hash (" + decoded + ") has an invalid length:" + Arrays.asList(splitted)); //$NON-NLS-1$ //$NON-NLS-2$
 		return BookingResponse.failure(MESSAGE_FAIL);
 	}
 
