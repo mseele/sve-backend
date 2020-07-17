@@ -1,14 +1,21 @@
 package de.sve.backend.manager;
 
+import static java.util.Objects.requireNonNullElse;
+
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -29,6 +36,7 @@ import de.sve.backend.model.events.EventType;
 import de.sve.backend.model.news.NewsType;
 import de.sve.backend.model.news.Subscription;
 import de.sve.backend.sheets.EventsSheetController;
+import de.sve.backend.sheets.SheetExtractor;
 import de.sve.backend.store.DataStore;
 
 public class EventsManager {
@@ -77,19 +85,60 @@ public class EventsManager {
 		String decoded = new String(Base64.getDecoder().decode(hash.getBytes(chartset)), chartset);
 		String[] splitted = decoded.split("#"); //$NON-NLS-1$
 		if (splitted.length == 8) {
-			return booking(EventBooking.create(splitted[0],
-					   						   splitted[1],
-					   						   splitted[2],
-					   						   splitted[3],
-					   						   splitted[4],
-					   						   splitted[5],
-					   						   splitted[6],
-					   						   Boolean.valueOf("J".equals(splitted[7])), //$NON-NLS-1$
-					   						   Boolean.FALSE,
-											   "Pre-Booking")); //$NON-NLS-1$
+			EventBooking booking = EventBooking.create(splitted[0],
+					   								   splitted[1],
+					   								   splitted[2],
+					   								   splitted[3],
+					   								   splitted[4],
+					   								   splitted[5],
+					   								   splitted[6],
+					   								   Boolean.valueOf("J".equals(splitted[7])), //$NON-NLS-1$
+					   								   Boolean.FALSE,
+													   "Pre-Booking"); //$NON-NLS-1$
+			BookingResponse checkResult = checkPrebooking(booking);
+			if (checkResult != null) {
+				return booking(booking);
+			}
+			return checkResult;
 		}
 		LOG.error("Booking failed beacuse spitted prebooking hash (" + decoded + ") has an invalid length:" + Arrays.asList(splitted)); //$NON-NLS-1$ //$NON-NLS-2$
 		return BookingResponse.failure(MESSAGE_FAIL);
+	}
+
+	private static BookingResponse checkPrebooking(EventBooking booking) {
+		try {
+			Event event = DataStore.event(booking.eventId());
+			SheetExtractor sheetExtractor = new SheetExtractor(event.sheetId());
+			Map<String, String> accessor = new HashMap<>();
+			accessor.put("Vorname", booking.firstName()); //$NON-NLS-1$
+			accessor.put("Nachname", booking.lastName()); //$NON-NLS-1$
+			accessor.put("Straße & Nr", booking.street()); //$NON-NLS-1$
+			accessor.put("PLZ & Ort", booking.city()); //$NON-NLS-1$
+			accessor.put("Email", booking.email()); //$NON-NLS-1$
+			accessor.put("Telefon", booking.phone()); //$NON-NLS-1$
+			accessor.put("SVE-Mitglied", booking.isMember() ? "J" : "N"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			List<Map<String, String>> rows = sheetExtractor.get(event.gid().intValue(), new ArrayList<>(accessor.keySet()));
+			for (Map<String, String> row : rows) {
+				boolean match = true;
+				for (Entry<String, String> cell : row.entrySet()) {
+					String value = accessor.get(cell.getKey());
+					String cellValue = cell.getValue();
+					if (!Objects.equals(requireNonNullElse(value, "").strip(),	 //$NON-NLS-1$
+										requireNonNullElse(cellValue, "").strip())) { //$NON-NLS-1$
+						match = false;
+						break;
+					}
+
+				}
+				if (match) {
+					return BookingResponse.failure("Der Buchungslink wurde schon benutzt und ist daher ungültig."); //$NON-NLS-1$
+				}
+			}
+			return null;
+		} catch (Throwable t) {
+			LOG.error("Prebooking check failed", t); //$NON-NLS-1$
+			return BookingResponse.failure(MESSAGE_FAIL);
+		}
 	}
 
 	public static BookingResponse booking(EventBooking booking) {
