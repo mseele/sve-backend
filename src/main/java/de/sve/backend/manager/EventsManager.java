@@ -97,9 +97,9 @@ public class EventsManager {
 													   "Pre-Booking"); //$NON-NLS-1$
 			BookingResponse checkResult = checkPrebooking(booking);
 			if (checkResult != null) {
-				return booking(booking);
+				return checkResult;
 			}
-			return checkResult;
+			return booking(booking);
 		}
 		LOG.error("Booking failed beacuse spitted prebooking hash (" + decoded + ") has an invalid length:" + Arrays.asList(splitted)); //$NON-NLS-1$ //$NON-NLS-2$
 		return BookingResponse.failure(MESSAGE_FAIL);
