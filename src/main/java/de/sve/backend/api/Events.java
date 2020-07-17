@@ -22,6 +22,7 @@ import de.sve.backend.model.events.BookingResponse;
 import de.sve.backend.model.events.Event;
 import de.sve.backend.model.events.EventBooking;
 import de.sve.backend.model.events.EventCounter;
+import de.sve.backend.store.DataStore;
 
 @Path("/events")
 @SuppressWarnings("static-method")
@@ -94,6 +95,18 @@ public class Events {
 			return Response.status(Status.OK).build();
 		} catch (Throwable t) {
 			LOG.error("Could not save new event: " + event, t); //$NON-NLS-1$
+			return Response.status(Status.BAD_REQUEST).entity(t).build();
+		}
+	}
+
+	@Path("/refresh")
+	@POST
+	public Response refresh() {
+		try {
+			DataStore.reload();
+			return Response.status(Status.OK).build();
+		} catch (Throwable t) {
+			LOG.error("Refresh failed", t); //$NON-NLS-1$
 			return Response.status(Status.BAD_REQUEST).entity(t).build();
 		}
 	}
