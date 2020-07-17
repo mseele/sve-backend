@@ -131,6 +131,7 @@ public class EventsManager {
 
 				}
 				if (match) {
+					LOG.warn("Prebooking link data has been detected and invalidated for booking " + booking); //$NON-NLS-1$
 					return BookingResponse.failure("Der Buchungslink wurde schon benutzt und ist daher ungültig."); //$NON-NLS-1$
 				}
 			}
