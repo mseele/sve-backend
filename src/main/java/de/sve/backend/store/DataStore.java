@@ -86,6 +86,10 @@ public class DataStore {
 		}
 	}
 
+	public static void reload() throws Exception {
+		reloadCache();
+	}
+
 	private static void lazyLoad() throws Exception {
 		if (LAST_REFRESH == null || LAST_REFRESH.isBefore(LAST_REFRESH.minusMinutes(60))) {
 			reloadCache();
