@@ -1,6 +1,7 @@
 package de.sve.backend;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.google.gson.Gson;
@@ -20,6 +21,7 @@ public class Utils {
 	public static Gson gson() {
 		return new GsonBuilder().registerTypeAdapterFactory(GenerateTypeAdapter.FACTORY)
 								.registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+								.registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
 								.create();
 	}
 
@@ -29,6 +31,7 @@ public class Utils {
 
 	private static class LocalDateTimeAdapter extends TypeAdapter<LocalDateTime> {
 
+		@SuppressWarnings("resource")
 		@Override
 		public void write(final JsonWriter jsonWriter, final LocalDateTime date) throws IOException {
 			if (date == null) {
@@ -45,6 +48,29 @@ public class Utils {
 				return null;
 			}
 			return LocalDateTime.parse(jsonReader.nextString());
+		}
+
+	}
+
+	private static class LocalDateAdapter extends TypeAdapter<LocalDate> {
+
+		@SuppressWarnings("resource")
+		@Override
+		public void write(final JsonWriter jsonWriter, final LocalDate date) throws IOException {
+			if (date == null) {
+				jsonWriter.nullValue();
+			} else {
+				jsonWriter.value(date.toString());
+			}
+		}
+
+		@Override
+		public LocalDate read(final JsonReader jsonReader) throws IOException {
+			if (jsonReader.peek() == JsonToken.NULL) {
+				jsonReader.nextNull();
+				return null;
+			}
+			return LocalDate.parse(jsonReader.nextString());
 		}
 
 	}
