@@ -108,6 +108,10 @@ public class EventsManager {
 	private static BookingResponse checkPrebooking(EventBooking booking) {
 		try {
 			Event event = DataStore.event(booking.eventId());
+			if (!event.beta()) {
+				LOG.warn("Prebooking has ended for booking " + booking); //$NON-NLS-1$
+				return BookingResponse.failure("Der Buchungslink ist nicht mehr gültig da die Frühbuchungsphase zu Ende ist."); //$NON-NLS-1$
+			}
 			SheetExtractor sheetExtractor = new SheetExtractor(event.sheetId());
 			Map<String, String> accessor = new HashMap<>();
 			accessor.put("Vorname", booking.firstName()); //$NON-NLS-1$
