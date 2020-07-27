@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.6.0](https://github.com/mseele/sve-backend/compare/v1.5.1...v1.6.0) (2020-07-27)
+
+
+### Features
+
+* **events:** add refresh post request ([32bd4a1](https://github.com/mseele/sve-backend/commit/32bd4a1790da3021d8752d6318dbf2ed46b00a66))
+* **prebooking:** identify duplicate link clicks ([fca7e5d](https://github.com/mseele/sve-backend/commit/fca7e5d44cb5bad38cf22bea24f898663aeda8a0))
+
+
+### Bug Fixes
+
+* **prebooking:** fix wrong if clause when checking prebooking ([6bc83d9](https://github.com/mseele/sve-backend/commit/6bc83d9c93fab7221626248df421f6be6d717cd4))
+* **prebooking:** invalidate prebooking for non-beta events ([64ff51b](https://github.com/mseele/sve-backend/commit/64ff51b34ccf9e75986e79920a192220a3db2460))
+* **prebooking:** log warn message if booking link is invalid ([4347c6b](https://github.com/mseele/sve-backend/commit/4347c6b567edcf66c8273bbdf3de240c6151a9e4))
+
 ### [1.5.1](https://github.com/mseele/sve-backend/compare/v1.5.0...v1.5.1) (2020-06-26)
 
 
