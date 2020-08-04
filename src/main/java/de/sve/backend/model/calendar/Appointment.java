@@ -12,9 +12,14 @@ import com.ryanharter.auto.value.gson.GenerateTypeAdapter;
 @GenerateTypeAdapter
 public abstract class Appointment {
 
-	public static Appointment create(String title, String description, LocalDate startDate, LocalDate endDate, LocalDateTime startDateTime, LocalDateTime endDateTime) {
-		return new AutoValue_Appointment(title, description, startDate, endDate, startDateTime, endDateTime);
+	public static Appointment create(String id, int sortIndex, String title, String description, LocalDate startDate, LocalDate endDate, LocalDateTime startDateTime, LocalDateTime endDateTime) {
+		return new AutoValue_Appointment(id, sortIndex, title, description, startDate, endDate, startDateTime, endDateTime);
 	}
+
+	@Nullable
+	public abstract String id();
+
+	public abstract int sortIndex();
 
 	public abstract String title();
 
