@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -43,10 +44,13 @@ public class CalendarService {
         						 .setOrderBy("startTime") //$NON-NLS-1$
         						 .setSingleEvents(true)
         						 .execute();
+		AtomicInteger sortIndexer = new AtomicInteger(0);
 		return events.getItems().stream().map(item -> {
 			EventDateTime start = item.getStart();
 			EventDateTime end = item.getEnd();
-			return Appointment.create(item.getSummary(),
+			return Appointment.create(item.getId(),
+									  sortIndexer.getAndIncrement(),
+									  item.getSummary(),
 									  item.getDescription(),
 									  toLocalDate(start, 0),
 									  toLocalDate(end, -1),
