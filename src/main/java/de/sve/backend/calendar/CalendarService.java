@@ -69,6 +69,7 @@ public class CalendarService {
 			return Appointment.create(item.getId(),
 									  sortIndexer.getAndIncrement(),
 									  item.getSummary(),
+									  item.getHtmlLink(),
 									  item.getDescription(),
 									  toLocalDate(start, 0),
 									  toLocalDate(end, -1),
