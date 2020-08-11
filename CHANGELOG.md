@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.8.0](https://github.com/mseele/sve-backend/compare/v1.7.0...v1.8.0) (2020-08-11)
+
+
+### Features
+
+* **calendar:** add html link to appointment ([5013ed4](https://github.com/mseele/sve-backend/commit/5013ed4f6d9ed9397a1037f99319ea850212d9e9)), closes [#34](https://github.com/mseele/sve-backend/issues/34)
+* **calendar:** add notifications hook ([8e2ede5](https://github.com/mseele/sve-backend/commit/8e2ede568d207a8292b3c7a06bdf63063fda6996))
+* **calendar:** add watch/stop calendar api calls ([0fc1634](https://github.com/mseele/sve-backend/commit/0fc16343764ae8c9b06c1939a24f15479d431e52))
+
+
+### Bug Fixes
+
+* **api:** add id and sortIndex to appointment ([642e4a2](https://github.com/mseele/sve-backend/commit/642e4a20bea8b0996581dfc96010840cf512d49a))
+
 ## [1.7.0](https://github.com/mseele/sve-backend/compare/v1.6.0...v1.7.0) (2020-07-27)
 
 
