@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -19,6 +20,7 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
+import com.google.api.services.calendar.model.Channel;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.Events;
 import com.google.auth.http.HttpCredentialsAdapter;
@@ -34,6 +36,22 @@ public class CalendarService {
 	private static final List<String> SCOPES = Collections.singletonList(CalendarScopes.CALENDAR_READONLY);
 
 	private static final String TIME_ZONE = "Europe/Berlin"; //$NON-NLS-1$
+
+	public static Channel watch(String calendarId, String id, LocalDateTime expiration) throws IOException, GeneralSecurityException {
+		Channel content = new Channel();
+		content.put("id", id); //$NON-NLS-1$
+		content.put("type", "web_hook"); //$NON-NLS-1$ //$NON-NLS-2$
+		content.put("address", "https://sve-backend.appspot.com/api/calendar/notifications"); //$NON-NLS-1$ //$NON-NLS-2$
+		content.put("expiration", expiration.toEpochSecond(ZoneOffset.UTC) * 1000); //$NON-NLS-1$
+		return service().events().watch(calendarId, content).execute();
+	}
+
+	public static void stop(String id, String resourceId) throws IOException, GeneralSecurityException {
+		Channel content = new Channel();
+		content.put("id", id); //$NON-NLS-1$
+		content.put("resourceId", resourceId); //$NON-NLS-1$
+		service().channels().stop(content).execute();
+	}
 
 	public static List<Appointment> appointments(String calendarId, int maxResults) throws GeneralSecurityException, IOException {
 		DateTime timeMin = new DateTime(new Date(System.currentTimeMillis()), TimeZone.getTimeZone(TIME_ZONE));
