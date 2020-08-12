@@ -51,7 +51,7 @@ dependencies {
     implementation 'com.google.apis:google-api-services-calendar:v3-rev20200610-1.30.10'
     implementation 'io.mikael:urlbuilder:2.0.9'
     implementation 'org.apache.commons:commons-text:1.9'
-    implementation 'com.google.cloud:google-cloud-logging-logback:0.118.1-alpha'
+    implementation 'com.google.cloud:google-cloud-logging-logback:0.118.2-alpha'
     annotationProcessor "com.google.auto.value:auto-value:${autoValueVersion}"
     annotationProcessor "com.ryanharter.auto.value:auto-value-gson-extension:${autoValueGsonVersion}"
     annotationProcessor "com.ryanharter.auto.value:auto-value-gson-factory:${autoValueGsonVersion}"
