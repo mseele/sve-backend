@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.9.0](https://github.com/mseele/sve-backend/compare/v1.8.0...v1.9.0) (2020-08-13)
+
+
+### Features
+
+* **calendar:** trigger re-deploy on calendar change ([ff5dbe1](https://github.com/mseele/sve-backend/commit/ff5dbe1634622c8b8c4de3a44f005cd40a67a259))
+* **email:** send multiple emails via 1 smtp session ([9e22c80](https://github.com/mseele/sve-backend/commit/9e22c808745355b65e0c11ba301fd96d51529f5f)), closes [#31](https://github.com/mseele/sve-backend/issues/31)
+
 ## [1.8.0](https://github.com/mseele/sve-backend/compare/v1.7.0...v1.8.0) (2020-08-11)
 
 
