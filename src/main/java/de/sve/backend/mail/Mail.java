@@ -11,7 +11,7 @@ import com.google.common.collect.ImmutableSet;
 
 /**
  * Create and send an email.
- * 
+ *
  * @author mseele
  */
 @AutoValue
@@ -21,6 +21,10 @@ public abstract class Mail {
 		return new AutoValue_Mail.Builder().sender(account)
 										   .bcc()
 										   .attachments();
+	}
+
+	public static void send(List<Mail> mails) throws MessagingException {
+		Postman.deliver(mails);
 	}
 
 	public abstract MailAccount sender();
@@ -57,7 +61,7 @@ public abstract class Mail {
 
 		public abstract Builder attachments(Attachment... value);
 
-		abstract Mail build();
+		public abstract Mail build();
 
 		public void send() throws MessagingException {
 			Postman.deliver(build());

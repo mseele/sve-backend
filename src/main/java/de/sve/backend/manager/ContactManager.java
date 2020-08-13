@@ -1,5 +1,6 @@
 package de.sve.backend.manager;
 
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import de.sve.backend.mail.Attachment;
 import de.sve.backend.mail.Mail;
 import de.sve.backend.model.contact.Email;
+import de.sve.backend.model.contact.Emails;
 import de.sve.backend.model.contact.Message;
 
 public class ContactManager {
@@ -42,20 +44,26 @@ public class ContactManager {
 		LOG.info("Info message has been send successfully"); //$NON-NLS-1$
 	}
 
-	public static void email(Email email) throws Exception {
-		List<Email.Attachment> attachments = email.attachments();
-		if (attachments == null) {
-			attachments = Collections.emptyList();
+	public static void emails(Emails emails) throws Exception {
+		List<Mail> mails = new ArrayList<>();
+		for (Email email : emails.emails()) {
+			List<Email.Attachment> attachments = email.attachments();
+			if (attachments == null) {
+				attachments = Collections.emptyList();
+			}
+			mails.add(Mail.via(email.type().mailAccount())
+						  .to(email.to())
+						  .subject(email.subject())
+						  .content(email.content())
+						  .attachments(attachments.stream()
+								  				  .map(a -> Attachment.create(a.name(),
+								  						  					  Base64.getDecoder().decode(a.data()),
+								  						  					  a.mimeType()))
+								  				  .collect(Collectors.toList()))
+						  .build());
 		}
-		Mail.via(email.type().mailAccount())
-			.to(email.to())
-			.subject(email.subject())
-			.content(email.content())
-			.attachments(attachments.stream()
-							  		.map(a -> Attachment.create(a.name(), Base64.getDecoder().decode(a.data()), a.mimeType()))
-							  		.collect(Collectors.toList()))
-			.send();
-		LOG.info("Email has been send successfully"); //$NON-NLS-1$
+		Mail.send(mails);
+		LOG.info("Emails (" + mails.size() + ") has been send successfully"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 }
