@@ -47,7 +47,7 @@ dependencies {
     implementation 'com.sun.mail:jakarta.mail:1.6.5'
     implementation 'com.google.cloud:google-cloud-firestore:1.35.2'
     implementation 'com.google.auth:google-auth-library-oauth2-http:0.21.1'
-    implementation 'com.google.apis:google-api-services-sheets:v4-rev20200707-1.30.10'
+    implementation 'com.google.apis:google-api-services-sheets:v4-rev20200813-1.30.10'
     implementation 'com.google.apis:google-api-services-calendar:v3-rev20200610-1.30.10'
     implementation 'io.mikael:urlbuilder:2.0.9'
     implementation 'org.apache.commons:commons-text:1.9'
