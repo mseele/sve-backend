@@ -45,7 +45,7 @@ dependencies {
     implementation "com.ryanharter.auto.value:auto-value-gson-runtime:${autoValueGsonVersion}"
     implementation 'com.google.guava:guava:29.0-jre'
     implementation 'com.sun.mail:jakarta.mail:1.6.5'
-    implementation 'com.google.cloud:google-cloud-firestore:1.35.2'
+    implementation 'com.google.cloud:google-cloud-firestore:2.0.0'
     implementation 'com.google.auth:google-auth-library-oauth2-http:0.21.1'
     implementation 'com.google.apis:google-api-services-sheets:v4-rev20200707-1.30.10'
     implementation 'com.google.apis:google-api-services-calendar:v3-rev20200610-1.30.10'
