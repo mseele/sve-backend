@@ -16,13 +16,10 @@ import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Session;
 import javax.mail.Transport;
-import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
-
-import com.google.common.collect.ImmutableSet;
 
 /**
  * Resposible for sending emails.
@@ -58,8 +55,9 @@ public class Postman {
 					MimeMessage message = new MimeMessage(session);
 					// recipients
 					message.setFrom(new InternetAddress(account.email()));
-					InternetAddress[] addresses = addresses(mail.to());
-					message.setRecipients(Message.RecipientType.TO, addresses);
+					for (String recipient : mail.to()) {
+						message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient));
+					}
 					for (String recipient : mail.bcc()) {
 						message.addRecipient(Message.RecipientType.BCC, new InternetAddress(recipient));
 					}
@@ -85,20 +83,10 @@ public class Postman {
 					message.setContent(multipart);
 					message.saveChanges();
 					// Send message
-					transport.sendMessage(message, addresses);
+					transport.sendMessage(message, message.getAllRecipients());
 				}
 			}
 		}
-	}
-
-	private static final InternetAddress[] addresses(ImmutableSet<String> recipients) throws AddressException {
-		InternetAddress[] addresses = new InternetAddress[recipients.size()];
-		int i = 0;
-		for (String recipient : recipients) {
-			addresses[i] = new InternetAddress(recipient);
-			i++;
-		}
-		return addresses;
 	}
 
 }
