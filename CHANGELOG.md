@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.1](https://github.com/mseele/sve-backend/compare/v1.9.0...v1.9.1) (2020-08-21)
+
+
+### Bug Fixes
+
+* **email:** fix bcc recipients bug ([335ceca](https://github.com/mseele/sve-backend/commit/335ceca3990008c0488115d8bd73249ef72064c7))
+
 ## [1.9.0](https://github.com/mseele/sve-backend/compare/v1.8.0...v1.9.0) (2020-08-13)
 
 
