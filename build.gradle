@@ -48,7 +48,7 @@ dependencies {
     implementation 'com.google.cloud:google-cloud-firestore:2.0.0'
     implementation 'com.google.auth:google-auth-library-oauth2-http:0.21.1'
     implementation 'com.google.apis:google-api-services-sheets:v4-rev20200813-1.30.10'
-    implementation 'com.google.apis:google-api-services-calendar:v3-rev20200610-1.30.10'
+    implementation 'com.google.apis:google-api-services-calendar:v3-rev20200818-1.30.10'
     implementation 'io.mikael:urlbuilder:2.0.9'
     implementation 'org.apache.commons:commons-text:1.9'
     implementation 'com.google.cloud:google-cloud-logging-logback:0.118.2-alpha'
