@@ -26,7 +26,7 @@ repositories {
 
 ext {
     jettyVersion = '9.4.31.v20200723'
-    jerseyVersion = '2.31'
+    jerseyVersion = '2.32'
     autoValueVersion = '1.7.4'
     autoValueGsonVersion = '1.3.0'
 }
