@@ -2,9 +2,11 @@ package de.sve.backend.store;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -47,10 +49,10 @@ public class EventsStore implements AutoCloseable {
 	}
 
 	protected void saveEvent(Event event) throws InterruptedException, ExecutionException {
-		List<String> dates = event.dates()
-								  .stream()
-								  .map(LocalDateTime::toString)
-								  .collect(Collectors.toList());
+		List<LocalDateTime> list = Objects.requireNonNullElse(event.dates(), Collections.emptyList());
+		List<String> dates = list.stream()
+								 .map(LocalDateTime::toString)
+								 .collect(Collectors.toList());
 		Map<String, Object> data = new HashMap<>();
 		data.put("sheetId", event.sheetId()); //$NON-NLS-1$
 		data.put("gid", event.gid()); //$NON-NLS-1$

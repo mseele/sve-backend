@@ -1,6 +1,8 @@
 package de.sve.backend.api.utils;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map.Entry;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
@@ -13,6 +15,8 @@ import javax.ws.rs.ext.Provider;
 @Provider
 @PreMatching
 public class CORSFilter implements ContainerRequestFilter, ContainerResponseFilter {
+
+	private static final String ACCESS_CONTROL_REQUEST_HEADERS = "access-control-request-headers"; //$NON-NLS-1$
 
 	/**
 	 * Method for ContainerRequestFilter.
@@ -51,10 +55,18 @@ public class CORSFilter implements ContainerRequestFilter, ContainerResponseFilt
 		if (isPreflightRequest(request)) {
 			response.getHeaders().add("Access-Control-Allow-Credentials", "true"); //$NON-NLS-1$ //$NON-NLS-2$
 			response.getHeaders().add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD"); //$NON-NLS-1$ //$NON-NLS-2$
-			// Whatever other non-standard/safe headers (see list above)
-			// you want the client to be able to send to the server,
-			// put it in this list. And remove the ones you don't want.
-			response.getHeaders().add("Access-Control-Allow-Headers", "*"); //$NON-NLS-1$ //$NON-NLS-2$
+			// Allow all requested headers - if there are some
+			for (Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
+				if (ACCESS_CONTROL_REQUEST_HEADERS.equals(entry.getKey().toLowerCase())) {
+					for (String value : entry.getValue()) {
+						if (value != null) {
+							response.getHeaders().add("Access-Control-Allow-Headers", value); //$NON-NLS-1$
+							break;
+						}
+					}
+					break;
+				}
+			}
 		}
 
 		// Cross origin requests can be either simple requests
