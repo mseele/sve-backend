@@ -7,6 +7,8 @@ import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import de.sve.backend.tasks.CheckEmailConnectivity;
+
 public class Application {
 
 	private static final Logger LOG = LoggerFactory.getLogger(Application.class);
@@ -22,6 +24,9 @@ public class Application {
 
 		// warm-up handler
 		ctx.addServlet(Warmup.class, "/_ah/warmup"); //$NON-NLS-1$
+
+		// tasks
+		ctx.addServlet(CheckEmailConnectivity.class, "/tasks/check_email_connectivity"); //$NON-NLS-1$
 
 		// jersy handler
 		final ServletHolder serHol = ctx.addServlet(ServletContainer.class, "/api/*"); //$NON-NLS-1$

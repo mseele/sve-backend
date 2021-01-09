@@ -28,6 +28,12 @@ import jakarta.mail.internet.MimeMultipart;
  */
 public class Postman {
 
+	protected static void checkConnectivity(MailAccount account) throws MessagingException {
+		connect(account, (session, transport) -> {
+			// do nothing
+		});
+	}
+
 	protected static void deliver(Mail mail) throws MessagingException {
 		deliver(Arrays.asList(mail));
 	}
@@ -37,19 +43,9 @@ public class Postman {
 	}
 
 	private static void deliver(Map<MailAccount, List<Mail>> mails) throws MessagingException {
-		// smtp properties
-		Properties properties = System.getProperties();
-		String server = "smtp.gmail.com"; //$NON-NLS-1$
-		properties.put("mail.smtp.host", server); //$NON-NLS-1$
-		properties.put("mail.smtp.port", "465"); //$NON-NLS-1$ //$NON-NLS-2$
-		properties.put("mail.smtp.ssl.enable", "true"); //$NON-NLS-1$ //$NON-NLS-2$
-		properties.put("mail.smtp.auth", "true"); //$NON-NLS-1$ //$NON-NLS-2$
 		for (Entry<MailAccount, List<Mail>> entry : mails.entrySet()) {
-			// authenticate
-			Session session = Session.getInstance(properties);
-			try (Transport transport = session.getTransport("smtp")) { //$NON-NLS-1$
-				MailAccount account = entry.getKey();
-				transport.connect(server, account.userName(), account.password());
+			MailAccount account = entry.getKey();
+			connect(account, (session, transport) -> {
 				// send mails
 				for (Mail mail : entry.getValue()) {
 					MimeMessage message = new MimeMessage(session);
@@ -85,8 +81,30 @@ public class Postman {
 					// Send message
 					transport.sendMessage(message, message.getAllRecipients());
 				}
-			}
+			});
 		}
+	}
+
+	private static void connect(MailAccount account, IMessageConsumer consumer) throws MessagingException {
+		// smtp properties
+		Properties properties = System.getProperties();
+		String server = "smtp.gmail.com"; //$NON-NLS-1$
+		properties.put("mail.smtp.host", server); //$NON-NLS-1$
+		properties.put("mail.smtp.port", "465"); //$NON-NLS-1$ //$NON-NLS-2$
+		properties.put("mail.smtp.ssl.enable", "true"); //$NON-NLS-1$ //$NON-NLS-2$
+		properties.put("mail.smtp.auth", "true"); //$NON-NLS-1$ //$NON-NLS-2$
+		// authenticate
+		Session session = Session.getInstance(properties);
+		try (Transport transport = session.getTransport("smtp")) { //$NON-NLS-1$
+			transport.connect(server, account.userName(), account.password());
+			consumer.consume( session, transport);
+		}
+	}
+
+	private static interface IMessageConsumer {
+
+		void consume(Session session, Transport transport) throws MessagingException;
+
 	}
 
 }

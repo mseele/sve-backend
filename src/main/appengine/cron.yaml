@@ -1,0 +1,4 @@
+cron:
+- description: "weekly check of email connectivity"
+  url: /tasks/check_email_connectivity
+  schedule: every monday 19:00
