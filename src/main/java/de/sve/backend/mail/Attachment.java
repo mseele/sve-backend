@@ -1,13 +1,13 @@
 package de.sve.backend.mail;
 
-import javax.activation.DataSource;
-import javax.mail.util.ByteArrayDataSource;
-
 import com.google.auto.value.AutoValue;
+
+import jakarta.activation.DataSource;
+import jakarta.mail.util.ByteArrayDataSource;
 
 /**
  * Creates an attachment for an email.
- * 
+ *
  * @author mseele
  */
 @AutoValue

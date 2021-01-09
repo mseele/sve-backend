@@ -3,11 +3,12 @@ package de.sve.backend.mail;
 import java.util.List;
 
 import javax.annotation.Nullable;
-import javax.mail.MessagingException;
 
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+
+import jakarta.mail.MessagingException;
 
 /**
  * Create and send an email.
