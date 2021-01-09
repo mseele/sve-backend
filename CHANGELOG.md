@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.2](https://github.com/mseele/sve-backend/compare/v1.9.1...v1.9.2) (2020-11-08)
+
+
+### Bug Fixes
+
+* **cors:** do not use wildcard to work on older browsers ([b6a2ba3](https://github.com/mseele/sve-backend/commit/b6a2ba3bacf7147441031e54095d6b8ae87fc693))
+* **store:** fix possible NPE when using customDate ([831ad05](https://github.com/mseele/sve-backend/commit/831ad05343050b6f38901a29610e1e80129f73a9))
+
 ### [1.9.1](https://github.com/mseele/sve-backend/compare/v1.9.0...v1.9.1) (2020-08-21)
 
 
