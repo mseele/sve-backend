@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import de.sve.backend.tasks.CheckEmailConnectivity;
+import de.sve.backend.tasks.RenewCalendarWatch;
 
 public class Application {
 
@@ -27,6 +28,7 @@ public class Application {
 
 		// tasks
 		ctx.addServlet(CheckEmailConnectivity.class, "/tasks/check_email_connectivity"); //$NON-NLS-1$
+		ctx.addServlet(RenewCalendarWatch.class, "/tasks/renew_calendar_watch"); //$NON-NLS-1$
 
 		// jersy handler
 		final ServletHolder serHol = ctx.addServlet(ServletContainer.class, "/api/*"); //$NON-NLS-1$
