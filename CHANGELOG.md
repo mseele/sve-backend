@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.10.0](https://github.com/mseele/sve-backend/compare/v1.9.2...v1.10.0) (2021-01-09)
+
+
+### Features
+
+* **tasks:** add check email connectivity task ([ddd58b3](https://github.com/mseele/sve-backend/commit/ddd58b3b6083ecd20419aa9cd20b0e2008aae626))
+* **tasks:** add renew calendar watch task ([48234a1](https://github.com/mseele/sve-backend/commit/48234a1bafd335d9c3d71e099a270609f237ff11))
+
 ### [1.9.2](https://github.com/mseele/sve-backend/compare/v1.9.1...v1.9.2) (2020-11-08)
 
 
