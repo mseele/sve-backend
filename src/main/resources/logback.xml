@@ -1,9 +1,10 @@
 <configuration>
 	<appender name="CLOUD" class="com.google.cloud.logging.logback.LoggingAppender">
-		<!-- Optional : filter logs at or above a level -->
 		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-			<level>DEBUG</level>
+			<level>INFO</level>
 		</filter>
+		<log>application.log</log>
+		<resourceType>gae_app</resourceType>
 	</appender>
 
 	<root level="info">
