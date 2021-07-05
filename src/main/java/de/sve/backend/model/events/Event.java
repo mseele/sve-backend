@@ -103,18 +103,6 @@ public abstract class Event {
 		return subscribers() >= maxSubscribers() && waitingList() >= maxWaitingList();
 	}
 
-	public Event bookEvent() {
-		Long subscribers = subscribers();
-		Long waitingList = waitingList();
-		if (maxSubscribers() == -1 || subscribers() < maxSubscribers()) {
-			subscribers = Long.valueOf(subscribers.longValue() + 1);
-		} else if (waitingList < maxWaitingList()) {
-			waitingList = Long.valueOf(waitingList.longValue() + 1);
-		}
-		return create(id(), sheetId(), gid(), type(), name(), sortIndex(), visible(), beta(), shortDescription(), description(), image(), light(), dates(), customDate(), durationInMinutes(),
-				maxSubscribers(), subscribers, costMember(), costNonMember(), waitingList, maxWaitingList(), location(), bookingTemplate(), waitingTemplate(), externalOperator());
-	}
-
 	public Event update(Event event) {
 		return create(id(),
 					  requireNonNullElse(event.sheetId(), sheetId()),

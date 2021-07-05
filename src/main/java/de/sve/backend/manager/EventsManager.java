@@ -150,9 +150,15 @@ public class EventsManager {
 		try {
 			Event event = DataStore.event(booking.eventId());
 			if (event.maxSubscribers() == -1 || event.subscribers() < event.maxSubscribers()) {
-				return successfullBooking(booking, event.bookEvent(), true);
+				event = DataStore.book(booking.eventId(), true);
+				if (event.maxSubscribers() == -1 || event.subscribers() <= event.maxSubscribers()) {
+					return successfullBooking(booking, event, true);
+				}
 			} else if (event.waitingList() < event.maxWaitingList()) {
-				return successfullBooking(booking, event.bookEvent(), false);
+				event = DataStore.book(booking.eventId(), false);
+				if (event.waitingList() <= event.maxWaitingList()) {
+					return successfullBooking(booking, event, false);
+				}
 			}
 			LOG.error("Booking failed because Event (" + event.id() + ") was overbooked."); //$NON-NLS-1$ //$NON-NLS-2$
 			return BookingResponse.failure(MESSAGE_FAIL);
@@ -170,7 +176,6 @@ public class EventsManager {
 			NewsManager.subscribe(subscription, false);
 		}
 		sendMail(booking, event, isBooking);
-		DataStore.save(event);
 		LOG.info("Booking of Event (" + event.id() + ") was successfull: " + result); //$NON-NLS-1$ //$NON-NLS-2$
 		String message;
 		if (isBooking) {
