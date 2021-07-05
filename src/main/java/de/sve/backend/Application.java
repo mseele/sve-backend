@@ -23,9 +23,6 @@ public class Application {
 		ctx.setContextPath("/"); //$NON-NLS-1$
 		server.setHandler(ctx);
 
-		// warm-up handler
-		ctx.addServlet(Warmup.class, "/_ah/warmup"); //$NON-NLS-1$
-
 		// tasks
 		ctx.addServlet(CheckEmailConnectivity.class, "/tasks/check_email_connectivity"); //$NON-NLS-1$
 		ctx.addServlet(RenewCalendarWatch.class, "/tasks/renew_calendar_watch"); //$NON-NLS-1$

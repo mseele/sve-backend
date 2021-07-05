@@ -2,6 +2,3 @@ runtime: java11
 instance_class: F2
 
 entrypoint: java -jar sve-backend-all.jar
-
-inbound_services:
-- warmup
