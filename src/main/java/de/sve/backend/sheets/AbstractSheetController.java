@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.Sheet;
@@ -24,11 +24,11 @@ public abstract class AbstractSheetController {
 	private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
 
 	protected Sheets fSheets;
-	
+
 	protected String fSpreadsheetId;
 
 	public AbstractSheetController(String spreadsheetId) throws GeneralSecurityException, IOException {
-		this.fSheets = new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), credentials())
+		this.fSheets = new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), GsonFactory.getDefaultInstance(), credentials())
 								 .setApplicationName("sve-backend-sheet-controller") //$NON-NLS-1$
 								 .build();
 		this.fSpreadsheetId = spreadsheetId;
