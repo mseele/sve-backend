@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.FieldValue;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.FirestoreOptions;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
@@ -46,6 +47,12 @@ public class EventsStore implements AutoCloseable {
 			return create(document);
 		}
 		return null;
+	}
+
+	protected Event increment(String id, boolean isBooking) throws InterruptedException, ExecutionException {
+		String name = isBooking ? "subscribers" : "waitingList"; //$NON-NLS-1$ //$NON-NLS-2$
+		collection().document(id).update(name, FieldValue.increment(1)).get();
+		return loadEvent(id);
 	}
 
 	protected void saveEvent(Event event) throws InterruptedException, ExecutionException {

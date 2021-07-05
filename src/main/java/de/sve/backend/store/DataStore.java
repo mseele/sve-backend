@@ -37,6 +37,12 @@ public class DataStore {
 		}
 	}
 
+	public static Event book(String id, boolean isBooking) throws Exception {
+		try (EventsStore store = new EventsStore()) {
+			return store.increment(id, isBooking);
+		}
+	}
+
 	public static void subscribe(Subscription data) throws Exception {
 		try (NewsStore store = new NewsStore()) {
 			Subscription subscription = store.loadSubscription(data);
