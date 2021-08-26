@@ -55,14 +55,15 @@ public class EventsManager {
 
 	private static String MESSAGE_FAIL = "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal."; //$NON-NLS-1$
 
-	public static List<Event> events(boolean beta) throws Exception {
-		return events(beta, null);
-	}
-
-	public static List<Event> events(Boolean beta, EventType type) throws Exception {
+	public static List<Event> events(Boolean all, Boolean beta) throws Exception {
 		return DataStore.events()
 				.stream()
-		 		.filter(e -> e.visible() && (type == null || type == e.type()) && (beta == null || beta.booleanValue() == e.beta()))
+		 		.filter(e -> {
+					if (Boolean.TRUE == all) {
+						return true;
+					}
+		 			return e.visible() && (beta == null || beta.booleanValue() == e.beta());
+		 		})
 		 		.sorted((event1, event2) -> {
 					 if (event1.isBookedUp() == event2.isBookedUp()) {
 						 return event1.sortIndex().compareTo(event2.sortIndex());

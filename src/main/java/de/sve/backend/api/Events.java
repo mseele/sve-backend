@@ -30,9 +30,9 @@ public class Events {
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public List<Event> getEvents(@QueryParam("beta") boolean beta) throws BackendException {
+	public List<Event> getEvents(@QueryParam("beta") Boolean beta, @QueryParam("beta") Boolean all) throws BackendException {
 		try {
-			return EventsManager.events(beta);
+			return EventsManager.events(all, beta);
 		} catch (Throwable t) {
 			String message = "Error while loading events"; //$NON-NLS-1$
 			LOG.error(message, t);
