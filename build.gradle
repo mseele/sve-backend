@@ -71,7 +71,7 @@ shadowJar {
 appengine {
     deploy {
         projectId = "sve-backend"
-        version = "12"
+        version = "13"
         stopPreviousVersion = false
         promote = false
     }
