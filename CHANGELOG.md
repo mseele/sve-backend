@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.11.0](https://github.com/mseele/sve-backend/compare/v1.10.0...v1.11.0) (2021-08-26)
+
+
+### Features
+
+* add new all param for events api ([64b635e](https://github.com/mseele/sve-backend/commit/64b635e76fa6c097d51cd7c5c11f050335e1c4e9))
+
+
+### Bug Fixes
+
+* remove caching ([2549e5b](https://github.com/mseele/sve-backend/commit/2549e5ba5630ae0b55f4b426e9788acb67ce93a4))
+* remove race-condition when multiple bookings happen in parallel ([d1cc964](https://github.com/mseele/sve-backend/commit/d1cc964fddef2301211616a4c13e9df892172e3f))
+* switch to DEBUG filter ([7cf4db2](https://github.com/mseele/sve-backend/commit/7cf4db2ea3f2cea0b5b98fb08b5c0559d8c8d6dd))
+
 ## [1.10.0](https://github.com/mseele/sve-backend/compare/v1.9.2...v1.10.0) (2021-01-09)
 
 
