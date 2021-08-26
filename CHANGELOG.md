@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.11.1](https://github.com/mseele/sve-backend/compare/v1.11.0...v1.11.1) (2021-08-26)
+
+
+### Bug Fixes
+
+* query parameter name ([d51b486](https://github.com/mseele/sve-backend/commit/d51b486ebec0feb2e6c5f62c45e7f4e281b5a45e))
+
 ## [1.11.0](https://github.com/mseele/sve-backend/compare/v1.10.0...v1.11.0) (2021-08-26)
 
 
