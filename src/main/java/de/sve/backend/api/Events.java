@@ -30,7 +30,7 @@ public class Events {
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public List<Event> getEvents(@QueryParam("beta") Boolean beta, @QueryParam("beta") Boolean all) throws BackendException {
+	public List<Event> getEvents(@QueryParam("all") Boolean all, @QueryParam("beta") Boolean beta) throws BackendException {
 		try {
 			return EventsManager.events(all, beta);
 		} catch (Throwable t) {
