@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.12.0](https://github.com/mseele/sve-backend/compare/v1.11.1...v1.12.0) (2021-12-07)
+
+
+### Features
+
+* make booking button text configurable ([168b21d](https://github.com/mseele/sve-backend/commit/168b21da76ab4be6b1dd72adf0a3710c468cc69f))
+
 ### [1.11.1](https://github.com/mseele/sve-backend/compare/v1.11.0...v1.11.1) (2021-08-26)
 
 
