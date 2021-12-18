@@ -17,9 +17,9 @@ public abstract class Event {
 
 	public static Event create(String id, String sheetId, Long gid, EventType type, String name, Long sortIndex, Boolean visible, Boolean beta, String shortDescription, String description,
 			String image, Boolean light, List<LocalDateTime> dates, String customDate, Long durationInMinutes, Long maxSubscribers, Long subscribers, Double costMember, Double costNonMember,
-			Long waitingList, Long maxWaitingList, String location, String bookingTemplate, String waitingTemplate, String bookingButton, Boolean externalOperator) {
+			Long waitingList, Long maxWaitingList, String location, String bookingTemplate, String waitingTemplate, String altBookingButtonText, Boolean externalOperator) {
 		return new AutoValue_Event(id, sheetId, gid, type, name, sortIndex, visible, beta, shortDescription, description, image, light, dates, customDate, durationInMinutes, maxSubscribers,
-				subscribers, costMember, costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate, bookingButton, externalOperator);
+				subscribers, costMember, costNonMember, waitingList, maxWaitingList, location, bookingTemplate, waitingTemplate, altBookingButtonText, externalOperator);
 	}
 
 	public abstract String id();
@@ -94,7 +94,7 @@ public abstract class Event {
 	public abstract String waitingTemplate();
 
 	@Nullable
-	public abstract String bookingButton();
+	public abstract String altBookingButtonText();
 
 	@Nullable
 	public abstract Boolean externalOperator();
@@ -131,7 +131,7 @@ public abstract class Event {
 					  requireNonNullElse(event.location(), location()),
 					  requireNonNullElse(event.bookingTemplate(), bookingTemplate()),
 					  requireNonNullElse(event.waitingTemplate(), waitingTemplate()),
-					  requireNonNullElse(event.bookingButton(), bookingButton()),
+					  requireNonNullElse(event.altBookingButtonText(), altBookingButtonText()),
 					  requireNonNullElse(event.externalOperator(), externalOperator()));
 	}
 
