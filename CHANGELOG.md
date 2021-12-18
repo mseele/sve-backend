@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.13.0](https://github.com/mseele/sve-backend/compare/v1.12.0...v1.13.0) (2021-12-18)
+
+
+### Features
+
+* add support for alternative email addresses as sender ([d3bd4b4](https://github.com/mseele/sve-backend/commit/d3bd4b4ac280441177d237b5b51a64caca6bd005))
+
 ## [1.12.0](https://github.com/mseele/sve-backend/compare/v1.11.1...v1.12.0) (2021-12-07)
 
 
