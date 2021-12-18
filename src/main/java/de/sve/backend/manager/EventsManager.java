@@ -190,7 +190,13 @@ public class EventsManager {
 	private static void sendMail(EventBooking booking, Event event, boolean isBooking) throws Throwable {
 		try {
 			EventType type = event.type();
-			MailAccount account = MailAccount.of(type);
+			// check if the event has an alternative email address configured
+			MailAccount account = MailAccount.of(event.altEmailAddress());
+			// use default email address if a alternative
+			// email address could not be resolved
+			if (account == null) {
+				account = MailAccount.of(type);
+			}
 			Mail.Builder builder = Mail.via(account);
 			String subjectPrefix;
 			switch (type) {
