@@ -32,7 +32,7 @@ ext {
 }
 
 dependencies {
-    implementation "org.eclipse.jetty:jetty-server:${jettyVersion}"
+	implementation "org.eclipse.jetty:jetty-server:${jettyVersion}"
     implementation "org.eclipse.jetty:jetty-servlet:${jettyVersion}"
     implementation "org.eclipse.jetty:jetty-util:${jettyVersion}"
     implementation "org.glassfish.jersey.containers:jersey-container-servlet-core:${jerseyVersion}"
@@ -51,7 +51,9 @@ dependencies {
     implementation 'com.google.apis:google-api-services-calendar:v3-rev20211026-1.32.1'
     implementation 'io.mikael:urlbuilder:2.0.9'
     implementation 'org.apache.commons:commons-text:1.9'
-    implementation 'com.google.cloud:google-cloud-logging-logback:0.122.5-alpha'
+    implementation platform('com.google.cloud:libraries-bom:24.2.0')
+	implementation 'com.google.cloud:google-cloud-logging'
+	implementation 'org.slf4j:slf4j-jdk14:2.0.0-alpha5'
     annotationProcessor "com.google.auto.value:auto-value:${autoValueVersion}"
     annotationProcessor "com.ryanharter.auto.value:auto-value-gson-extension:${autoValueGsonVersion}"
     annotationProcessor "com.ryanharter.auto.value:auto-value-gson-factory:${autoValueGsonVersion}"

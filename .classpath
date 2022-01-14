@@ -75,12 +75,12 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-firestore/3.0.9/221ec35ec02e49aa8770649920766e9a47100dc0/google-cloud-firestore-3.0.9-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-firestore/3.0.9/744d56c7f54c7b564c23b1357a876efdf8cd9863/google-cloud-firestore-3.0.9.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-firestore/3.0.10/55b5c2b5f288aec6ac21258b07a039e0ab483fb8/google-cloud-firestore-3.0.10-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-firestore/3.0.10/e136459d4f4a4665fe24635a29a94e5fe6146f13/google-cloud-firestore-3.0.10.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-logging-logback/0.122.5-alpha/68c29f3505b7e6869f67c2a689aa160bbed451d3/google-cloud-logging-logback-0.122.5-alpha-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-logging-logback/0.122.5-alpha/2b0fbbfa1a44560c44b82b86e9fb612fc67b88ee/google-cloud-logging-logback-0.122.5-alpha.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-logging/3.5.3/7e2ba75c75a6d1c9ed938a2c6073dfc43f329c3f/google-cloud-logging-3.5.3-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-logging/3.5.3/a068779b97eafe944074285f97a3fa26d43c2dc4/google-cloud-logging-3.5.3.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -115,7 +115,7 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-gson/1.40.1/ac6093276dfbf5aaa26cc0e1712ec1f9c27b3087/google-http-client-gson-1.40.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-gson/1.40.1/3c9ce115e5f9c19bd16585a281140fc8c95e5b1f/google-http-client-gson-1.40.1.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-gson/1.41.0/12a3c71aa3449020825d0d2ba69d5e4151bc5a57/google-http-client-gson-1.41.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-gson/1.41.0/1a754a5dd672218a2ac667d7ff2b28df7a5a240e/google-http-client-gson-1.41.0.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -130,12 +130,12 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-apache-v2/1.39.2/a4e15e622c860fc0a13b65c3756401d3fcecdac8/google-http-client-apache-v2-1.39.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-apache-v2/1.39.2/aa58c06d8f5eb1db008771fb0473e5a36e41c45f/google-http-client-apache-v2-1.39.2.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-apache-v2/1.41.0/cbcd2c2741a88e3bef56034070e453c01ffad78f/google-http-client-apache-v2-1.41.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client-apache-v2/1.41.0/d3edd9b035d8407a359c3395a5a7f1b3d1e534e/google-http-client-apache-v2-1.41.0.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client/1.40.1/100577a1205b74a577156c4176a195ce8224e048/google-http-client-1.40.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client/1.40.1/23e18f41fe9280eee4a6c43790ae3e89ed4d2759/google-http-client-1.40.1.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client/1.41.0/32e564cf99daed1c8e9c5b628bf25530428e1cb0/google-http-client-1.41.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.http-client/google-http-client/1.41.0/6334215e876a7bda17072910e16b150868a7018b/google-http-client-1.41.0.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -145,7 +145,7 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/proto-google-cloud-firestore-bundle-v1/3.0.9/a49f6e793f6d97b680bd1efbf2704ede5fab31cd/proto-google-cloud-firestore-bundle-v1-3.0.9-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/proto-google-cloud-firestore-bundle-v1/3.0.9/4b63548d248636842884a36e1c05fc2a748a80d2/proto-google-cloud-firestore-bundle-v1-3.0.9.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/proto-google-cloud-firestore-bundle-v1/3.0.10/dada26ace57c63a721056ee7bd190f99946926cb/proto-google-cloud-firestore-bundle-v1-3.0.10-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/proto-google-cloud-firestore-bundle-v1/3.0.10/6077db1bc30e8b1d30007c22675b5ae4f6530e51/proto-google-cloud-firestore-bundle-v1-3.0.10.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -166,6 +166,106 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-text/1.9/ae5c56310246339ac93e96c576243689173142d4/commons-text-1.9-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-text/1.9/ba6ac8c2807490944a0a27f6f8e68fb5ed2e80e2/commons-text-1.9.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-jdk14/2.0.0-alpha5/99ba046cf1862bb9b004e049993dd5491cb3dd04/slf4j-jdk14-2.0.0-alpha5-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.slf4j/slf4j-jdk14/2.0.0-alpha5/303aca334e7eccf86bfe61d3c8f769bc1b81ae82/slf4j-jdk14-2.0.0-alpha5.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/3.19.2/d0c5d998de57ebb714673fca418dad2fa05e9c72/protobuf-java-3.19.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/3.19.2/e958ce38f96b612d3819ff1c753d4d70609aea74/protobuf-java-3.19.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java-util/3.19.2/e04eb1cb7a5050819eecfcd80f413cc9e32f14b5/protobuf-java-util-3.19.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java-util/3.19.2/fd73ae9d9f8121eca362d54279f73bb56219a594/protobuf-java-util-3.19.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-firestore-v1/3.0.10/5a2c22af842ff34e771064a7d472e81214410c2a/proto-google-cloud-firestore-v1-3.0.10-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-firestore-v1/3.0.10/8cd44e1c2844e73cc000b18f1e7739059da8ee79/proto-google-cloud-firestore-v1-3.0.10.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-logging-v2/0.94.3/79c0a521b8d379d1801dac3b95f5e8375ed920bb/proto-google-cloud-logging-v2-0.94.3-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-logging-v2/0.94.3/9489189456776f2a2d06c0485a1d580c0510bdb8/proto-google-cloud-logging-v2-0.94.3.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.auth/google-auth-library-credentials/1.3.0/ea17e4e8f4883df2809ebb238f03abb3d4eb140b/google-auth-library-credentials-1.3.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.auth/google-auth-library-credentials/1.3.0/8e085f0a36301395052d1adc26befd4bc0b80d3e/google-auth-library-credentials-1.3.0.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core/2.3.5/a33f32809c0e250e8ffe7cce62aa619bd8f36d44/google-cloud-core-2.3.5-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core/2.3.5/a3dfdc439c0660c42dad7355edc6fc0f2d2eca77/google-cloud-core-2.3.5.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core-grpc/2.3.5/6ed68fd2c2f2716da24c16eb565884beed46dbc8/google-cloud-core-grpc-2.3.5-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core-grpc/2.3.5/cd6952f6932149e20ba76705e83ad31a62a543c0/google-cloud-core-grpc-2.3.5.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-api/1.43.2/b7d050d4630270b25151da6453416dc51bc0bb89/grpc-api-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-api/1.43.2/27037d34c59e0514f9c6c5a90c2e1c903c9f67e9/grpc-api-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.opencensus/opencensus-api/0.28.0/2405538307d22fe513cbbc790d72b593437e606a/opencensus-api-0.28.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.opencensus/opencensus-api/0.28.0/fc0d06a9d975a38c581dff59b99cf31db78bd99/opencensus-api-0.28.0.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-context/1.43.2/c344fffad8eaec5126d499f80b097d53c7ea935a/grpc-context-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-context/1.43.2/cc6fd89fb5adbae97e7724d4f4f7fbed71018163/grpc-context-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-core/1.43.2/5a76d87b3dbd316756983b4529a4d4d84e0c64bd/grpc-core-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-core/1.43.2/c65caaa4e04c7058b87fa85b7d740a26db1f174e/grpc-core-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf/1.43.2/9e74c8c66047bee146877077fc9bc39bb1cfd2cf/grpc-protobuf-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf/1.43.2/3137da7dfb3c9f676375b8c5216f33221cdc100a/grpc-protobuf-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf-lite/1.43.2/39f325ebcd59783fc299a344f828f2d09f6295b3/grpc-protobuf-lite-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf-lite/1.43.2/63b433515810299ed3fb8fe375b10eb1ac71dd17/grpc-protobuf-lite-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-stub/1.43.2/b9692550b1cec33cf1984d596ab04154b2c01804/grpc-stub-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-stub/1.43.2/a1d1db8180c7e3579e5401881184cf335bd7bd07/grpc-stub-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/api-common/2.1.2/f11f36b6e5d0ecc252e999f19dcfe9aabf132a80/api-common-2.1.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/api-common/2.1.2/eff20f72b42843d48d01c19099d4a22e8da773fa/api-common-2.1.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax/2.8.1/e3eb9af4d07fb206096229606b0ad4e7affefd64/gax-2.8.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax/2.8.1/c99dcb923675ae3e2fe8eb66f736e80f89c66231/gax-2.8.1.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax-grpc/2.8.1/b5ba894a42517abd7880f234fc8c093f859b4b2b/gax-grpc-2.8.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax-grpc/2.8.1/a05a5132300512c128cecf57ac5b784153131c61/gax-grpc-2.8.1.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-common-protos/2.7.1/3a3a967a74248eae154bd59b1a60c225ae843292/proto-google-common-protos-2.7.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-common-protos/2.7.1/f0f101045d738992ec8a3956f0cce9ce49a76fe1/proto-google-common-protos-2.7.1.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-iam-v1/1.2.0/690ac8ed3fe7d2f896e4bc3f4d0cab45a226dbf4/proto-google-iam-v1-1.2.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-iam-v1/1.2.0/4ac276c6fc59c48ea916514bfcfaec66b8d607b4/proto-google-iam-v1-1.2.0.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -240,11 +340,6 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-firestore-v1/3.0.9/52aba98beb9af580849cc45592eeecb53ab770ed/proto-google-cloud-firestore-v1-3.0.9-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-firestore-v1/3.0.9/f48dee21533a413094ccf3cf32ce90c6c036b9a/proto-google-cloud-firestore-v1-3.0.9.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.guava/failureaccess/1.0.1/1d064e61aad6c51cc77f9b59dc2cccc78e792f5a/failureaccess-1.0.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.guava/failureaccess/1.0.1/1dcf1de382a0bf95a3d8b0849546c88bac1292c9/failureaccess-1.0.1.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
@@ -260,7 +355,7 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.checkerframework/checker-qual/3.19.0/5b703df399e82ae3efcf57b50c2304598abbc40f/checker-qual-3.19.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.checkerframework/checker-qual/3.19.0/838b42bb6f7f73315167b359d24649845cef1c48/checker-qual-3.19.0.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.checkerframework/checker-qual/3.20.0/7e497d4dacfbfe2e91d2c9f92e9ff62612c70b53/checker-qual-3.20.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.checkerframework/checker-qual/3.20.0/c13d84bf34ed1a652c44bf73fe8a97d4f1ce17ff/checker-qual-3.20.0.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -275,12 +370,7 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core-grpc/2.3.3/e5c377de36214bc954da229136e6c4d53de9a27f/google-cloud-core-grpc-2.3.3-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core-grpc/2.3.3/78af45bb9b46ef12c4899076b9bd5b2e025f89d9/google-cloud-core-grpc-2.3.3.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-core/1.42.1/17555970d11243fb0dad446188834d8e6dad24dd/grpc-core-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-core/1.42.1/2d142647452a700189908baa488dc928233e8be9/grpc-core-1.42.1.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.11/24014867e470db3942db53b17a4902f4215d5ea8/commons-lang3-3.11-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.11/68e9a6adf7cf8eb7e9d31bbc554c7c75eeaac568/commons-lang3-3.11.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -300,7 +390,7 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpcore/4.4.14/9d3e55f73fedca10282469031cf6bc3a69e36711/httpcore-4.4.14-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpcore/4.4.14/9dd1a631c082d92ecd4bd8fd4cf55026c720a8c1/httpcore-4.4.14.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpcore/4.4.15/2ab1724e80d075698903a49f5e8fa90b077937ac/httpcore-4.4.15-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.httpcomponents/httpcore/4.4.15/7f2e0c573eaa7a74bac2e89b359e1f73d92a0a1d/httpcore-4.4.15.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -310,112 +400,12 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/api-common/2.1.1/96758bc00da4b38742b116205b0705b728987dc0/api-common-2.1.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/api-common/2.1.1/2eef95ab13b5bf7915408df2e3bc4c73736cd42c/api-common-2.1.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/javax.annotation/javax.annotation-api/1.3.2/65dfd2c47380bf72ec62a5b8c4ceb78a4eda1a53/javax.annotation-api-1.3.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/javax.annotation/javax.annotation-api/1.3.2/934c04d3cfef185a8008e7bf34331b79730a9d43/javax.annotation-api-1.3.2.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf/1.42.1/47be38d01877d8489a140f1420511b8a7be6382/grpc-protobuf-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf/1.42.1/374d43968ef44fdf7105ad304e3f859d7a17471b/grpc-protobuf-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf-lite/1.42.1/4814fdfaf273c33ef1a90790585aee8fefbc42a6/grpc-protobuf-lite-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-protobuf-lite/1.42.1/8119b67e3ff9f4d0def3054037d260c26c69adb8/grpc-protobuf-lite-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.opencensus/opencensus-api/0.28.0/2405538307d22fe513cbbc790d72b593437e606a/opencensus-api-0.28.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.opencensus/opencensus-api/0.28.0/fc0d06a9d975a38c581dff59b99cf31db78bd99/opencensus-api-0.28.0.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-context/1.42.1/e24abf0fada95147009fbaccb9296f0729d564ff/grpc-context-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-context/1.42.1/c0cc9e5e08ced39792908aeda77e694bff39cea1/grpc-context-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/3.19.1/96612f5d4cfcc6b9d2a3375668db583495c8a60f/protobuf-java-3.19.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java/3.19.1/d6840043a0a9b1b62ec040a2e98b816b5cc944f/protobuf-java-3.19.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-common-protos/2.7.0/7f8004c08e5b9c2c35570f8daf0419964faf865/proto-google-common-protos-2.7.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-common-protos/2.7.0/b89a09270e6681417e7f6bede09fc006de0d977f/proto-google-common-protos-2.7.0.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax/2.7.1/9d7d299a1435b4f2b62e72bbe2b4a334ef46bd44/gax-2.7.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax/2.7.1/113bee04813baeb2302de70f204aab69f3e7621a/gax-2.7.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-api/1.42.1/f741dcfc79b7d3d37fa639819326f00932f3d262/grpc-api-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-api/1.42.1/4a7f734f57ad5b68e4ac591481eb562cdb3d2a94/grpc-api-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax-grpc/2.7.1/dcf9310a8e1490468cee326fe23882f6a0a09b27/gax-grpc-2.7.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api/gax-grpc/2.7.1/60fef9e181ccdd86d88c3885796024ed01a14b4c/gax-grpc-2.7.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.threeten/threetenbp/1.5.2/6d845129ff7d898a22e5528a974f7ac40c4217f6/threetenbp-1.5.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.threeten/threetenbp/1.5.2/9aec3509609fc41f29ddc46119a124b8659e2c25/threetenbp-1.5.2.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-stub/1.42.1/e51c7ad5f7261e2df9656c2bd29a3078bab6edb0/grpc-stub-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-stub/1.42.1/6fa0c2fb4ff581c89b4aab2d47fb2b568503f630/grpc-stub-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.auth/google-auth-library-credentials/1.3.0/ea17e4e8f4883df2809ebb238f03abb3d4eb140b/google-auth-library-credentials-1.3.0-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.auth/google-auth-library-credentials/1.3.0/8e085f0a36301395052d1adc26befd4bc0b80d3e/google-auth-library-credentials-1.3.0.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core/2.3.3/5636edeaeba25ff6daff0a0f6f3a85d13286f20f/google-cloud-core-2.3.3-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-core/2.3.3/1dddbe00892a2943cae3bd90f6980b1c944e641b/google-cloud-core-2.3.3.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-iam-v1/1.1.7/2e4326aec560e86071b8eefa7c7fd0e062eca1ac/proto-google-iam-v1-1.1.7-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-iam-v1/1.1.7/9e2d92d3109c14b0f1df68d5165fd9366f8a9f98/proto-google-iam-v1-1.1.7.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java-util/3.19.1/9c7508759d05a1c3b06e75ad3b19bc6bbfcf049b/protobuf-java-util-3.19.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.protobuf/protobuf-java-util/3.19.1/27fba36b4d610c3c7d4b998c966c48efeb31c34a/protobuf-java-util-3.19.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.11/24014867e470db3942db53b17a4902f4215d5ea8/commons-lang3-3.11-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-lang3/3.11/68e9a6adf7cf8eb7e9d31bbc554c7c75eeaac568/commons-lang3-3.11.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-classic/1.2.8/e74690dde389b1a4e0ef11654c7b1ab05a4b9ff5/logback-classic-1.2.8-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-classic/1.2.8/22d21c4dfc77adf6f2f24bf3991846792de50b48/logback-classic-1.2.8.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-core/1.2.8/5eadd2c1bfd7a9f3ccac906e9cc79b86be8e32e3/logback-core-1.2.8-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/ch.qos.logback/logback-core/1.2.8/30d9b7f26ae89e5c13ac916a832732daa8300800/logback-core-1.2.8.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-logging/3.5.1/1893e2f07f47a9afe16ebbd94601c1f1815d4952/google-cloud-logging-3.5.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.cloud/google-cloud-logging/3.5.1/44902bd0c7f79de25ba28da2263893e9f4def4e3/google-cloud-logging-3.5.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-logging-v2/0.94.1/a4f110d89c3492aa42f5072b64cf81a4d3ab1621/proto-google-cloud-logging-v2-0.94.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/com.google.api.grpc/proto-google-cloud-logging-v2/0.94.1/5b999eebbe82901e8b2382ecfc0a2c353ba32faf/proto-google-cloud-logging-v2-0.94.1.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -426,6 +416,31 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.glassfish.hk2.external/aopalliance-repackaged/3.0.1/5936869fc8cf2af30aee4ae4c55746e09f0de389/aopalliance-repackaged-3.0.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.glassfish.hk2.external/aopalliance-repackaged/3.0.1/5790cd4154515c8ad5267ea8e7a6cd896692cf1/aopalliance-repackaged-3.0.1.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-alts/1.43.2/3e4a64387b5fa2923d09ba7c14c0a82dd9976cf7/grpc-alts-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-alts/1.43.2/d455472c0e92b618be145f9fe96847b7b49ad733/grpc-alts-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-auth/1.43.2/93dadadcf5ef9f0bc6a014d64a2d02b80e79160d/grpc-auth-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-auth/1.43.2/eb09273098bfd761f6daafa50be5b85b16c73cae/grpc-auth-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-grpclb/1.43.2/d1225caf3f138ddcd6cbde2286eaa0839fa4a5d4/grpc-grpclb-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-grpclb/1.43.2/640d55674e8393a95c5b7e872369f27eb4cb0f52/grpc-grpclb-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-netty-shaded/1.43.2/3346a3003a9800491136fe9bf82fa04d802d2f9e/grpc-netty-shaded-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-netty-shaded/1.43.2/e4399db174148350bcd0462aba267b4cdef63f03/grpc-netty-shaded-1.43.2.jar">
+		<attributes>
+			<attribute name="gradle_used_by_scope" value="main,test"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-services/1.43.2/ef2f0bbc439eee013205ae6f9a247c341185ff24/grpc-services-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-services/1.43.2/640afe074fbd01203b9805528d43d7005d8b7f84/grpc-services-1.43.2.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
@@ -445,37 +460,12 @@
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-alts/1.42.1/9400aa280b343231b6ea088b71a060341633ae06/grpc-alts-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-alts/1.42.1/fb0c0c50878c277bca403945f315025f7190ea2e/grpc-alts-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-grpclb/1.42.1/319f18499723e17317b8f43c79678790f4d682b/grpc-grpclb-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-grpclb/1.42.1/6763214f6c32d8b90e93a63e6a40bc1a78734cdc/grpc-grpclb-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.conscrypt/conscrypt-openjdk-uber/2.5.1/f9cbb8c61564503a85169b913d9fd7f8c508a73a/conscrypt-openjdk-uber-2.5.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/org.conscrypt/conscrypt-openjdk-uber/2.5.1/3658b276ab54bd600f754b3c8cf4b7cd77fc61e6/conscrypt-openjdk-uber-2.5.1.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-auth/1.42.1/2618bfa14c67459601108b7532ca0dee59918842/grpc-auth-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-auth/1.42.1/130f19ed48f11a44ad4c188d77af4dfb4400ebe3/grpc-auth-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-netty-shaded/1.42.1/cdf46714b191b875fab3dad201b96bda6477baa/grpc-netty-shaded-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-netty-shaded/1.42.1/5641b23560b62c52bf0e1305b746d21cc30fdef/grpc-netty-shaded-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-xds/1.42.1/c68b22bc65e342d406d647f583619db136de484e/grpc-xds-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-xds/1.42.1/a04c4897d5f8336ba27262473f928bf7ead96a28/grpc-xds-1.42.1.jar">
-		<attributes>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-services/1.42.1/3d4d721d60f9d81295baabefc78ecbe3c3e0b123/grpc-services-1.42.1-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-services/1.42.1/5593600d454f7d5b2553756950c66d68445dcb2f/grpc-services-1.42.1.jar">
+	<classpathentry sourcepath="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-xds/1.43.2/8625d954fc919a630b990c5ca1cfa86d2b4034d4/grpc-xds-1.43.2-sources.jar" kind="lib" path="/Users/mseele/.gradle/caches/modules-2/files-2.1/io.grpc/grpc-xds/1.43.2/f5e1e4e2b112a442e71d8b41870d701b94d6e6b3/grpc-xds-1.43.2.jar">
 		<attributes>
 			<attribute name="gradle_used_by_scope" value="main,test"/>
 		</attributes>
