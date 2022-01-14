@@ -27,7 +27,7 @@ public class Application {
 		ctx.addServlet(CheckEmailConnectivity.class, "/tasks/check_email_connectivity"); //$NON-NLS-1$
 		ctx.addServlet(RenewCalendarWatch.class, "/tasks/renew_calendar_watch"); //$NON-NLS-1$
 
-		// jersy handler
+		// jersey handler
 		final ServletHolder serHol = ctx.addServlet(ServletContainer.class, "/api/*"); //$NON-NLS-1$
 		serHol.setInitOrder(1);
 		serHol.setInitParameter("jersey.config.server.provider.packages", "de.sve.backend.api"); //$NON-NLS-1$ //$NON-NLS-2$
