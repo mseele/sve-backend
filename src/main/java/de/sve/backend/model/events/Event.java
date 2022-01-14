@@ -1,7 +1,5 @@
 package de.sve.backend.model.events;
 
-import static java.util.Objects.requireNonNullElse;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -143,5 +141,9 @@ public abstract class Event {
 					  requireNonNullElse(event.altEmailAddress(), altEmailAddress()),
 					  requireNonNullElse(event.externalOperator(), externalOperator()));
 	}
+
+	private static <T> T requireNonNullElse(T obj, T defaultObj) {
+        return (obj != null) ? obj : defaultObj;
+    }
 
 }
