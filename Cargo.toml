@@ -1,5 +1,5 @@
 [package]
-name = "sve-backend"
+name = "sve_backend"
 version = "0.1.0"
 edition = "2021"
 
