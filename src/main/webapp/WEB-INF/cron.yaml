@@ -1,7 +1,0 @@
-cron:
-- description: "weekly check of email connectivity"
-  url: /tasks/check_email_connectivity
-  schedule: every monday 19:00
-- description: "weekly renew of calendar watch"
-  url: /tasks/renew_calendar_watch
-  schedule: every monday 19:15
