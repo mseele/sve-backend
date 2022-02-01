@@ -1,11 +1,19 @@
+mod api;
 mod models;
 mod store;
 
+use actix_web::{middleware::Logger, web, App, HttpServer};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| App::new())
-        .bind("0.0.0.0:8080")?
-        .run()
-        .await
+    env_logger::init();
+
+    HttpServer::new(|| {
+        App::new()
+            .wrap(Logger::default())
+            .service(web::scope("/api").configure(api::events::config))
+    })
+    .bind("0.0.0.0:8080")?
+    .run()
+    .await
 }
