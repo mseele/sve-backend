@@ -11,5 +11,5 @@ cargo build --release --target=x86_64-unknown-linux-musl
 docker build --pull --rm -f "Dockerfile" -t sve_backend:latest "."
 
 # upload into google app engine repository
-docker tag sve_backend:latest eu.gcr.io/$gae-project-name$/sve_backend
-docker push eu.gcr.io/$gae-project-name$/sve_backend
+docker tag sve_backend:latest eu.gcr.io/sve-backend/sve_backend
+docker push eu.gcr.io/sve-backend/sve_backend
