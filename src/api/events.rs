@@ -67,7 +67,7 @@ pub struct EventsRequest {
     beta: Option<bool>,
 }
 
-#[get("/")]
+#[get("")]
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     //TODO: work with info
 
