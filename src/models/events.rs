@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Error};
+use anyhow::{anyhow, bail};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
