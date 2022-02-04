@@ -71,8 +71,8 @@ pub struct EventsRequest {
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     //TODO: work with info
 
-    let mut client = store::events::get_client().await?;
-    let events = store::events::get_events(&mut client).await?;
+    let mut client = store::get_client().await?;
+    let events = store::get_events(&mut client).await?;
 
     Ok(web::Json(events))
 }
