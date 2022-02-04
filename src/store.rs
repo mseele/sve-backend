@@ -1,6 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::models::events::{self, Event, Kind, PartialEvent};
+use crate::models::{
+    events::{self, Event, Kind, PartialEvent},
+    news::{NewsType, Subscription},
+};
 
 use anyhow::{bail, Context, Result};
 use chrono::NaiveDateTime;
@@ -133,39 +136,6 @@ pub async fn write_event(
     Ok(())
 }
 
-async fn create_event(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    event: Event,
-) -> Result<()> {
-    client
-        .create_document(Request::new(CreateDocumentRequest {
-            parent: format!("projects/{}/databases/(default)/documents/", PROJECT),
-            collection_id: "events".into(),
-            document_id: event.id.clone(),
-            document: Some(from_event(event)),
-            ..Default::default()
-        }))
-        .await?;
-
-    Ok(())
-}
-
-async fn update_event(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    partial_event: PartialEvent,
-) -> Result<()> {
-    let (document, update_mask) = from_partial_event(partial_event);
-    client
-        .update_document(Request::new(UpdateDocumentRequest {
-            document: Some(document),
-            update_mask: Some(update_mask),
-            ..Default::default()
-        }))
-        .await?;
-
-    Ok(())
-}
-
 pub async fn delete_event(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     id: &str,
@@ -230,36 +200,6 @@ pub async fn book_event(
             Err(err)
         }
     }
-}
-
-async fn commit_transaction(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    writes: Vec<Write>,
-    transaction: Vec<u8>,
-) -> Result<()> {
-    client
-        .commit(Request::new(CommitRequest {
-            database: format!("projects/{}/databases/(default)", PROJECT),
-            writes,
-            transaction,
-        }))
-        .await?;
-
-    Ok(())
-}
-
-async fn rollback_transaction(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    transaction: Vec<u8>,
-) -> Result<()> {
-    client
-        .rollback(Request::new(RollbackRequest {
-            database: format!("projects/{}/databases/(default)", PROJECT),
-            transaction,
-        }))
-        .await?;
-
-    Ok(())
 }
 
 pub enum BookingTransaction {
@@ -346,6 +286,229 @@ pub async fn run_book_event_transaction(
     }
 
     Ok(BookingTransaction::BookedOut)
+}
+
+pub async fn get_subscriptions(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+) -> Result<Vec<Subscription>> {
+    let mut subscriptions: Vec<Subscription> = Vec::new();
+
+    let mut next_page_token = String::from("");
+    loop {
+        let response = client
+            .list_documents(Request::new(ListDocumentsRequest {
+                parent: format!("projects/{}/databases/(default)/documents", PROJECT),
+                collection_id: "subscriptions".into(),
+                page_size: 500,
+                page_token: next_page_token,
+                ..Default::default()
+            }))
+            .await?
+            .into_inner();
+
+        // TODO: avoid borrowing (and clone)
+        for document in response.documents {
+            subscriptions.push(to_subscription(&document)?);
+        }
+
+        next_page_token = response.next_page_token;
+        if next_page_token.is_empty() {
+            break;
+        }
+    }
+
+    Ok(subscriptions)
+}
+
+pub async fn subscribe(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    subscription: &Subscription,
+) -> Result<Subscription> {
+    let email = subscription.email.as_str();
+    match get_subscription(client, email).await? {
+        Some(existing_subscription) => {
+            let mut types = subscription.types.clone();
+            // add existing types
+            for existing_type in existing_subscription.types {
+                if !types.contains(&existing_type) {
+                    types.push(existing_type);
+                }
+            }
+            // remove duplicates
+            types.dedup();
+
+            update_subscription(client, &subscription.email, &types).await?;
+
+            Ok(Subscription::new(subscription.email.clone(), types))
+        }
+        None => {
+            let mut fields: HashMap<String, Value> = HashMap::new();
+            insert_news_type_values(&mut fields, "types", subscription.types.clone());
+            client
+                .create_document(Request::new(CreateDocumentRequest {
+                    parent: format!("projects/{}/databases/(default)/documents", PROJECT),
+                    collection_id: "subscriptions".into(),
+                    document_id: subscription.email.clone(),
+                    document: Some(Document {
+                        fields,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }))
+                .await?;
+
+            Ok(subscription.clone())
+        }
+    }
+}
+
+pub async fn unsubscribe(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    subscription: &Subscription,
+) -> Result<()> {
+    let email = subscription.email.as_str();
+    match get_subscription(client, email).await? {
+        Some(existing_subscription) => {
+            let types: Vec<NewsType> = existing_subscription
+                .types
+                .clone()
+                .into_iter()
+                .filter(|t| !subscription.types.contains(t))
+                .collect();
+            if types.len() > 0 {
+                update_subscription(client, &subscription.email, &types).await?;
+            } else {
+                client
+                    .delete_document(Request::new(DeleteDocumentRequest {
+                        name: format!(
+                            "projects/{}/databases/(default)/documents/subscriptions/{}",
+                            PROJECT, email
+                        ),
+                        ..Default::default()
+                    }))
+                    .await?;
+            }
+        }
+        // email has not been registered before - nothing to do
+        None => (),
+    }
+
+    Ok(())
+}
+
+async fn update_subscription(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    email: &str,
+    types: &Vec<NewsType>,
+) -> Result<()> {
+    let mut fields: HashMap<String, Value> = HashMap::new();
+    insert_news_type_values(&mut fields, "types", types.clone());
+
+    let update_mask = DocumentMask {
+        field_paths: fields.keys().cloned().collect(),
+    };
+
+    let document = Document {
+        name: format!(
+            "projects/{}/databases/(default)/documents/subscriptions/{}",
+            PROJECT, email
+        ),
+        fields,
+        ..Default::default()
+    };
+
+    client
+        .update_document(Request::new(UpdateDocumentRequest {
+            document: Some(document),
+            update_mask: Some(update_mask),
+            ..Default::default()
+        }))
+        .await?;
+
+    Ok(())
+}
+
+async fn get_subscription(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    email: &str,
+) -> Result<Option<Subscription>> {
+    let get_document_result = client
+        .get_document(Request::new(GetDocumentRequest {
+            name: format!(
+                "projects/{}/databases/(default)/documents/subscriptions/{}",
+                PROJECT, email
+            ),
+            ..Default::default()
+        }))
+        .await;
+    match get_document_result {
+        Ok(response) => Ok(Some(to_subscription(&response.get_ref())?)),
+        Err(status) if status.code() == Code::NotFound => Ok(None),
+        Err(status) => Err(status.into()),
+    }
+}
+
+async fn create_event(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    event: Event,
+) -> Result<()> {
+    client
+        .create_document(Request::new(CreateDocumentRequest {
+            parent: format!("projects/{}/databases/(default)/documents", PROJECT),
+            collection_id: "events".into(),
+            document_id: event.id.clone(),
+            document: Some(from_event(event)),
+            ..Default::default()
+        }))
+        .await?;
+
+    Ok(())
+}
+
+async fn update_event(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    partial_event: PartialEvent,
+) -> Result<()> {
+    let (document, update_mask) = from_partial_event(partial_event);
+    client
+        .update_document(Request::new(UpdateDocumentRequest {
+            document: Some(document),
+            update_mask: Some(update_mask),
+            ..Default::default()
+        }))
+        .await?;
+
+    Ok(())
+}
+
+async fn commit_transaction(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    writes: Vec<Write>,
+    transaction: Vec<u8>,
+) -> Result<()> {
+    client
+        .commit(Request::new(CommitRequest {
+            database: format!("projects/{}/databases/(default)", PROJECT),
+            writes,
+            transaction,
+        }))
+        .await?;
+
+    Ok(())
+}
+
+async fn rollback_transaction(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    transaction: Vec<u8>,
+) -> Result<()> {
+    client
+        .rollback(Request::new(RollbackRequest {
+            database: format!("projects/{}/databases/(default)", PROJECT),
+            transaction,
+        }))
+        .await?;
+
+    Ok(())
 }
 
 fn from_partial_event(event: PartialEvent) -> (Document, DocumentMask) {
@@ -529,6 +692,25 @@ fn insert_date_values(fields: &mut HashMap<String, Value>, key: &str, values: Ve
     );
 }
 
+fn insert_news_type_values(fields: &mut HashMap<String, Value>, key: &str, values: Vec<NewsType>) {
+    fields.insert(
+        key.into(),
+        Value {
+            value_type: Some(ValueType::ArrayValue(ArrayValue {
+                values: values
+                    .into_iter()
+                    .map(|news_type| {
+                        let news_string: &str = news_type.into();
+                        return Value {
+                            value_type: Some(ValueType::StringValue(news_string.to_string())),
+                        };
+                    })
+                    .collect(),
+            })),
+        },
+    );
+}
+
 fn to_event(doc: &Document) -> Result<events::Event> {
     let name = &doc.name;
     let index = name
@@ -570,6 +752,23 @@ fn to_event(doc: &Document) -> Result<events::Event> {
         get_opt_string(doc, "altBookingButtnText")?,
         get_opt_string(doc, "altEmailAddress")?,
         get_bool(doc, "externalOperator")?,
+    );
+    Ok(event)
+}
+
+fn to_subscription(doc: &Document) -> Result<Subscription> {
+    let name = &doc.name;
+    let index = name
+        .rfind('/')
+        .with_context(|| format!("Found no / in document name {}", doc.name))?;
+    let email: &str = &name[index + 1..];
+
+    let event = Subscription::new(
+        email.into(),
+        get_strings(doc, "types")?
+            .iter()
+            .map(|s| NewsType::from_str(s))
+            .collect::<Result<Vec<_>, _>>()?,
     );
     Ok(event)
 }
