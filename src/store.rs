@@ -1,9 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::models::{
-    events::{self, Event, Kind, PartialEvent},
-    news::{NewsType, Subscription},
-};
+use crate::models::{Event, Kind, NewsType, PartialEvent, Subscription};
 
 use anyhow::{bail, Context, Result};
 use chrono::NaiveDateTime;
@@ -711,14 +708,14 @@ fn insert_news_type_values(fields: &mut HashMap<String, Value>, key: &str, value
     );
 }
 
-fn to_event(doc: &Document) -> Result<events::Event> {
+fn to_event(doc: &Document) -> Result<Event> {
     let name = &doc.name;
     let index = name
         .rfind('/')
         .with_context(|| format!("Found no / in document name {}", doc.name))?;
     let id: &str = &name[index + 1..];
 
-    let event = events::Event::new(
+    let event = Event::new(
         id.into(),
         get_string(doc, "sheetId")?,
         get_integer(doc, "gid")?,
