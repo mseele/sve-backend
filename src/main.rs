@@ -4,6 +4,8 @@ mod store;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
+pub const CREDENTIALS: &str = include_str!("../data/credentials.json");
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();

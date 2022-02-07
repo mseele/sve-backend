@@ -33,7 +33,7 @@ pub struct GouthInterceptor;
 impl Interceptor for GouthInterceptor {
     fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
         let token = Builder::new()
-            .json(include_str!("../data/credentials.json"))
+            .json(crate::CREDENTIALS)
             .build()
             .map_err(|e| Status::new(Code::Internal, format!("Could not create token: {}", e)))?;
         let header_value = token.header_value().map_err(|e| {
