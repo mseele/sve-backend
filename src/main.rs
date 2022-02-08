@@ -1,7 +1,7 @@
 mod api;
+mod calendar;
 mod models;
 mod store;
-mod calendar;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
