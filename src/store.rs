@@ -1,7 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
-
 use crate::models::{Event, Kind, NewsType, PartialEvent, Subscription};
-
 use anyhow::{bail, Context, Result};
 use chrono::NaiveDateTime;
 use googapis::{
@@ -18,6 +15,7 @@ use googapis::{
     CERTIFICATES,
 };
 use gouth::Builder;
+use std::{collections::HashMap, str::FromStr};
 use tonic::{
     codegen::InterceptedService,
     metadata::MetadataValue,
