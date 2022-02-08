@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail};
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -280,6 +280,46 @@ impl FromStr for NewsType {
             "Events" => Ok(NewsType::Events),
             "Fitness" => Ok(NewsType::Fitness),
             other => bail!("Invalid type {}", other),
+        }
+    }
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Appointment {
+    pub id: Option<String>,
+    pub sort_index: u32,
+    pub title: Option<String>,
+    pub link: Option<String>,
+    pub description: Option<String>,
+    pub start_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
+    pub start_date_time: Option<NaiveDateTime>,
+    pub end_date_time: Option<NaiveDateTime>,
+}
+
+impl Appointment {
+    pub fn new(
+        id: Option<String>,
+        sort_index: u32,
+        title: Option<String>,
+        link: Option<String>,
+        description: Option<String>,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+        start_date_time: Option<NaiveDateTime>,
+        end_date_time: Option<NaiveDateTime>,
+    ) -> Appointment {
+        Appointment {
+            id,
+            sort_index,
+            title,
+            link,
+            description,
+            start_date,
+            end_date,
+            start_date_time,
+            end_date_time,
         }
     }
 }
