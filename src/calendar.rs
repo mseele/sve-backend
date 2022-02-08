@@ -1,13 +1,13 @@
+use crate::models::Appointment;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, Utc};
 use chrono_tz::Europe::Berlin;
 use google_calendar3::{
-    api::{Event, EventDateTime},
+    api::{Channel, Event, EventDateTime},
     CalendarHub,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 use yup_oauth2::ServiceAccountKey;
-
-use crate::models::Appointment;
 
 async fn calendar_hub() -> Result<CalendarHub> {
     let secret: ServiceAccountKey =
@@ -23,6 +23,30 @@ async fn calendar_hub() -> Result<CalendarHub> {
     );
 
     Ok(hub)
+}
+
+pub async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
+    // now + 1 year
+    let expiration =
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() + (1000 * 60 * 60 * 24 * 365);
+
+    let hub = calendar_hub().await?;
+
+    // stop the current watch
+    let mut request = Channel::default();
+    request.id = Some(id.into());
+    request.resource_id = Some(resource_id.into());
+    hub.channels().stop(request).doit().await?;
+
+    // add a new watch
+    let mut request = Channel::default();
+    request.id = Some(id.into());
+    request.type_ = Some("web_hook".into());
+    request.address = Some("https://sve-backend.appspot.com/api/calendar/notifications".into());
+    request.expiration = Some(format!("{}", expiration));
+    hub.events().watch(request, calendar_id).doit().await?;
+
+    Ok(())
 }
 
 pub async fn appointments(calendar_id: &str, max_results: i32) -> Result<Vec<Appointment>> {
