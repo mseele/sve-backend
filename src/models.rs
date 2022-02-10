@@ -2,6 +2,8 @@ use anyhow::{anyhow, bail};
 use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use steel_cent::currency::EUR;
+use steel_cent::Money;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -238,6 +240,64 @@ impl FromStr for Kind {
             "Events" => Ok(Kind::Events),
             other => bail!("Invalid type {}", other),
         }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EventBooking {
+    pub event_id: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub street: String,
+    pub city: String,
+    pub email: String,
+    pub phone: Option<String>,
+    pub member: Option<bool>,
+    pub updates: Option<bool>,
+    pub comments: Option<String>,
+}
+
+impl EventBooking {
+    pub fn new(
+        event_id: String,
+        first_name: String,
+        last_name: String,
+        street: String,
+        city: String,
+        email: String,
+        phone: Option<String>,
+        member: Option<bool>,
+        updates: Option<bool>,
+        comments: Option<String>,
+    ) -> EventBooking {
+        EventBooking {
+            event_id,
+            first_name,
+            last_name,
+            street,
+            city,
+            email,
+            phone,
+            member,
+            updates,
+            comments,
+        }
+    }
+
+    pub fn is_member(&self) -> bool {
+        self.member.unwrap_or(false)
+    }
+
+    pub fn cost(&self, event: &Event) -> Money {
+        let cost = match self.is_member() {
+            true => event.cost_member,
+            false => event.cost_non_member,
+        };
+        let fract = cost.fract();
+        let major = (cost - fract) as i64;
+        let minor = (fract * 100_f64) as i64;
+        Money::of_major_minor(EUR, major, minor)
     }
 }
 

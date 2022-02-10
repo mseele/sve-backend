@@ -16,7 +16,9 @@ chrono-tz = { version = "0.6" }
 googapis = { version = "0.6", features = ["google-firestore-v1"] }
 gouth = { version = "0.2" }
 tonic = { version = "0.6", features = ["tls"] }
+google-sheets4 = "2.0"
 google-calendar3 = "2.0"
 yup-oauth2 = "5.1"
 hyper = "0.14"
 hyper-rustls = "0.22"
+steel-cent = "0.2"
