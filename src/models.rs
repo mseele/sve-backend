@@ -383,3 +383,85 @@ impl Appointment {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cost() {
+        let member = EventBooking::new(
+            String::from("id"),
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        let no_member = EventBooking::new(
+            String::from("id"),
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let event = new_event(59.0, 69_f64);
+        let cost = member.cost(&event);
+        assert_eq!(cost.major_part(), 59);
+        assert_eq!(cost.minor_part(), 0);
+        let cost = no_member.cost(&event);
+        assert_eq!(cost.major_part(), 69);
+        assert_eq!(cost.minor_part(), 0);
+
+        let event = new_event(5.99, 9.99);
+        let cost = member.cost(&event);
+        assert_eq!(cost.major_part(), 5);
+        assert_eq!(cost.minor_part(), 99);
+        let cost = no_member.cost(&event);
+        assert_eq!(cost.major_part(), 9);
+        assert_eq!(cost.minor_part(), 99);
+    }
+
+    fn new_event(cost_member: f64, cost_non_member: f64) -> Event {
+        Event::new(
+            String::from("id"),
+            String::from("sheet_id"),
+            0,
+            Kind::Fitness,
+            String::from("name"),
+            0,
+            true,
+            false,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            Vec::new(),
+            None,
+            0,
+            0,
+            0,
+            cost_member,
+            cost_non_member,
+            0,
+            0,
+            String::from("location"),
+            String::from("booking_template"),
+            String::from("waiting_template"),
+            None,
+            None,
+            false,
+        )
+    }
+
+}
