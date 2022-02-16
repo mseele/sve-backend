@@ -39,27 +39,75 @@ async fn sheets_hub() -> Result<Sheets> {
 pub async fn save_booking(booking: &EventBooking, event: &Event) -> Result<()> {
     let hub = sheets_hub().await?;
     let sheet_title = get_sheet_title(&hub, event).await?;
-    let (insert_index, headers_indices) = resolve_indices(&hub, event, &sheet_title).await?;
-    insert(
-        &hub,
-        booking,
-        event,
-        &sheet_title,
-        insert_index,
-        headers_indices,
-    )
-    .await?;
-    Ok(())
+    let values = get_values(&hub, &event.sheet_id, &sheet_title).await?;
+    match values {
+        Some(values) => {
+            // verify all headers are available and store their indices
+            let headers_indices = get_header_indices(&values[0]).with_context(|| {
+                format!(
+                    "Headers are missing in sheet '{}' of spreadsheet '{}'",
+                    sheet_title, &event.sheet_id,
+                )
+            })?;
+
+            // first empty row is the value length +1
+            let insert_index = values.len() + 1;
+
+            insert(
+                &hub,
+                booking,
+                event,
+                &sheet_title,
+                insert_index,
+                headers_indices,
+            )
+            .await?;
+
+            Ok(())
+        }
+        None => bail!(
+            "Found no values in sheet '{}' of spreadsheet '{}'",
+            sheet_title,
+            &event.sheet_id,
+        ),
+    }
 }
 
-async fn insert(
-    hub: &Sheets,
-    booking: &EventBooking,
-    event: &Event,
-    sheet_title: &str,
-    insert_index: usize,
-    headers_indices: Vec<usize>,
-) -> Result<()> {
+/// Returns true if there is already a dataset
+/// in the spreadsheet for the given booking and
+/// false if there is no dataset in the spreadsheet.
+pub async fn has_booking(booking: &EventBooking, event: &Event) -> Result<bool> {
+    let hub = sheets_hub().await?;
+    let sheet_title = get_sheet_title(&hub, event).await?;
+    let values = get_values(&hub, &event.sheet_id, &sheet_title).await?;
+
+    match values {
+        Some(values) => {
+            let headers_indices = get_header_indices(&values[0]).with_context(|| {
+                format!(
+                    "Headers are missing in sheet '{}' of spreadsheet '{}'",
+                    sheet_title, &event.sheet_id,
+                )
+            })?;
+            let booking_values = into_values(booking, event, headers_indices);
+            Ok(values
+                .iter()
+                .skip(1)
+                .find(|row| vec_compare(row, &booking_values))
+                .is_some())
+        }
+        None => Ok(false),
+    }
+}
+
+fn vec_compare(va: &[String], vb: &[String]) -> bool {
+    (va.len() == vb.len()) &&  // zip stops at the shortest
+     va.iter()
+       .zip(vb)
+       .all(|(a,b)| a.to_lowercase().trim().eq(b.to_lowercase().trim()))
+}
+
+fn into_values(booking: &EventBooking, event: &Event, headers_indices: Vec<usize>) -> Vec<String> {
     let current_date_time = Utc::now()
         .with_timezone(&Berlin)
         .format("%d.%m.%Y %H:%M:%S")
@@ -90,6 +138,18 @@ async fn insert(
     ];
     sort_by_indices(&mut values, headers_indices);
 
+    values
+}
+
+async fn insert(
+    hub: &Sheets,
+    booking: &EventBooking,
+    event: &Event,
+    sheet_title: &str,
+    insert_index: usize,
+    headers_indices: Vec<usize>,
+) -> Result<()> {
+    let values = into_values(booking, event, headers_indices);
     hub.spreadsheets()
         .values_update(
             ValueRange {
@@ -106,39 +166,18 @@ async fn insert(
     Ok(())
 }
 
-async fn resolve_indices(
+async fn get_values(
     hub: &Sheets,
-    event: &Event,
+    sheet_id: &str,
     sheet_title: &str,
-) -> Result<(usize, Vec<usize>)> {
+) -> Result<Option<Vec<Vec<String>>>> {
     let (_, value_range) = hub
         .spreadsheets()
-        .values_get(
-            &event.sheet_id,
-            format!("'{}'!B1:L1000", sheet_title).as_str(),
-        )
+        .values_get(sheet_id, format!("'{}'!B1:L1000", sheet_title).as_str())
         .doit()
         .await?;
 
-    match value_range.values {
-        Some(values) => {
-            // verify all headers are available and store their indices
-            let headers_indices = get_header_indices(&values[0]).with_context(|| {
-                format!(
-                    "Headers are missing in sheet '{}' of spreadsheet '{}'",
-                    sheet_title, &event.sheet_id,
-                )
-            })?;
-
-            // first empty row is the value length +1
-            Ok((values.len() + 1, headers_indices))
-        }
-        None => bail!(
-            "Found no values in sheet '{}' of spreadsheet '{}'",
-            sheet_title,
-            &event.sheet_id,
-        ),
-    }
+    Ok(value_range.values)
 }
 
 async fn get_sheet_title(hub: &Sheets, event: &Event) -> Result<String> {
@@ -213,7 +252,50 @@ mod tests {
     use super::*;
 
     #[test]
-    fn correct_header_indices() {
+    fn test_vec_compare() {
+        // success
+        assert_eq!(
+            vec_compare(
+                &[String::from("a"), String::from("b"), String::from("c")],
+                &[String::from("a"), String::from("b"), String::from("c")]
+            ),
+            true
+        );
+        assert_eq!(
+            vec_compare(
+                &[
+                    String::from(" aAa "),
+                    String::from("Bä"),
+                    String::from("  c")
+                ],
+                &[
+                    String::from(" AaA "),
+                    String::from("bÄ  "),
+                    String::from("C")
+                ]
+            ),
+            true
+        );
+
+        // failure
+        assert_eq!(
+            vec_compare(
+                &[String::from("1")],
+                &[String::from("1"), String::from("2")]
+            ),
+            false
+        );
+        assert_eq!(
+            vec_compare(
+                &[String::from("a"), String::from("b"), String::from("c")],
+                &[String::from("a"), String::from("c"), String::from("b")]
+            ),
+            false
+        );
+    }
+
+    #[test]
+    fn test_get_header_indices() {
         let values = vec![
             String::from("SVE-Mitglied"),
             String::from("Buchungsdatum"),
@@ -233,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_order() {
+    fn test_sort_by_indices() {
         let indices = vec![0, 3, 2, 1];
         let mut data = vec!["a", "b", "c", "d"];
         sort_by_indices(&mut data, indices);
