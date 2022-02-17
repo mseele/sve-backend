@@ -12,7 +12,7 @@ pub struct Event {
     pub sheet_id: String,
     pub gid: i64,
     #[serde(rename = "type")]
-    pub kind: Kind,
+    pub event_type: EventType,
     pub name: String,
     pub sort_index: i64,
     pub visible: bool,
@@ -43,7 +43,7 @@ impl Event {
         id: String,
         sheet_id: String,
         gid: i64,
-        kind: Kind,
+        event_type: EventType,
         name: String,
         sort_index: i64,
         visible: bool,
@@ -72,7 +72,7 @@ impl Event {
             id,
             sheet_id,
             gid,
-            kind,
+            event_type,
             name,
             sort_index,
             visible,
@@ -107,7 +107,7 @@ pub struct PartialEvent {
     pub sheet_id: Option<String>,
     pub gid: Option<i64>,
     #[serde(rename = "type")]
-    pub kind: Option<Kind>,
+    pub event_type: Option<EventType>,
     pub name: Option<String>,
     pub sort_index: Option<i64>,
     pub visible: Option<bool>,
@@ -146,8 +146,8 @@ impl TryFrom<PartialEvent> for Event {
                 .gid
                 .ok_or_else(|| anyhow!("Attribute 'gid' is missing"))?,
             value
-                .kind
-                .ok_or_else(|| anyhow!("Attribute 'kind' is missing"))?,
+                .event_type
+                .ok_or_else(|| anyhow!("Attribute 'event_type' is missing"))?,
             value
                 .name
                 .ok_or_else(|| anyhow!("Attribute 'name' is missing"))?,
@@ -216,28 +216,27 @@ impl TryFrom<PartialEvent> for Event {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename = "EventType")]
-pub enum Kind {
+pub enum EventType {
     Fitness,
     Events,
 }
 
-impl From<Kind> for &str {
-    fn from(kind: Kind) -> Self {
-        match kind {
-            Kind::Fitness => "Fitness",
-            Kind::Events => "Events",
+impl From<EventType> for &str {
+    fn from(event_type: EventType) -> Self {
+        match event_type {
+            EventType::Fitness => "Fitness",
+            EventType::Events => "Events",
         }
     }
 }
 
-impl FromStr for Kind {
+impl FromStr for EventType {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Fitness" => Ok(Kind::Fitness),
-            "Events" => Ok(Kind::Events),
+            "Fitness" => Ok(EventType::Fitness),
+            "Events" => Ok(EventType::Events),
             other => bail!("Invalid type {}", other),
         }
     }
@@ -437,7 +436,7 @@ mod tests {
             String::from("id"),
             String::from("sheet_id"),
             0,
-            Kind::Fitness,
+            EventType::Fitness,
             String::from("name"),
             0,
             true,
