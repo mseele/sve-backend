@@ -73,10 +73,16 @@ pub async fn save_booking(booking: &EventBooking, event: &Event) -> Result<()> {
     }
 }
 
-/// Returns true if there is already a dataset
+/// Result of the `detect_booking` function
+pub enum BookingDetection {
+    Booked,
+    NotBooked,
+}
+
+/// Returns `BookingDetection::Booked` if there is already a dataset
 /// in the spreadsheet for the given booking and
-/// false if there is no dataset in the spreadsheet.
-pub async fn has_booking(booking: &EventBooking, event: &Event) -> Result<bool> {
+/// `BookingDetection::NotBooked` if there is no dataset in the spreadsheet.
+pub async fn detect_booking(booking: &EventBooking, event: &Event) -> Result<BookingDetection> {
     let hub = sheets_hub().await?;
     let sheet_title = get_sheet_title(&hub, event).await?;
     let values = get_values(&hub, &event.sheet_id, &sheet_title).await?;
@@ -90,13 +96,16 @@ pub async fn has_booking(booking: &EventBooking, event: &Event) -> Result<bool> 
                 )
             })?;
             let booking_values = into_values(booking, event, headers_indices);
-            Ok(values
+            match values
                 .iter()
                 .skip(1)
                 .find(|row| vec_compare(row, &booking_values))
-                .is_some())
+            {
+                Some(_) => Ok(BookingDetection::Booked),
+                None => Ok(BookingDetection::NotBooked),
+            }
         }
-        None => Ok(false),
+        None => Ok(BookingDetection::NotBooked),
     }
 }
 
