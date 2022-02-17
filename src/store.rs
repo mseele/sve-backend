@@ -1,4 +1,4 @@
-use crate::models::{Event, Kind, NewsType, PartialEvent, Subscription};
+use crate::models::{Event, EventType, NewsType, PartialEvent, Subscription};
 use anyhow::{bail, Context, Result};
 use chrono::NaiveDateTime;
 use googapis::{
@@ -510,7 +510,7 @@ fn from_partial_event(event: PartialEvent) -> (Document, DocumentMask) {
     let mut fields: HashMap<String, Value> = HashMap::new();
     insert_opt_string_value(&mut fields, "sheetId", event.sheet_id);
     insert_opt_integer_value(&mut fields, "gid", event.gid);
-    match event.kind {
+    match event.event_type {
         Some(value) => insert_str_value(&mut fields, "type", value.into()),
         None => (),
     }
@@ -566,7 +566,7 @@ fn from_event(event: Event) -> Document {
     let mut fields: HashMap<String, Value> = HashMap::new();
     insert_string_value(&mut fields, "sheetId", event.sheet_id);
     insert_integer_value(&mut fields, "gid", event.gid);
-    insert_str_value(&mut fields, "type", event.kind.into());
+    insert_str_value(&mut fields, "type", event.event_type.into());
     insert_string_value(&mut fields, "name", event.name);
     insert_integer_value(&mut fields, "sortIndex", event.sort_index);
     insert_bool_value(&mut fields, "visible", event.visible);
@@ -717,7 +717,7 @@ fn to_event(doc: &Document) -> Result<Event> {
         id.into(),
         get_string(doc, "sheetId")?,
         get_integer(doc, "gid")?,
-        Kind::from_str(&get_string(doc, "type")?)?,
+        EventType::from_str(&get_string(doc, "type")?)?,
         get_string(doc, "name")?,
         get_integer(doc, "sortIndex")?,
         get_bool(doc, "visible")?,
