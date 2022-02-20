@@ -1,9 +1,17 @@
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
+use base64::STANDARD;
 use chrono::{NaiveDate, NaiveDateTime};
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::AsyncSmtpTransport;
+use lettre::Executor;
+use lettre::Tokio1Executor;
 use serde::{Deserialize, Serialize};
+use std::str::from_utf8;
 use std::str::FromStr;
 use steel_cent::currency::EUR;
 use steel_cent::Money;
+
+base64_serde_type!(Base64Standard, STANDARD);
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -383,6 +391,77 @@ impl Appointment {
     }
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailAccount {
+    #[serde(rename = "type")]
+    pub email_type: EmailType,
+    pub address: String,
+    #[serde(with = "Base64Standard")]
+    password: Vec<u8>,
+}
+
+impl EmailAccount {
+    pub fn mailer(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
+        let transport = AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.gmail.com")?
+            .credentials(Credentials::new(
+                self.address.clone(),
+                from_utf8(&self.password)
+                    .with_context(|| {
+                        format!("Invalid UTF-8 sequence in password of {}", self.address)
+                    })?
+                    .into(),
+            ))
+            .build();
+        Ok(transport)
+    }
+    // pub fn connect(&self) -> Result<SmtpConnection> {
+    //     let transport = SmtpClient::new_simple("smtp.gmail.com")?
+    //         .credentials(Credentials::new(
+    //             self.address.clone(),
+    //             from_utf8(&self.password)
+    //                 .with_context(|| {
+    //                     format!("Invalid UTF-8 sequence in password of {}", self.address)
+    //                 })?
+    //                 .into(),
+    //         ))
+    //         .transport();
+    //     Ok(SmtpConnection::new(transport))
+    // }
+}
+
+// pub struct SmtpConnection {
+//     transport: SmtpTransport,
+// }
+
+// impl SmtpConnection {
+//     fn new(transport: SmtpTransport) -> SmtpConnection {
+//         SmtpConnection { transport }
+//     }
+// }
+
+// impl<'a> Transport<'a> for SmtpConnection {
+//     type Result = SmtpResult;
+
+//     fn send(&mut self, email: SendableEmail) -> SmtpResult {
+//         self.transport.send(email)
+//     }
+// }
+
+// impl Drop for SmtpConnection {
+
+// }
+
+#[derive(Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum EmailType {
+    Fitness,
+    Events,
+    Info,
+    Kunstrasen,
+    Jugendturnier,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,5 +541,4 @@ mod tests {
             false,
         )
     }
-
 }
