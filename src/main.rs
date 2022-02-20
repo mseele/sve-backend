@@ -1,5 +1,9 @@
+#[macro_use]
+extern crate base64_serde;
+
 mod api;
 mod calendar;
+mod email;
 mod models;
 mod sheets;
 mod store;
