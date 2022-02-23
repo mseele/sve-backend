@@ -23,6 +23,8 @@ pub struct EventsRequest {
     beta: Option<bool>,
 }
 
+// handler methods
+
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     let mut events = get_events(info.all, info.beta).await?;
 
