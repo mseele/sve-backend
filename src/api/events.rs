@@ -1,9 +1,12 @@
 use crate::models::{EventCounter, PartialEvent};
-use crate::store;
+use crate::store::{self, GouthInterceptor};
 use crate::{api::ResponseError, models::Event};
 use actix_web::{web, HttpResponse, Responder, Result};
+use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use serde::Deserialize;
 use std::fmt::Debug;
+use tonic::codegen::InterceptedService;
+use tonic::transport::Channel;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -23,10 +26,11 @@ pub struct EventsRequest {
     beta: Option<bool>,
 }
 
-// handler methods
+// handlers
 
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
-    let mut events = get_events(info.all, info.beta).await?;
+    let mut client = store::get_client().await?;
+    let mut events = get_events(&mut client, info.all, info.beta).await?;
 
     // sort the events
     events.sort_unstable_by(|a, b| {
@@ -42,11 +46,8 @@ async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, Respo
 }
 
 async fn counter() -> Result<impl Responder, ResponseError> {
-    let event_counters = get_events(None, None)
-        .await?
-        .into_iter()
-        .map(|event| event.into())
-        .collect::<Vec<EventCounter>>();
+    let mut client = store::get_client().await?;
+    let event_counters = get_event_counters(&mut client).await?;
 
     Ok(web::Json(event_counters))
 }
@@ -66,11 +67,14 @@ async fn delete(partial_event: web::Json<PartialEvent>) -> Result<HttpResponse, 
     Ok(HttpResponse::Ok().finish())
 }
 
-// helper methods
+// logic
 
-async fn get_events(all: Option<bool>, beta: Option<bool>) -> anyhow::Result<Vec<Event>> {
-    let mut client = store::get_client().await?;
-    let values = store::get_events(&mut client).await?;
+async fn get_events(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    all: Option<bool>,
+    beta: Option<bool>,
+) -> anyhow::Result<Vec<Event>> {
+    let values = store::get_events(client).await?;
 
     let values = values
         .into_iter()
@@ -95,4 +99,16 @@ async fn get_events(all: Option<bool>, beta: Option<bool>) -> anyhow::Result<Vec
         .collect::<Vec<_>>();
 
     Ok(values)
+}
+
+async fn get_event_counters(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+) -> anyhow::Result<Vec<EventCounter>> {
+    let event_counters = get_events(client, None, None)
+        .await?
+        .into_iter()
+        .map(|event| event.into())
+        .collect::<Vec<EventCounter>>();
+
+    Ok(event_counters)
 }
