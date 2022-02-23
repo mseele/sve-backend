@@ -106,7 +106,7 @@ pub async fn get_event(
 pub async fn write_event(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     partial_event: PartialEvent,
-) -> Result<()> {
+) -> Result<Event> {
     let get_document_result = client
         .get_document(Request::new(GetDocumentRequest {
             name: format!(
@@ -121,14 +121,15 @@ pub async fn write_event(
         Err(status) if status.code() == Code::NotFound => Ok(None),
         Err(status) => Err(status.into()),
     };
+    let event;
     let document_result = document_result?;
     if document_result.is_some() {
-        update_event(client, partial_event).await?;
+        event = update_event(client, partial_event).await?;
     } else {
-        create_event(client, partial_event.try_into()?).await?;
+        event = create_event(client, partial_event.try_into()?).await?;
     }
 
-    Ok(())
+    Ok(event)
 }
 
 pub async fn delete_event(
@@ -446,8 +447,8 @@ async fn get_subscription(
 async fn create_event(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     event: Event,
-) -> Result<()> {
-    client
+) -> Result<Event> {
+    let response = client
         .create_document(Request::new(CreateDocumentRequest {
             parent: format!("projects/{}/databases/(default)/documents", PROJECT),
             collection_id: "events".into(),
@@ -457,15 +458,18 @@ async fn create_event(
         }))
         .await?;
 
-    Ok(())
+    // TODO: use into_inner() to avoid borrowing (and clone)
+    let event = to_event(&response.get_ref())?;
+
+    Ok(event)
 }
 
 async fn update_event(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     partial_event: PartialEvent,
-) -> Result<()> {
+) -> Result<Event> {
     let (document, update_mask) = from_partial_event(partial_event);
-    client
+    let response = client
         .update_document(Request::new(UpdateDocumentRequest {
             document: Some(document),
             update_mask: Some(update_mask),
@@ -473,7 +477,10 @@ async fn update_event(
         }))
         .await?;
 
-    Ok(())
+    // TODO: use into_inner() to avoid borrowing (and clone)
+    let event = to_event(&response.get_ref())?;
+
+    Ok(event)
 }
 
 async fn commit_transaction(
