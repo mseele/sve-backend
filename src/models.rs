@@ -316,6 +316,46 @@ impl EventBooking {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EventCounter {
+    pub id: String,
+    pub max_subscribers: i64,
+    pub subscribers: i64,
+    pub waiting_list: i64,
+    pub max_waiting_list: i64,
+}
+
+impl EventCounter {
+    pub fn new(
+        id: String,
+        max_subscribers: i64,
+        subscribers: i64,
+        waiting_list: i64,
+        max_waiting_list: i64,
+    ) -> EventCounter {
+        EventCounter {
+            id,
+            max_subscribers,
+            subscribers,
+            waiting_list,
+            max_waiting_list,
+        }
+    }
+}
+
+impl From<Event> for EventCounter {
+    fn from(event: Event) -> Self {
+        EventCounter::new(
+            event.id,
+            event.max_subscribers,
+            event.subscribers,
+            event.waiting_list,
+            event.max_waiting_list,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Subscription {
