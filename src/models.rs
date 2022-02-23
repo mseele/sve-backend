@@ -75,8 +75,8 @@ impl Event {
         alt_booking_button_text: Option<String>,
         alt_email_address: Option<String>,
         external_operator: bool,
-    ) -> Event {
-        Event {
+    ) -> Self {
+        Self {
             id,
             sheet_id,
             gid,
@@ -285,8 +285,8 @@ impl EventBooking {
         member: Option<bool>,
         updates: Option<bool>,
         comments: Option<String>,
-    ) -> EventBooking {
-        EventBooking {
+    ) -> Self {
+        Self {
             event_id,
             first_name,
             last_name,
@@ -333,8 +333,8 @@ impl EventCounter {
         subscribers: i64,
         waiting_list: i64,
         max_waiting_list: i64,
-    ) -> EventCounter {
-        EventCounter {
+    ) -> Self {
+        Self {
             id,
             max_subscribers,
             subscribers,
@@ -424,8 +424,8 @@ impl Appointment {
         end_date: Option<NaiveDate>,
         start_date_time: Option<NaiveDateTime>,
         end_date_time: Option<NaiveDateTime>,
-    ) -> Appointment {
-        Appointment {
+    ) -> Self {
+        Self {
             id,
             sort_index,
             title,
