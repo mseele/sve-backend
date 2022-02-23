@@ -1,11 +1,15 @@
 use crate::models::EventCounter;
 use crate::store;
 use crate::{api::ResponseError, models::Event};
-use actix_web::{get, web, Responder, Result};
+use actix_web::{web, Responder, Result};
 use serde::Deserialize;
 use std::fmt::Debug;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/events")
+            .route("", web::get().to(events))
+            .route("/counter", web::get().to(counter))
     cfg.service(web::scope("/events").service(events).service(counter));
 }
 
@@ -15,7 +19,6 @@ pub struct EventsRequest {
     beta: Option<bool>,
 }
 
-#[get("")]
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     let mut events = get_events(info.all, info.beta).await?;
 
@@ -32,7 +35,6 @@ async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, Respo
     Ok(web::Json(events))
 }
 
-#[get("/counter")]
 async fn counter() -> Result<impl Responder, ResponseError> {
     let event_counters = get_events(None, None)
         .await?
