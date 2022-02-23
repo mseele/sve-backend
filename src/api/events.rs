@@ -1,7 +1,7 @@
 use crate::models::{EventCounter, PartialEvent};
 use crate::store;
 use crate::{api::ResponseError, models::Event};
-use actix_web::{web, Responder, Result};
+use actix_web::{web, HttpResponse, Responder, Result};
 use serde::Deserialize;
 use std::fmt::Debug;
 
@@ -12,7 +12,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/counter", web::get().to(counter))
             // TODO: .route("/booking", web::post().to(booking))
             // TODO: .route("/prebooking", web::post().to(prebooking))
-            .route("/update", web::post().to(update)),
+            .route("/update", web::post().to(update))
+            .route("/delete", web::post().to(delete)),
     );
 }
 
@@ -55,6 +56,15 @@ async fn update(partial_event: web::Json<PartialEvent>) -> Result<impl Responder
 
     Ok(web::Json(result))
 }
+
+async fn delete(partial_event: web::Json<PartialEvent>) -> Result<HttpResponse, ResponseError> {
+    let mut client = store::get_client().await?;
+    store::delete_event(&mut client, &partial_event.0.id).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+// helper methods
 
 async fn get_events(all: Option<bool>, beta: Option<bool>) -> anyhow::Result<Vec<Event>> {
     let mut client = store::get_client().await?;
