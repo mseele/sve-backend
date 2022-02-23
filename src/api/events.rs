@@ -10,7 +10,10 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/events")
             .route("", web::get().to(events))
             .route("/counter", web::get().to(counter))
-    cfg.service(web::scope("/events").service(events).service(counter));
+            // TODO: .route("/booking", web::post().to(booking))
+            // TODO: .route("/prebooking", web::post().to(prebooking))
+            .route("/update", web::post().to(update)),
+    );
 }
 
 #[derive(Debug, Deserialize)]
