@@ -1,4 +1,4 @@
-use crate::models::EventCounter;
+use crate::models::{EventCounter, PartialEvent};
 use crate::store;
 use crate::{api::ResponseError, models::Event};
 use actix_web::{web, Responder, Result};
@@ -46,6 +46,14 @@ async fn counter() -> Result<impl Responder, ResponseError> {
         .collect::<Vec<EventCounter>>();
 
     Ok(web::Json(event_counters))
+}
+
+async fn update(partial_event: web::Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
+    let partial_event = partial_event.0;
+    let mut client = store::get_client().await?;
+    let result = store::write_event(&mut client, partial_event).await?;
+
+    Ok(web::Json(result))
 }
 
 async fn get_events(all: Option<bool>, beta: Option<bool>) -> anyhow::Result<Vec<Event>> {
