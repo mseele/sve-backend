@@ -356,6 +356,46 @@ impl From<Event> for EventCounter {
     }
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BookingResponse {
+    success: bool,
+    message: String,
+    counter: Vec<EventCounter>,
+}
+
+impl BookingResponse {
+    pub fn success(message: &str, counter: Vec<EventCounter>) -> Self {
+        Self {
+            success: true,
+            message: message.into(),
+            counter,
+        }
+    }
+
+    pub fn failure(message: &str) -> Self {
+        Self {
+            success: false,
+            message: message.into(),
+            counter: Vec::new(),
+        }
+    }
+}
+
+// public static BookingResponse success(String message, List<EventCounter> counter) {
+//     return new AutoValue_BookingResponse(Boolean.TRUE, message, counter);
+// }
+
+// public static BookingResponse failure(String message) {
+//     return new AutoValue_BookingResponse(Boolean.FALSE, message, Collections.emptyList());
+// }
+
+// public abstract Boolean success();
+
+// public abstract String message();
+
+// public abstract List<EventCounter> counter();
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Subscription {
