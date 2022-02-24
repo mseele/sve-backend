@@ -4,6 +4,7 @@ extern crate base64_serde;
 mod api;
 mod calendar;
 mod email;
+mod logic;
 mod models;
 mod sheets;
 mod store;
@@ -19,7 +20,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
             .wrap(Logger::default())
-            .service(web::scope("/api").configure(api::events::config))
+            .service(web::scope("/api").configure(api::config))
     })
     .bind("0.0.0.0:8080")?
     .run()
