@@ -409,11 +409,21 @@ impl Subscription {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub enum NewsType {
     General,
     Events,
     Fitness,
+}
+
+impl NewsType {
+    pub fn display_name(self: &Self) -> &str {
+        match self {
+            NewsType::General => "Allgemein",
+            NewsType::Events => "Events",
+            NewsType::Fitness => "Fitness",
+        }
+    }
 }
 
 impl From<NewsType> for &str {
