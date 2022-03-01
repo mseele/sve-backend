@@ -1,7 +1,7 @@
-use crate::logic::events;
-use crate::models::{EventBooking, PartialEvent};
+use crate::logic::{events, news};
+use crate::models::{EventBooking, PartialEvent, Subscription};
+use actix_web::http::header::ContentType;
 use actix_web::{web, HttpResponse, Responder, Result};
-use log::error;
 use serde::Deserialize;
 use std::fmt::Debug;
 
@@ -75,6 +75,12 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/update", web::post().to(update))
             .route("/delete", web::post().to(delete)),
     );
+    cfg.service(
+        web::scope("/news")
+            .route("/subscribe", web::post().to(subscribe))
+            .route("/unsubscribe", web::post().to(unsubscribe))
+            .route("/subscribers", web::get().to(subscribers)),
+    );
 }
 
 // events
@@ -105,7 +111,44 @@ async fn update(partial_event: web::Json<PartialEvent>) -> Result<impl Responder
     Ok(web::Json(event))
 }
 
-async fn delete(partial_event: web::Json<PartialEvent>) -> Result<HttpResponse, ResponseError> {
+async fn delete(partial_event: web::Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
     events::delete(partial_event.0).await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+async fn subscribe(subscription: web::Json<Subscription>) -> Result<impl Responder, ResponseError> {
+    news::subscribe(subscription.0).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn unsubscribe(
+    subscription: web::Json<Subscription>,
+) -> Result<impl Responder, ResponseError> {
+    news::unsubscribe(subscription.0).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn subscribers() -> Result<impl Responder, ResponseError> {
+    let subscriptions = news::get_subscriptions().await?;
+    let result = subscriptions
+        .into_iter()
+        .map(|(news_type, emails)| {
+            let title: &str = &format!(
+                "---------- {}: {} ----------",
+                news_type.display_name(),
+                emails.len()
+            );
+            vec![
+                title,
+                &emails.into_iter().collect::<Vec<_>>().join(";"),
+                title,
+            ]
+            .join("<br/>")
+        })
+        .collect::<Vec<_>>()
+        .join("<br/><br/><br/>");
+
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType::html())
+        .body(result))
 }
