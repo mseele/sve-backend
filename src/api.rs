@@ -1,13 +1,12 @@
 use crate::logic::{events, news};
 use crate::models::{EventBooking, PartialEvent, Subscription};
 use actix_web::http::header::ContentType;
-use actix_web::{web, HttpResponse, Responder, Result};
-use serde::Deserialize;
-use std::fmt::Debug;
-
 use actix_web::{error, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
+use actix_web::{web, HttpResponse, Responder, Result};
+use serde::Deserialize;
 use std::error::Error;
+use std::fmt::Debug;
 use std::fmt::Display;
 
 pub struct ResponseError {
