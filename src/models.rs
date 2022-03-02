@@ -3,7 +3,6 @@ use base64::STANDARD;
 use chrono::{NaiveDate, NaiveDateTime};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::AsyncSmtpTransport;
-use lettre::Executor;
 use lettre::Tokio1Executor;
 use serde::{Deserialize, Serialize};
 use std::str::from_utf8;
@@ -231,7 +230,7 @@ impl TryFrom<PartialEvent> for Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum EventType {
     Fitness,
     Events,
@@ -242,6 +241,15 @@ impl From<EventType> for &str {
         match event_type {
             EventType::Fitness => "Fitness",
             EventType::Events => "Events",
+        }
+    }
+}
+
+impl From<EventType> for NewsType {
+    fn from(event_type: EventType) -> Self {
+        match event_type {
+            EventType::Fitness => NewsType::Fitness,
+            EventType::Events => NewsType::Events,
         }
     }
 }
