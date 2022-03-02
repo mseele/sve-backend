@@ -24,5 +24,5 @@ FROM scratch
 # Run the web service on container startup
 COPY --from=builder /usr/local/cargo/bin/sve_backend .
 USER 1000
-ENV RUST_BACKTRACE=1 RUST_LOG=info RUST_LOG=actix_web=debug
+ENV RUST_BACKTRACE=1 RUST_LOG=info
 CMD ["./sve_backend"]
