@@ -9,7 +9,8 @@ mod models;
 mod sheets;
 mod store;
 
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{dev::Service, web, App, HttpServer};
+use log::error;
 
 pub const CREDENTIALS: &str = include_str!("../data/credentials.json");
 
@@ -19,7 +20,16 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
-            .wrap(Logger::default())
+            .wrap_fn(|req, srv| {
+                let fut = srv.call(req);
+                async {
+                    let res = fut.await?;
+                    if let Some(error) = res.response().error() {
+                        error!("{:?}", error);
+                    }
+                    Ok(res)
+                }
+            })
             .service(web::scope("/api").configure(api::config))
     })
     .bind("0.0.0.0:8080")?
