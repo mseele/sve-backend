@@ -71,7 +71,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("", web::get().to(events))
             .route("/counter", web::get().to(counter))
             .route("/booking", web::post().to(booking))
-            // TODO: .route("/prebooking", web::post().to(prebooking))
+            .route("/prebooking", web::post().to(prebooking))
             .route("/update", web::post().to(update))
             .route("/delete", web::post().to(delete)),
     );
@@ -103,6 +103,11 @@ async fn counter() -> Result<impl Responder, ResponseError> {
 
 async fn booking(booking: web::Json<EventBooking>) -> Result<impl Responder, ResponseError> {
     let response = events::booking(booking.0).await;
+    Ok(web::Json(response))
+}
+
+async fn prebooking(hash: String) -> Result<impl Responder, ResponseError> {
+    let response = events::prebooking(hash).await;
     Ok(web::Json(response))
 }
 
