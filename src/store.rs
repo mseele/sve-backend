@@ -204,7 +204,7 @@ pub enum BookingTransaction {
     BookedOut,
 }
 
-pub async fn run_book_event_transaction(
+async fn run_book_event_transaction(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     id: &str,
     transaction: Vec<u8>,
