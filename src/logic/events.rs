@@ -1,10 +1,12 @@
-use crate::models::{BookingResponse, EventBooking, EventCounter};
+use crate::models::{BookingResponse, EventBooking, EventCounter, Subscription};
 use crate::models::{Event, PartialEvent};
-use crate::sheets;
+use crate::sheets::{self, BookingDetection};
 use crate::store::{self, BookingResult, GouthInterceptor};
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
+use base64::decode;
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
-use log::error;
+use log::{error, info, warn};
+use std::str::from_utf8;
 use tonic::codegen::InterceptedService;
 use tonic::transport::Channel;
 
@@ -40,6 +42,16 @@ pub async fn booking(booking: EventBooking) -> BookingResponse {
         Ok(response) => response,
         Err(e) => {
             error!("Booking failed: {}", e);
+            BookingResponse::failure(MESSAGE_FAIL)
+        }
+    }
+}
+
+pub async fn prebooking(hash: String) -> BookingResponse {
+    match do_prebooking(hash).await {
+        Ok(response) => response,
+        Err(e) => {
+            error!("Prebooking failed: {}", e);
             BookingResponse::failure(MESSAGE_FAIL)
         }
     }
@@ -103,20 +115,27 @@ async fn create_event_counters(
 
 async fn do_booking(booking: EventBooking) -> anyhow::Result<BookingResponse> {
     let mut client = store::get_client().await?;
-    let result = match store::book_event(&mut client, &booking.event_id).await? {
-        BookingResult::Booked(event) => {
+    Ok(book_event(&mut client, booking).await?)
+}
+
+async fn book_event(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    booking: EventBooking,
+) -> anyhow::Result<BookingResponse> {
+    let booking_result = &store::book_event(client, &booking.event_id).await?;
+    let result = match booking_result {
+        BookingResult::Booked(event) | BookingResult::WaitingList(event) => {
             sheets::save_booking(&booking, &event).await?;
-            subscribe_to_updates(&mut client, &booking, &event).await?;
-            // TODO: send mail
-            let message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail.";
-            BookingResponse::success(message, create_event_counters(&mut client).await?)
-        }
-        BookingResult::WaitingList(event) => {
-            sheets::save_booking(&booking, &event).await?;
-            subscribe_to_updates(&mut client, &booking, &event).await?;
-            // TODO: send mail
-            let message = "Du stehst jetzt auf der Warteliste. Wir benachrichtigen Dich, wenn Plätze frei werden.";
-            BookingResponse::success(message, create_event_counters(&mut client).await?)
+            subscribe_to_updates(client, &booking, &event).await?;
+            send_mail(&booking, &event, &booking_result).await?;
+            info!("Booking of Event {} was successfull", booking.event_id);
+            let message;
+            if let BookingResult::Booked(_) = booking_result {
+                message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail.";
+            } else {
+                message = "Du stehst jetzt auf der Warteliste. Wir benachrichtigen Dich, wenn Plätze frei werden.";
+            }
+            BookingResponse::success(message, create_event_counters(client).await?)
         }
         BookingResult::BookedOut => {
             error!(
@@ -130,6 +149,65 @@ async fn do_booking(booking: EventBooking) -> anyhow::Result<BookingResponse> {
     Ok(result)
 }
 
+async fn do_prebooking(hash: String) -> anyhow::Result<BookingResponse> {
+    let bytes =
+        decode(&hash).with_context(|| format!("Error decoding the prebooking hash {}", &hash))?;
+    let decoded = from_utf8(&bytes).with_context(|| {
+        format!(
+            "Error converting the decoded prebooking hash {} into a string slice",
+            &hash
+        )
+    })?;
+    let splitted = decoded.split('#').collect::<Vec<_>>();
+
+    // fail if the length is not correct
+    if splitted.len() != 8 {
+        bail!(
+            "Booking failed beacuse spitted prebooking hash ({}) has an invalid length: {}",
+            decoded,
+            splitted.len()
+        );
+    }
+
+    let booking = EventBooking::new(
+        splitted[0].into(),
+        splitted[1].into(),
+        splitted[2].into(),
+        splitted[3].into(),
+        splitted[4].into(),
+        splitted[5].into(),
+        Some(splitted[6].into()),
+        Some("J".eq(splitted[7])),
+        Some(false),
+        Some(String::from("Pre-Booking")),
+    );
+
+    let mut client = store::get_client().await?;
+    let event = store::get_event(&mut client, &booking.event_id).await?;
+
+    // prebooking is only available for beta events
+    if !event.beta {
+        warn!("Prebooking has ended for booking {:?}", booking);
+        return Ok(BookingResponse::failure(
+            "Der Buchungslink ist nicht mehr gültig da die Frühbuchungsphase zu Ende ist.",
+        ));
+    }
+
+    // check if prebooking has been used already
+    let result = sheets::detect_booking(&booking, &event).await?;
+    if let BookingDetection::Booked = result {
+        warn!(
+            "Prebooking link data has been detected and invalidated for booking {:?}",
+            booking
+        );
+        return Ok(BookingResponse::failure(
+            "Der Buchungslink wurde schon benutzt und ist daher ungültig.",
+        ));
+    }
+
+    Ok(book_event(&mut client, booking).await?)
+}
+
 async fn subscribe_to_updates(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     booking: &EventBooking,
@@ -139,8 +217,20 @@ async fn subscribe_to_updates(
     if booking.updates.unwrap_or(false) == false {
         return Ok(());
     }
+    // TODO: try to get rid of clone
+    let subscription =
+        Subscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
+    crate::logic::news::subscribe_to_news(client, subscription, false).await?;
 
-    // TODO: subscribe to updates
+    Ok(())
+}
+
+async fn send_mail(
+    booking: &EventBooking,
+    event: &Event,
+    booking_result: &BookingResult,
+) -> anyhow::Result<()> {
+    // FIXME: create email
 
     Ok(())
 }
