@@ -1,4 +1,4 @@
-use crate::logic::{calendar, contact, events, news};
+use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
 use actix_web::http::header::ContentType;
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
@@ -90,6 +90,17 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/calendar")
             .route("/appointments", web::get().to(appointments))
             .route("/notifications", web::post().to(notifications)),
+    );
+    cfg.service(
+        web::scope("/tasks")
+            .route(
+                "/check_email_connectivity",
+                web::get().to(check_email_connectivity),
+            )
+            .route(
+                "/renew_calendar_watch",
+                web::post().to(renew_calendar_watch),
+            ),
     );
 }
 
@@ -203,5 +214,17 @@ async fn message(message: web::Json<ContactMessage>) -> Result<impl Responder, R
 
 async fn emails(emails: web::Json<MassEmails>) -> Result<impl Responder, ResponseError> {
     contact::emails(emails.0.emails).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+// tasks
+
+async fn check_email_connectivity() -> Result<impl Responder, ResponseError> {
+    tasks::check_email_connectivity().await;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn renew_calendar_watch() -> Result<impl Responder, ResponseError> {
+    tasks::renew_calendar_watch().await;
     Ok(HttpResponse::Ok().finish())
 }
