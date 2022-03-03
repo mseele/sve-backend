@@ -550,7 +550,7 @@ pub struct ContactMessage {
     pub to: String,
     pub name: String,
     pub email: String,
-    pub phone: String,
+    pub phone: Option<String>,
     pub message: String,
 }
 
@@ -586,6 +586,17 @@ pub enum MessageType {
     Events,
     Fitness,
     Kunstrasen,
+}
+
+impl From<MessageType> for EmailType {
+    fn from(message_type: MessageType) -> Self {
+        match message_type {
+            MessageType::General => EmailType::Info,
+            MessageType::Events => EmailType::Events,
+            MessageType::Fitness => EmailType::Fitness,
+            MessageType::Kunstrasen => EmailType::Kunstrasen,
+        }
+    }
 }
 
 #[cfg(test)]
