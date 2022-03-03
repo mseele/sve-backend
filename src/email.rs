@@ -1,7 +1,6 @@
-use anyhow::{bail, Context, Result};
-use lettre::{transport::smtp::Error, AsyncTransport, Message};
-
 use crate::models::{EmailAccount, EmailType};
+use anyhow::{bail, Context, Result};
+use lettre::{AsyncTransport, Message};
 
 const EMAIL_DATA: &str = include_str!("../data/email.json");
 
@@ -41,42 +40,32 @@ pub async fn send_message(from: &EmailAccount, message: Message) -> Result<()> {
 }
 
 pub async fn send_messages(from: &EmailAccount, messages: Vec<Message>) -> Result<()> {
-//     let fitness_account = email_accounts()
-//         .into_iter()
-//         .find(|a| match a.email_type {
-//             EmailType::Fitness => true,
-//             _ => false,
-//         })
-//         .unwrap();
-
-//     let mailer = fitness_account.mailer()?;
-
-//     let email = Message::builder()
-//         .from(fitness_account.address.parse()?)
-//         .to("mseele@gmail.com".parse()?)
-//         .subject("Example subject")
-//         .body(String::from("Hello, world!"))?;
-
-//     let result = mailer.send(email).await?;
-//     println!("{:?}", result);
-
-//     // let result = connection.test_connection().await?;
-//     // println!("{:?}", result);
-
-//     Ok(())
-    todo!()
+    let mailer = from.mailer()?;
+    for message in messages {
+        mailer.send(message).await?;
+    }
+    Ok(())
 }
 
-pub fn get_account_by_address(email_address: &str) -> Result<Option<EmailAccount>> {
-    Ok(email_accounts()?
+pub fn get_account_by_address(email_address: &str) -> Result<EmailAccount> {
+    let email_account = email_accounts()?
         .into_iter()
-        .find(|account| account.address == email_address))
+        .find(|account| account.address == email_address)
+        .with_context(|| {
+            format!(
+                "Found no email account for email address '{}'",
+                email_address
+            )
+        })?;
+    Ok(email_account)
 }
 
-pub fn get_account_by_type(email_type: EmailType) -> Result<Option<EmailAccount>> {
-    Ok(email_accounts()?
+pub fn get_account_by_type(email_type: EmailType) -> Result<EmailAccount> {
+    let email_account = email_accounts()?
         .into_iter()
-        .find(|account| account.email_type == email_type))
+        .find(|account| account.email_type == email_type)
+        .with_context(|| format!("Found no email account for email type {:?}", email_type))?;
+    Ok(email_account)
 }
 
 fn email_accounts() -> Result<Vec<EmailAccount>> {
