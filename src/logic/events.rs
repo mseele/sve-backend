@@ -13,7 +13,7 @@ use tonic::transport::Channel;
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
 
-pub async fn get_events(all: Option<bool>, beta: Option<bool>) -> anyhow::Result<Vec<Event>> {
+pub async fn get_events(all: Option<bool>, beta: Option<bool>) -> Result<Vec<Event>> {
     let mut client = store::get_client().await?;
     let mut events = get_and_filter_events(&mut client, all, beta).await?;
 
@@ -30,7 +30,7 @@ pub async fn get_events(all: Option<bool>, beta: Option<bool>) -> anyhow::Result
     Ok(events)
 }
 
-pub async fn get_event_counters() -> anyhow::Result<Vec<EventCounter>> {
+pub async fn get_event_counters() -> Result<Vec<EventCounter>> {
     let mut client = store::get_client().await?;
     let event_counters = create_event_counters(&mut client).await?;
 
@@ -103,7 +103,7 @@ async fn get_and_filter_events(
 
 async fn create_event_counters(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-) -> anyhow::Result<Vec<EventCounter>> {
+) -> Result<Vec<EventCounter>> {
     let event_counters = get_and_filter_events(client, None, None)
         .await?
         .into_iter()
@@ -113,7 +113,7 @@ async fn create_event_counters(
     Ok(event_counters)
 }
 
-async fn do_booking(booking: EventBooking) -> anyhow::Result<BookingResponse> {
+async fn do_booking(booking: EventBooking) -> Result<BookingResponse> {
     let mut client = store::get_client().await?;
     Ok(book_event(&mut client, booking).await?)
 }
@@ -121,7 +121,7 @@ async fn do_booking(booking: EventBooking) -> anyhow::Result<BookingResponse> {
 async fn book_event(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     booking: EventBooking,
-) -> anyhow::Result<BookingResponse> {
+) -> Result<BookingResponse> {
     let booking_result = &store::book_event(client, &booking.event_id).await?;
     let result = match booking_result {
         BookingResult::Booked(event) | BookingResult::WaitingList(event) => {
@@ -149,7 +149,7 @@ async fn book_event(
     Ok(result)
 }
 
-async fn do_prebooking(hash: String) -> anyhow::Result<BookingResponse> {
+async fn do_prebooking(hash: String) -> Result<BookingResponse> {
     let bytes =
         decode(&hash).with_context(|| format!("Error decoding the prebooking hash {}", &hash))?;
     let decoded = from_utf8(&bytes).with_context(|| {
@@ -212,7 +212,7 @@ async fn subscribe_to_updates(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     booking: &EventBooking,
     event: &Event,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     // only subscribe to updates if updates field is true
     if booking.updates.unwrap_or(false) == false {
         return Ok(());
@@ -229,7 +229,7 @@ async fn send_mail(
     booking: &EventBooking,
     event: &Event,
     booking_result: &BookingResult,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     // FIXME: create email
 
     Ok(())
