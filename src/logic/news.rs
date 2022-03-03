@@ -1,28 +1,26 @@
-use std::collections::{HashMap, HashSet};
-use std::iter::Map;
-
-use crate::models::{BookingResponse, EventBooking, EventCounter, NewsType, Subscription};
+use crate::models::{NewsType, Subscription};
 use crate::store::{self, GouthInterceptor};
 use anyhow::Result;
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
+use std::collections::{HashMap, HashSet};
 use tonic::codegen::InterceptedService;
 use tonic::transport::Channel;
 
-pub async fn subscribe(subscription: Subscription) -> anyhow::Result<()> {
+pub async fn subscribe(subscription: Subscription) -> Result<()> {
     let mut client = store::get_client().await?;
     subscribe_to_news(&mut client, subscription, true).await?;
 
     Ok(())
 }
 
-pub async fn unsubscribe(subscription: Subscription) -> anyhow::Result<()> {
+pub async fn unsubscribe(subscription: Subscription) -> Result<()> {
     let mut client = store::get_client().await?;
     store::unsubscribe(&mut client, &subscription).await?;
 
     Ok(())
 }
 
-pub async fn get_subscriptions() -> anyhow::Result<HashMap<NewsType, HashSet<String>>> {
+pub async fn get_subscriptions() -> Result<HashMap<NewsType, HashSet<String>>> {
     let mut client = store::get_client().await?;
     let subscriptions = store::get_subscriptions(&mut client).await?;
 
@@ -53,7 +51,7 @@ pub async fn subscribe_to_news(
     Ok(())
 }
 
-async fn send_mail(subscription: Subscription) -> anyhow::Result<()> {
+async fn send_mail(subscription: Subscription) -> Result<()> {
     // FIXME: create email
 
     Ok(())
