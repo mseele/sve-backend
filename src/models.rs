@@ -568,6 +568,52 @@ pub enum EmailType {
     Jugendturnier,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactMessage {
+    #[serde(rename = "type")]
+    pub message_type: MessageType,
+    pub to: String,
+    pub name: String,
+    pub email: String,
+    pub phone: String,
+    pub message: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MassEmails {
+    pub emails: Vec<MassEmail>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MassEmail {
+    #[serde(rename = "type")]
+    pub message_type: MessageType,
+    pub to: String,
+    pub subject: String,
+    pub content: String,
+    pub attachments: Option<Vec<EmailAttachment>>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailAttachment {
+    pub name: String,
+    pub mime_type: String,
+    pub data: String,
+}
+
+#[derive(Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum MessageType {
+    General,
+    Events,
+    Fitness,
+    Kunstrasen,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

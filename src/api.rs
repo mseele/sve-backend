@@ -1,5 +1,5 @@
-use crate::logic::{events, news};
-use crate::models::{EventBooking, PartialEvent, Subscription};
+use crate::logic::{contact, events, news};
+use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
 use actix_web::http::header::ContentType;
 use actix_web::{error, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
@@ -80,6 +80,11 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/unsubscribe", web::post().to(unsubscribe))
             .route("/subscribers", web::get().to(subscribers)),
     );
+    cfg.service(
+        web::scope("/contact")
+            .route("/message", web::post().to(message))
+            .route("/emails", web::post().to(emails)),
+    );
 }
 
 // events
@@ -120,6 +125,8 @@ async fn delete(partial_event: web::Json<PartialEvent>) -> Result<impl Responder
     Ok(HttpResponse::Ok().finish())
 }
 
+// news
+
 async fn subscribe(subscription: web::Json<Subscription>) -> Result<impl Responder, ResponseError> {
     news::subscribe(subscription.0).await?;
     Ok(HttpResponse::Ok().finish())
@@ -155,4 +162,16 @@ async fn subscribers() -> Result<impl Responder, ResponseError> {
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(result))
+}
+
+// contact
+
+async fn message(message: web::Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
+    contact::message(message.0).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn emails(emails: web::Json<MassEmails>) -> Result<impl Responder, ResponseError> {
+    contact::emails(emails.0.emails).await?;
+    Ok(HttpResponse::Ok().finish())
 }
