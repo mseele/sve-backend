@@ -1,9 +1,10 @@
-use crate::logic::{contact, events, news};
+use crate::logic::{calendar, contact, events, news};
 use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
 use actix_web::http::header::ContentType;
-use actix_web::{error, HttpResponseBuilder};
+use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
+use log::error;
 use serde::Deserialize;
 use std::error::Error;
 use std::fmt::Debug;
@@ -85,6 +86,11 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/message", web::post().to(message))
             .route("/emails", web::post().to(emails)),
     );
+    cfg.service(
+        web::scope("/calendar")
+            .route("/appointments", web::get().to(appointments))
+            .route("/notifications", web::post().to(notifications)),
+    );
 }
 
 // events
@@ -162,6 +168,30 @@ async fn subscribers() -> Result<impl Responder, ResponseError> {
     Ok(HttpResponse::Ok()
         .content_type(ContentType::html())
         .body(result))
+}
+
+// calendar
+
+async fn appointments() -> Result<impl Responder, ResponseError> {
+    let result = calendar::appointments().await?;
+    Ok(web::Json(result))
+}
+
+async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError> {
+    let header_key = "X-Goog-Channel-Id";
+    let channel_id = req.headers().get(header_key);
+    if let Some(channel_id) = channel_id {
+        match channel_id.to_str() {
+            Ok(channel_id) => calendar::notifications(channel_id).await?,
+            Err(e) => error!(
+                "Could not parse header '{}' into a str: {:?}",
+                header_key, e
+            ),
+        }
+    } else {
+        error!("Header '{}' has not been found in the request", header_key);
+    }
+    Ok(HttpResponse::Ok().finish())
 }
 
 // contact
