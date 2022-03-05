@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::str::from_utf8;
 use std::str::FromStr;
 use steel_cent::currency::EUR;
+use steel_cent::formatting::{format, france_style as euro_style};
 use steel_cent::Money;
 
 base64_serde_type!(Base64Standard, STANDARD);
@@ -321,6 +322,10 @@ impl EventBooking {
         let major = (cost - fract) as i64;
         let minor = (fract * 100_f64) as i64;
         Money::of_major_minor(EUR, major, minor)
+    }
+
+    pub fn cost_as_string(&self, event: &Event) -> String {
+        format(euro_style(), &self.cost(event))
     }
 }
 
@@ -644,17 +649,21 @@ mod tests {
         let cost = member.cost(&event);
         assert_eq!(cost.major_part(), 59);
         assert_eq!(cost.minor_part(), 0);
+        assert_eq!(member.cost_as_string(&event), "59,00\u{a0}€");
         let cost = no_member.cost(&event);
         assert_eq!(cost.major_part(), 69);
         assert_eq!(cost.minor_part(), 0);
+        assert_eq!(no_member.cost_as_string(&event), "69,00\u{a0}€");
 
         let event = new_event(5.99, 9.99);
         let cost = member.cost(&event);
         assert_eq!(cost.major_part(), 5);
         assert_eq!(cost.minor_part(), 99);
+        assert_eq!(member.cost_as_string(&event), "5,99\u{a0}€");
         let cost = no_member.cost(&event);
         assert_eq!(cost.major_part(), 9);
         assert_eq!(cost.minor_part(), 99);
+        assert_eq!(no_member.cost_as_string(&event), "9,99\u{a0}€");
     }
 
     fn new_event(cost_member: f64, cost_non_member: f64) -> Event {

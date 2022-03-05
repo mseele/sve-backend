@@ -130,7 +130,7 @@ fn into_values(booking: &EventBooking, event: &Event, headers_indices: Vec<usize
         true => String::from("J"),
         false => String::from("N"),
     };
-    let cost = format(euro_style(), &booking.cost(event));
+    let cost = booking.cost_as_string(event);
     let comments = booking.comments.clone().unwrap_or(String::new());
     let mut values = vec![
         current_date_time,
