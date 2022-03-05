@@ -219,7 +219,7 @@ async fn subscribe_to_updates(
     // TODO: try to get rid of clone
     let subscription =
         Subscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
-    crate::logic::news::subscribe_to_news(client, subscription, false).await?;
+    super::news::subscribe_to_news(client, subscription, false).await?;
 
     Ok(())
 }
