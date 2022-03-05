@@ -457,6 +457,16 @@ impl FromStr for NewsType {
     }
 }
 
+impl From<NewsType> for EmailType {
+    fn from(news_type: NewsType) -> Self {
+        match news_type {
+            NewsType::General => EmailType::Info,
+            NewsType::Events => EmailType::Events,
+            NewsType::Fitness => EmailType::Fitness,
+        }
+    }
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Appointment {
