@@ -532,7 +532,7 @@ impl EmailAccount {
     }
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Hash, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum EmailType {
     Fitness,
@@ -579,7 +579,7 @@ pub struct EmailAttachment {
     pub data: String,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum MessageType {
     General,
