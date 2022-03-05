@@ -3,7 +3,6 @@ use crate::models::{Event, PartialEvent};
 use crate::sheets::{self, BookingDetection};
 use crate::store::{self, BookingResult, GouthInterceptor};
 use anyhow::{bail, Context, Result};
-use base64::decode;
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use log::{error, info, warn};
 use std::str::from_utf8;
@@ -150,8 +149,8 @@ async fn book_event(
 }
 
 async fn do_prebooking(hash: String) -> Result<BookingResponse> {
-    let bytes =
-        decode(&hash).with_context(|| format!("Error decoding the prebooking hash {}", &hash))?;
+    let bytes = base64::decode(&hash)
+        .with_context(|| format!("Error decoding the prebooking hash {}", &hash))?;
     let decoded = from_utf8(&bytes).with_context(|| {
         format!(
             "Error converting the decoded prebooking hash {} into a string slice",
