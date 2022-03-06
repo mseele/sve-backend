@@ -231,7 +231,7 @@ impl TryFrom<PartialEvent> for Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum EventType {
     Fitness,
     Events,
@@ -251,6 +251,15 @@ impl From<EventType> for NewsType {
         match event_type {
             EventType::Fitness => NewsType::Fitness,
             EventType::Events => NewsType::Events,
+        }
+    }
+}
+
+impl From<EventType> for EmailType {
+    fn from(event_type: EventType) -> Self {
+        match event_type {
+            EventType::Fitness => EmailType::Fitness,
+            EventType::Events => EmailType::Events,
         }
     }
 }

@@ -7,7 +7,8 @@ use std::collections::{HashMap, HashSet};
 use tonic::codegen::InterceptedService;
 use tonic::transport::Channel;
 
-const UNSUBSCRIBE_URL: &str = "https://www.sv-eutingen.de/newsletter#abmelden";
+pub const UNSUBSCRIBE_MESSAGE: &str = "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
+                               https://www.sv-eutingen.de/newsletter#abmelden";
 
 pub async fn subscribe(subscription: Subscription) -> Result<()> {
     let mut client = store::get_client().await?;
@@ -106,17 +107,22 @@ async fn send_mail(subscription: Subscription) -> Result<()> {
         .to(subscription.email.parse()?)
         .bcc(email_account.mailbox()?)
         .subject(subject)
-        .body(format!("Lieber Interessent/In,
+        .body(format!(
+            "Lieber Interessent/In,
 
         vielen Dank für Dein Interesse an {}.
 
         Ab sofort erhältst Du automatisch eine E-Mail{}.
 
-        Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
         {}
 
         Herzliche Grüße
-        {}", topic, kind, UNSUBSCRIBE_URL, regards))?;
+        {}",
+            topic,
+            kind,
+            UNSUBSCRIBE_MESSAGE,
+            regards
+        ))?;
 
     email::send_message(&email_account, message).await?;
 
