@@ -341,6 +341,111 @@ fn replace_payday(body: String, event: &Event) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{NaiveDate, NaiveDateTime};
+
+    #[test]
+    fn test_create_body() {
+        let booking_member = EventBooking::new(
+            String::from("id"),
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        let booking_non_member = EventBooking::new(
+            String::from("id"),
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            None,
+            None,
+            None,
+        );
+        let event = Event::new(
+            String::from("id"),
+            String::from("sheet_id"),
+            0,
+            EventType::Fitness,
+            String::from("FitForFun"),
+            0,
+            true,
+            false,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            vec![
+                NaiveDate::from_ymd(2022, 3, 7).and_hms(19, 00, 00),
+                NaiveDate::from_ymd(2022, 3, 8).and_hms(19, 00, 00),
+                NaiveDate::from_ymd(2022, 3, 9).and_hms(19, 00, 00),
+                NaiveDate::from_ymd(2022, 3, 10).and_hms(19, 00, 00),
+                NaiveDate::from_ymd(2022, 3, 11).and_hms(19, 00, 00),
+                NaiveDate::from_ymd(2022, 3, 12).and_hms(19, 00, 00),
+                NaiveDate::from_ymd(2022, 3, 13).and_hms(19, 00, 00),
+            ],
+            None,
+            0,
+            0,
+            0,
+            5.0,
+            10.0,
+            0,
+            0,
+            String::from("Turn- & Festhalle Eutingen"),
+            String::from("booking_template"),
+            String::from("waiting_template"),
+            None,
+            None,
+            false,
+        );
+
+        assert_eq!(
+            create_body(
+                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0}
+${dates}",
+                &booking_member,
+                &event
+            ),
+            format!(
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00\u{a0}€ {}
+- Mo, 07. März 2022, 19:00 Uhr
+- Di, 08. März 2022, 19:00 Uhr
+- Mi, 09. März 2022, 19:00 Uhr
+- Do, 10. März 2022, 19:00 Uhr
+- Fr, 11. März 2022, 19:00 Uhr
+- Sa, 12. März 2022, 19:00 Uhr
+- So, 13. März 2022, 19:00 Uhr",
+                format_payday(Utc::now() + Duration::days(1))
+            )
+        );
+        assert_eq!(
+            create_body(
+                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0}
+${dates}",
+                &booking_non_member,
+                &event
+            ),
+            format!(
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00\u{a0}€ {}
+- Mo, 07. März 2022, 19:00 Uhr
+- Di, 08. März 2022, 19:00 Uhr
+- Mi, 09. März 2022, 19:00 Uhr
+- Do, 10. März 2022, 19:00 Uhr
+- Fr, 11. März 2022, 19:00 Uhr
+- Sa, 12. März 2022, 19:00 Uhr
+- So, 13. März 2022, 19:00 Uhr",
+                format_payday(Utc::now() + Duration::days(1))
+            )
+        );
+    }
 
     #[test]
     fn test_replace_payday() {
