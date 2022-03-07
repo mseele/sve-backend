@@ -110,18 +110,15 @@ async fn send_mail(subscription: Subscription) -> Result<()> {
         .body(format!(
             "Lieber Interessent/In,
 
-        vielen Dank für Dein Interesse an {}.
+vielen Dank für Dein Interesse an {}.
 
-        Ab sofort erhältst Du automatisch eine E-Mail{}.
+Ab sofort erhältst Du automatisch eine E-Mail{}.
 
-        {}
+{}
 
-        Herzliche Grüße
-        {}",
-            topic,
-            kind,
-            UNSUBSCRIBE_MESSAGE,
-            regards
+Herzliche Grüße
+{}",
+            topic, kind, UNSUBSCRIBE_MESSAGE, regards
         ))?;
 
     email::send_message(&email_account, message).await?;
