@@ -8,7 +8,7 @@ use tonic::codegen::InterceptedService;
 use tonic::transport::Channel;
 
 pub const UNSUBSCRIBE_MESSAGE: &str = "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
-https://www.sv-eutingen.de/newsletter#abmelden";
+https://www.sv-eutingen.de/newsletter";
 
 pub async fn subscribe(subscription: Subscription) -> Result<()> {
     let mut client = store::get_client().await?;
