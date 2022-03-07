@@ -9,6 +9,7 @@ mod models;
 mod sheets;
 mod store;
 
+use actix_cors::Cors;
 use actix_web::{dev::Service, web, App, HttpServer};
 use log::error;
 
@@ -19,7 +20,15 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     HttpServer::new(|| {
-        App::new()
+        App::new() //Access-Control-Allow-Origin
+            .wrap(
+                Cors::default()
+                    .send_wildcard()
+                    .allow_any_origin()
+                    .allow_any_method()
+                    .allow_any_header()
+                    .max_age(3600),
+            )
             .wrap_fn(|req, srv| {
                 let fut = srv.call(req);
                 async {
