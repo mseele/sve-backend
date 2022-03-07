@@ -524,7 +524,7 @@ impl EmailAccount {
     }
 
     pub fn new_message(&self) -> Result<MessageBuilder> {
-        Ok(Message::builder().sender(self.mailbox()?))
+        Ok(Message::builder().from(self.mailbox()?))
     }
 
     pub fn mailer(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
