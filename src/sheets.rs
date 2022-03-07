@@ -3,7 +3,6 @@ use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use chrono_tz::Europe::Berlin;
 use google_sheets4::{api::ValueRange, Sheets};
-use steel_cent::formatting::{format, france_style as euro_style};
 use yup_oauth2::ServiceAccountKey;
 
 const REQUIRED_HEADERS: [&str; 11] = [
