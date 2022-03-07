@@ -404,20 +404,6 @@ impl BookingResponse {
     }
 }
 
-// public static BookingResponse success(String message, List<EventCounter> counter) {
-//     return new AutoValue_BookingResponse(Boolean.TRUE, message, counter);
-// }
-
-// public static BookingResponse failure(String message) {
-//     return new AutoValue_BookingResponse(Boolean.FALSE, message, Collections.emptyList());
-// }
-
-// public abstract Boolean success();
-
-// public abstract String message();
-
-// public abstract List<EventCounter> counter();
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Subscription {
