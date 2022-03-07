@@ -4,7 +4,7 @@ use crate::models::{Event, PartialEvent};
 use crate::sheets::{self, BookingDetection};
 use crate::store::{self, BookingResult, GouthInterceptor};
 use anyhow::{bail, Context, Result};
-use chrono::{prelude::*, Duration};
+use chrono::{DateTime, Duration, Locale, Utc};
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use log::{error, info, warn};
 use regex::Regex;
