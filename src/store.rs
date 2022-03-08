@@ -24,7 +24,7 @@ use tonic::{
     Code, Request, Status,
 };
 
-const PROJECT: &str = include_str!("../data/project.id");
+const PROJECT: &str = "sve-backend";
 
 pub struct GouthInterceptor;
 
