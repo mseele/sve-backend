@@ -1,4 +1,3 @@
 /target
-data/credentials.json
-data/email.json
+/secret
 .vscode/launch.json

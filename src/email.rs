@@ -2,7 +2,7 @@ use crate::models::{EmailAccount, EmailType};
 use anyhow::{bail, Context, Result};
 use lettre::{AsyncTransport, Message};
 
-const EMAIL_DATA: &str = include_str!("../data/email.json");
+const EMAIL_DATA: &str = env!("SVE_EMAILS");
 
 pub async fn test_connection() -> Result<()> {
     let mut errors = Vec::new();
