@@ -5,6 +5,12 @@ FROM ekidd/rust-musl-builder:latest AS builder
 
 ADD --chown=rust:rust . ./
 
+RUN echo $SVE_CREDENTIALS | base64 -d > /root/temp
+RUN SVE_CREDENTIALS=$(cat /root/temp); echo "Output: $SVE_CREDENTIALS"
+
+RUN echo $SVE_EMAILS | base64 -d > /root/temp
+RUN SVE_EMAILS=$(cat /root/temp); echo "Output: $SVE_EMAILS"
+
 RUN cargo build --release
 
 ####################################################################################################
