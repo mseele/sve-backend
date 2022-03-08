@@ -5,12 +5,12 @@ FROM ekidd/rust-musl-builder:latest AS builder
 
 ADD --chown=rust:rust . ./
 
-RUN echo $SVE_CREDENTIALS | base64 -d > /tmp/base64
-RUN SVE_CREDENTIALS_ENCODED=$(cat /tmp/base64); echo "Output: $SVE_CREDENTIALS_ENCODED"
+RUN echo "$SVE_CREDENTIALS_ENCODED" | base64 -d > /tmp/base64
+RUN SVE_CREDENTIALS_DECODED=$(cat /tmp/base64); echo "Output: $SVE_CREDENTIALS_DECODED"
 ENV SVE_CREDENTIALS=$SVE_CREDENTIALS_ENCODED
 RUN echo $SVE_CREDENTIALS
 
-RUN echo $SVE_EMAILS | base64 -d > /tmp/base64
+RUN echo $SVE_EMAILS_ENCODED | base64 -d > /tmp/base64
 RUN SVE_EMAILS_DECODED=$(cat /tmp/base64); echo "Output: $SVE_EMAILS_DECODED"
 ENV SVE_EMAILS=$SVE_EMAILS_DECODED
 RUN echo $SVE_EMAILS
