@@ -12,4 +12,4 @@ jobs:
           registry: gcr.io
           project_id: sve-backend
           image_name: sve_backend
-          build_args: SVE_CREDENTIALS=ABC,SVE_EMAILS=XYZ
+          build_args: SVE_CREDENTIALS=${{ secrets.SVE_CREDENTIALS }},SVE_EMAILS=${{ secrets.SVE_EMAILS }}
