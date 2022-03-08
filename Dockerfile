@@ -1,20 +1,11 @@
 ####################################################################################################
 ## Builder
 ####################################################################################################
-FROM rust:latest AS builder
+FROM ekidd/rust-musl-builder:latest AS builder
 
-RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev build-essential gcc-x86-64-linux-gnu pkg-config libssl-dev
-RUN update-ca-certificates
+ADD --chown=rust:rust . ./
 
-WORKDIR /usr/src/app
-COPY . .
-
-ENV RUSTFLAGS='-C linker=x86_64-linux-musl-gcc'
-ENV TARGET_CC=x86_64-linux-musl-gcc
-
-# Install production dependencies and build a release artifact
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo build --release
 
 ####################################################################################################
 ## Final image
@@ -22,7 +13,7 @@ RUN cargo build --target x86_64-unknown-linux-musl --release
 FROM scratch
 
 # Run the web service on container startup
-COPY --from=builder /usr/src/app/target/x86_64-unknown-linux-musl/release/sve_backend .
+COPY --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/sve_backend /usr/local/bin/
 USER 1000
 ENV RUST_BACKTRACE=1 RUST_LOG=info
-CMD ["./sve_backend"]
+CMD /usr/local/bin/sve_backend
