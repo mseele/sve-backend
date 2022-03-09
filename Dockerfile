@@ -19,8 +19,9 @@ RUN echo "$SVE_EMAILS_ENCODED" | base64 -d > /tmp/base64
 RUN SVE_EMAILS_DECODED=$(cat /tmp/base64)
 ENV SVE_EMAILS=$SVE_EMAILS_DECODED
 
-RUN cargo install cross
-RUN cross build --target x86_64-unknown-linux-musl --release
+ENV OPENSSL_DIR=/usr/local/musl/
+
+RUN cargo build --target x86_64-unknown-linux-musl --release
 
 ####################################################################################################
 ## Final image
