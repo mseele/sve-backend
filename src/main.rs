@@ -13,11 +13,13 @@ use actix_cors::Cors;
 use actix_web::{dev::Service, web, App, HttpServer};
 use log::error;
 
-pub const CREDENTIALS: &str = include_str!("../secret/credentials.json");
+pub const CREDENTIALS: &str = env!("SVE_CREDENTIALS");
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
+
+    println!("Credentials: {}", CREDENTIALS);
 
     HttpServer::new(|| {
         App::new() //Access-Control-Allow-Origin
