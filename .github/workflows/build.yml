@@ -16,21 +16,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Setup gcloud CLI
-      - uses: google-github-actions/setup-gcloud@v0
+      # Auth gcloud CLI
+      - uses: google-github-actions/auth@v0
         with:
           service_account_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
+
+      # Setup gcloud CLI
+     - uses: google-github-actions/setup-gcloud@v0
 
       # Configure docker to use the gcloud command-line tool as a credential helper
       - run: |
           # Set up docker to authenticate
           # via gcloud command-line tool.
           gcloud auth configure-docker
-
-      - name: Decode base64 secrets
-        run: mkdir -p secret && \
-             echo $SVE_CREDENTIALS_ENCODED | base64 -d > secret/credentials.json && \
-             echo $SVE_EMAILS_ENCODED | base64 -d > secret/email.json
 
       # Build the Docker image
       - name: Build
