@@ -5,7 +5,7 @@ use chrono_tz::Europe::Berlin;
 use google_sheets4::{api::ValueRange, Sheets};
 use yup_oauth2::ServiceAccountKey;
 
-const REQUIRED_HEADERS: [&str; 11] = [
+const REQUIRED_HEADERS: [&str; 12] = [
     "buchungsdatum",
     "vorname",
     "nachname",
@@ -15,6 +15,7 @@ const REQUIRED_HEADERS: [&str; 11] = [
     "telefon",
     "sve-mitglied",
     "betrag",
+    "buchungsnr",
     "bezahlt",
     "kommentar",
 ];
@@ -35,7 +36,11 @@ async fn sheets_hub() -> Result<Sheets> {
     Ok(hub)
 }
 
-pub async fn save_booking(booking: &EventBooking, event: &Event) -> Result<()> {
+pub async fn save_booking(
+    booking: &EventBooking,
+    event: &Event,
+    booking_number: &String,
+) -> Result<()> {
     let hub = sheets_hub().await?;
     let sheet_title = get_sheet_title(&hub, event).await?;
     let values = get_values(&hub, &event.sheet_id, &sheet_title).await?;
@@ -56,6 +61,7 @@ pub async fn save_booking(booking: &EventBooking, event: &Event) -> Result<()> {
                 &hub,
                 booking,
                 event,
+                booking_number,
                 &sheet_title,
                 insert_index,
                 headers_indices,
@@ -94,7 +100,7 @@ pub async fn detect_booking(booking: &EventBooking, event: &Event) -> Result<Boo
                     sheet_title, &event.sheet_id,
                 )
             })?;
-            let booking_values = into_values(booking, event, headers_indices);
+            let booking_values = into_values(booking, event, &String::from(""), headers_indices);
             match values
                 .iter()
                 .skip(1)
@@ -115,7 +121,12 @@ fn vec_compare(va: &[String], vb: &[String]) -> bool {
        .all(|(a,b)| a.to_lowercase().trim().eq(b.to_lowercase().trim()))
 }
 
-fn into_values(booking: &EventBooking, event: &Event, headers_indices: Vec<usize>) -> Vec<String> {
+fn into_values(
+    booking: &EventBooking,
+    event: &Event,
+    booking_number: &String,
+    headers_indices: Vec<usize>,
+) -> Vec<String> {
     let current_date_time = Utc::now()
         .with_timezone(&Berlin)
         .format("%d.%m.%Y %H:%M:%S")
@@ -141,6 +152,7 @@ fn into_values(booking: &EventBooking, event: &Event, headers_indices: Vec<usize
         phone_number,
         member,
         cost,
+        booking_number.clone(),
         String::from("N"),
         comments,
     ];
@@ -153,11 +165,12 @@ async fn insert(
     hub: &Sheets,
     booking: &EventBooking,
     event: &Event,
+    booking_number: &String,
     sheet_title: &str,
     insert_index: usize,
     headers_indices: Vec<usize>,
 ) -> Result<()> {
-    let values = into_values(booking, event, headers_indices);
+    let values = into_values(booking, event, booking_number, headers_indices);
     hub.spreadsheets()
         .values_update(
             ValueRange {
@@ -165,7 +178,7 @@ async fn insert(
                 ..Default::default()
             },
             &event.sheet_id,
-            format!("'{0}'!B{1}:L{1}", sheet_title, insert_index,).as_str(),
+            format!("'{0}'!B{1}:M{1}", sheet_title, insert_index,).as_str(),
         )
         .value_input_option("USER_ENTERED")
         .doit()
@@ -181,7 +194,7 @@ async fn get_values(
 ) -> Result<Option<Vec<Vec<String>>>> {
     let (_, value_range) = hub
         .spreadsheets()
-        .values_get(sheet_id, format!("'{}'!B1:L1000", sheet_title).as_str())
+        .values_get(sheet_id, format!("'{}'!B1:M1000", sheet_title).as_str())
         .doit()
         .await?;
 
@@ -316,10 +329,11 @@ mod tests {
             String::from("Betrag"),
             String::from("Kommentar"),
             String::from("Bezahlt"),
+            String::from("Buchungsnr"),
         ];
         let indices = get_header_indices(&values);
         assert_eq!(indices.is_ok(), true);
-        assert_eq!(indices.unwrap(), &[7, 0, 1, 2, 5, 3, 4, 6, 8, 10, 9]);
+        assert_eq!(indices.unwrap(), &[7, 0, 1, 2, 5, 3, 4, 6, 8, 11, 10, 9]);
     }
 
     #[test]

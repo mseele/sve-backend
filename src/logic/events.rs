@@ -126,13 +126,14 @@ async fn book_event(
 ) -> Result<BookingResponse> {
     let booking_result = &store::book_event(client, &booking.event_id).await?;
     let result = match booking_result {
-        BookingResult::Booked(event) | BookingResult::WaitingList(event) => {
-            sheets::save_booking(&booking, &event).await?;
-            subscribe_to_updates(client, &booking, &event).await?;
-            send_mail(&booking, &event, &booking_result).await?;
+        BookingResult::Booked(event, booking_number)
+        | BookingResult::WaitingList(event, booking_number) => {
+            sheets::save_booking(&booking, event, booking_number).await?;
+            subscribe_to_updates(client, &booking, event).await?;
+            send_mail(&booking, event, booking_result).await?;
             info!("Booking of Event {} was successfull", booking.event_id);
             let message;
-            if let BookingResult::Booked(_) = booking_result {
+            if let BookingResult::Booked(_, _) = booking_result {
                 message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail.";
             } else {
                 message = "Du stehst jetzt auf der Warteliste. Wir benachrichtigen Dich, wenn Plätze frei werden.";
@@ -245,12 +246,15 @@ async fn send_mail(
     );
     let subject;
     let template;
-    if let BookingResult::Booked(_) = booking_result {
+    let booking_number;
+    if let BookingResult::Booked(_, b_nr) = booking_result {
         subject = format!("{} Bestätigung Buchung", subject_prefix);
         template = &event.booking_template;
+        booking_number = Some(b_nr);
     } else {
         subject = format!("{} Bestätigung Warteliste", subject_prefix);
         template = &event.waiting_template;
+        booking_number = None;
     }
 
     let message = email_account
@@ -258,14 +262,19 @@ async fn send_mail(
         .to(booking.email.parse()?)
         .bcc(email_account.mailbox()?)
         .subject(subject)
-        .body(create_body(template, booking, event))?;
+        .body(create_body(template, booking, event, booking_number))?;
 
     email::send_message(&email_account, message).await?;
 
     Ok(())
 }
 
-fn create_body(template: &str, booking: &EventBooking, event: &Event) -> String {
+fn create_body(
+    template: &str,
+    booking: &EventBooking,
+    event: &Event,
+    booking_number: Option<&String>,
+) -> String {
     let mut body = template
         .replace("${firstname}", booking.first_name.trim())
         .replace("${lastname}", booking.last_name.trim())
@@ -273,6 +282,9 @@ fn create_body(template: &str, booking: &EventBooking, event: &Event) -> String 
         .replace("${location}", &event.location)
         .replace("${price}", &booking.cost_as_string(event))
         .replace("${dates}", &format_dates(&event));
+    if let Some(booking_number) = booking_number {
+        body = body.replace("${booking_number}", booking_number);
+    }
     body = replace_payday(body, &event);
     if booking.updates.unwrap_or(false) {
         body.push_str(
@@ -409,13 +421,14 @@ mod tests {
 
         assert_eq!(
             create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0}
+                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${booking_number}
 ${dates}",
                 &booking_member,
-                &event
+                &event,
+                None
             ),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00\u{a0}€ {}
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00\u{a0}€ {} ${{booking_number}}
 - Mo, 07. März 2022, 19:00 Uhr
 - Di, 08. März 2022, 19:00 Uhr
 - Mi, 09. März 2022, 19:00 Uhr
@@ -428,13 +441,14 @@ ${dates}",
         );
         assert_eq!(
             create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0}
+                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${booking_number}
 ${dates}",
                 &booking_non_member,
-                &event
+                &event,
+                Some(&String::from("22-1012"))
             ),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00\u{a0}€ {}
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00\u{a0}€ {} 22-1012
 - Mo, 07. März 2022, 19:00 Uhr
 - Di, 08. März 2022, 19:00 Uhr
 - Mi, 09. März 2022, 19:00 Uhr
