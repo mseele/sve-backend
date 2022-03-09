@@ -20,6 +20,8 @@ const REQUIRED_HEADERS: [&str; 12] = [
     "kommentar",
 ];
 
+const REQUIRED_PREBOOKING_HEADERS: [usize; 7] = [1, 2, 3, 4, 5, 6, 7];
+
 async fn sheets_hub() -> Result<Sheets> {
     let secret: ServiceAccountKey =
         serde_json::from_str(crate::CREDENTIALS).with_context(|| "Error loading credentials")?;
@@ -100,18 +102,43 @@ pub async fn detect_booking(booking: &EventBooking, event: &Event) -> Result<Boo
                     sheet_title, &event.sheet_id,
                 )
             })?;
-            let booking_values = into_values(booking, event, &String::from(""), headers_indices);
-            match values
+            // collect the subset of prebooking header indices
+            let prebooking_header_indices = header_indices
                 .iter()
-                .skip(1)
-                .find(|row| vec_compare(row, &booking_values))
-            {
+                .filter(|i| REQUIRED_PREBOOKING_HEADERS.contains(i))
+                .map(|i| *i)
+                .collect::<Vec<_>>();
+            // generate booking values and filter by prebooking headers
+            let prebooking_values = filter_by_indices(
+                into_values(booking, event, &String::from(""), header_indices),
+                &prebooking_header_indices,
+            );
+            // check prebooking values for existance
+            match values.into_iter().skip(1).find(|row| {
+                vec_compare(
+                    &filter_by_indices(row.to_vec(), &prebooking_header_indices),
+                    &prebooking_values,
+                )
+            }) {
                 Some(_) => Ok(BookingDetection::Booked),
                 None => Ok(BookingDetection::NotBooked),
             }
         }
         None => Ok(BookingDetection::NotBooked),
     }
+}
+
+fn filter_by_indices(values: Vec<String>, indices: &[usize]) -> Vec<String> {
+    values
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, value)| {
+            if indices.contains(&index) {
+                return Some(value);
+            }
+            return None;
+        })
+        .collect::<Vec<_>>()
 }
 
 fn vec_compare(va: &[String], vb: &[String]) -> bool {
@@ -133,9 +160,9 @@ fn into_values(
         .to_string();
     let phone_number = match &booking.phone {
         Some(phone_number) if phone_number.trim().len() > 0 => {
-        let mut value = String::from("'");
+            let mut value = String::from("'");
             value.push_str(phone_number.trim());
-        value
+            value
         }
         Some(_) | None => String::from(""),
     };
