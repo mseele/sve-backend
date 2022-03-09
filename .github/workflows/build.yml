@@ -28,8 +28,7 @@ jobs:
           gcloud auth configure-docker
 
       - name: Decode base64 secrets
-        run: echo $SVE_CREDENTIALS_ENCODED | base64 -d > secret/credentials.json && \
-             echo $SVE_EMAILS_ENCODED | base64 -d > secret/email.json &&
+        run: echo $SVE_CREDENTIALS_ENCODED | base64 -d > secret/credentials.json && echo $SVE_EMAILS_ENCODED | base64 -d > secret/email.json &&
 
       # Build the Docker image
       - name: Build
