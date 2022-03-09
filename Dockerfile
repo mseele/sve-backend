@@ -13,7 +13,7 @@ ADD . ./
 
 RUN mkdir -p ./secret
 #RUN echo $SVE_CREDENTIALS_ENCODED | base64 -d > ./secret/credentials.json
-#RUN echo $SVE_EMAILS_ENCODED | base64 -d > ./secret/email.json
+RUN echo $SVE_EMAILS_ENCODED | base64 -d > ./secret/email.json
 
 ENV SVE_CREDENTIALS $SVE_CREDENTIALS_ENCODED
 RUN cargo build --target x86_64-unknown-linux-musl --release
