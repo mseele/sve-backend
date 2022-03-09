@@ -1,6 +1,6 @@
 use crate::models::{Event, EventType, NewsType, PartialEvent, Subscription};
 use anyhow::{bail, Context, Result};
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use googapis::{
     google::firestore::v1::{
         document_transform::{field_transform::TransformType, FieldTransform},
@@ -150,8 +150,8 @@ pub async fn delete_event(
 }
 
 pub enum BookingResult {
-    Booked(Event),
-    WaitingList(Event),
+    Booked(Event, String),
+    WaitingList(Event, String),
     BookedOut,
 }
 
@@ -171,17 +171,17 @@ pub async fn book_event(
     match run_book_event_transaction(client, id, transaction.clone()).await {
         Ok(result) => {
             match result {
-                BookingTransaction::Book(writes) => {
+                BookingTransaction::Book(writes, booking_number) => {
                     // commit transaction
                     commit_transaction(client, writes, transaction).await?;
                     let event = get_event(client, id).await?;
-                    Ok(BookingResult::Booked(event))
+                    Ok(BookingResult::Booked(event, booking_number))
                 }
-                BookingTransaction::WaitingList(writes) => {
+                BookingTransaction::WaitingList(writes, booking_number) => {
                     // commit transaction
                     commit_transaction(client, writes, transaction).await?;
                     let event = get_event(client, id).await?;
-                    Ok(BookingResult::WaitingList(event))
+                    Ok(BookingResult::WaitingList(event, booking_number))
                 }
                 BookingTransaction::BookedOut => {
                     // rollback transaction
@@ -199,8 +199,8 @@ pub async fn book_event(
 }
 
 pub enum BookingTransaction {
-    Book(Vec<Write>),
-    WaitingList(Vec<Write>),
+    Book(Vec<Write>, String),
+    WaitingList(Vec<Write>, String),
     BookedOut,
 }
 
@@ -229,7 +229,7 @@ async fn run_book_event_transaction(
                     max_waiting_list_field.into(),
                 ],
             }),
-            consistency_selector: Some(ConsistencySelector::Transaction(transaction)),
+            consistency_selector: Some(ConsistencySelector::Transaction(transaction.clone())),
             ..Default::default()
         }))
         .await?;
@@ -240,7 +240,12 @@ async fn run_book_event_transaction(
     let subscribers = get_integer(doc, subscribers_field)?;
     let max_subscribers = get_integer(doc, max_subscribers_field)?;
     if max_subscribers == -1 || subscribers < max_subscribers {
-        return Ok(BookingTransaction::Book(vec![Write {
+        let mut writes = Vec::new();
+        // generate booking number
+        let (write, booking_number) = get_next_booking_number(client, transaction).await?;
+        writes.push(write);
+
+        writes.push(Write {
             operation: Some(Operation::Transform(DocumentTransform {
                 document: format!(
                     "projects/{}/databases/(default)/documents/events/{}",
@@ -256,13 +261,21 @@ async fn run_book_event_transaction(
             update_mask: None,
             update_transforms: vec![],
             current_document: None,
-        }]));
+        });
+
+        return Ok(BookingTransaction::Book(writes, booking_number));
     }
 
     let waiting_list = get_integer(doc, waiting_list_field)?;
     let max_waiting_list = get_integer(doc, max_waiting_list_field)?;
     if waiting_list < max_waiting_list {
-        return Ok(BookingTransaction::WaitingList(vec![Write {
+        let mut writes = Vec::new();
+
+        // generate booking number
+        let (write, booking_number) = get_next_booking_number(client, transaction.clone()).await?;
+        writes.push(write);
+
+        writes.push(Write {
             operation: Some(Operation::Transform(DocumentTransform {
                 document: format!(
                     "projects/{}/databases/(default)/documents/events/{}",
@@ -278,10 +291,71 @@ async fn run_book_event_transaction(
             update_mask: None,
             update_transforms: vec![],
             current_document: None,
-        }]));
+        });
+
+        return Ok(BookingTransaction::WaitingList(writes, booking_number));
     }
 
     Ok(BookingTransaction::BookedOut)
+}
+
+async fn get_next_booking_number(
+    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    transaction: Vec<u8>,
+) -> Result<(Write, String)> {
+    let id_field = "id";
+    let response = client
+        .get_document(Request::new(GetDocumentRequest {
+            name: format!(
+                "projects/{}/databases/(default)/documents/counters/events",
+                PROJECT
+            ),
+            mask: Some(DocumentMask {
+                field_paths: vec![id_field.into()],
+            }),
+            consistency_selector: Some(ConsistencySelector::Transaction(transaction)),
+            ..Default::default()
+        }))
+        .await?;
+
+    // TODO: use into_inner() to avoid borrowing (and clone)
+    let doc = response.get_ref();
+    let id = get_integer(doc, id_field)?;
+
+    // next_id need to be between 1000 & 10000
+    let mut next_id = id;
+    let transform_type;
+    if id < 1000 || id >= 9999 {
+        transform_type = TransformType::Minimum(Value {
+            value_type: Some(ValueType::IntegerValue(1000)),
+        });
+        next_id = 1000;
+    } else {
+        transform_type = TransformType::Increment(Value {
+            value_type: Some(ValueType::IntegerValue(1)),
+        });
+        next_id += 1;
+    }
+
+    let write = Write {
+        operation: Some(Operation::Transform(DocumentTransform {
+            document: format!(
+                "projects/{}/databases/(default)/documents/counters/events",
+                PROJECT
+            ),
+            field_transforms: vec![FieldTransform {
+                field_path: id_field.into(),
+                transform_type: Some(transform_type),
+            }],
+        })),
+        update_mask: None,
+        update_transforms: vec![],
+        current_document: None,
+    };
+
+    let next_booking_number = format!("{}-{:04}", Utc::now().format("%y"), next_id);
+
+    Ok((write, next_booking_number))
 }
 
 pub async fn get_subscriptions(
