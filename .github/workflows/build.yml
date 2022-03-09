@@ -12,4 +12,4 @@ jobs:
           registry: eu.gcr.io
           project_id: sve-backend
           image_name: sve_backend
-          build_args: SVE_CREDENTIALS_ENCODED=${{ secrets.SVE_CREDENTIALS_ENCODED }},SVE_EMAILS_ENCODED=${{ secrets.SVE_EMAILS_ENCODED }}
+          build_args: SVE_CREDENTIALS=${{ secrets.SVE_CREDENTIALS }},SVE_CREDENTIALS_ENCODED=${{ secrets.SVE_CREDENTIALS_ENCODED }},SVE_EMAILS_ENCODED=${{ secrets.SVE_EMAILS_ENCODED }}
