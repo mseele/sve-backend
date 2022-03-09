@@ -3,8 +3,6 @@
 ####################################################################################################
 FROM rust:latest AS builder
 
-RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev pkg-config libssl-dev
 RUN update-ca-certificates
 
 WORKDIR /app
@@ -19,19 +17,15 @@ RUN echo "$SVE_EMAILS_ENCODED" | base64 -d > /tmp/base64
 RUN SVE_EMAILS_DECODED=$(cat /tmp/base64)
 ENV SVE_EMAILS=$SVE_EMAILS_DECODED
 
-ENV OPENSSL_LIB_DIR=/usr/local/lib/
-ENV OPENSSL_INCLUDE_DIR=/usr/local/include
-ENV OPENSSL_STATIC=yes
-
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN cargo build --release
 
 ####################################################################################################
 ## Final image
 ####################################################################################################
-FROM scratch
+FROM debian:buster-slim
 
 # Run the web service on container startup
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/sve_backend .
+COPY --from=builder /app/target/release/sve_backend .
 USER 1000
 ENV RUST_BACKTRACE=1 RUST_LOG=info
 CMD ["./sve_backend"]
