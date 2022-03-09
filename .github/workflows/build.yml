@@ -1,4 +1,4 @@
-name: Build and Deploy Release
+name: Setup, Build, and Publish
 on:
   push:
     tags:
@@ -9,7 +9,7 @@ env:
   REGISTRY_HOSTNAME: eu.gcr.io/sve-backend
 
 jobs:
-  build-and-deploy-release:
+  setup-build-and-publish:
     name: Setup, Build, and Publish
     runs-on: ubuntu-latest
     steps:
