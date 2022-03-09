@@ -38,9 +38,7 @@ jobs:
         run: |
           export TAG=work
           echo $TAG
-          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" \
-            --build-arg SVE_CREDENTIALS_ENCODED="$SVE_CREDENTIALS_ENCODED" \
-            --build-arg SVE_EMAILS_ENCODED="$SVE_EMAILS_ENCODED" .
+          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" .
 
       # Push the Docker image to Google Container Registry
       - name: Publish
