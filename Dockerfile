@@ -22,7 +22,7 @@ RUN cargo build --release
 ####################################################################################################
 ## Final image
 ####################################################################################################
-FROM debian:buster-slim
+FROM rust:latest
 
 # Run the web service on container startup
 COPY --from=builder /app/target/release/sve_backend .
