@@ -47,7 +47,7 @@ pub async fn save_booking(
     match values {
         Some(values) => {
             // verify all headers are available and store their indices
-            let headers_indices = get_header_indices(&values[0]).with_context(|| {
+            let header_indices = get_header_indices(&values[0]).with_context(|| {
                 format!(
                     "Headers are missing in sheet '{}' of spreadsheet '{}'",
                     sheet_title, &event.sheet_id,
@@ -64,7 +64,7 @@ pub async fn save_booking(
                 booking_number,
                 &sheet_title,
                 insert_index,
-                headers_indices,
+                header_indices,
             )
             .await?;
 
@@ -94,7 +94,7 @@ pub async fn detect_booking(booking: &EventBooking, event: &Event) -> Result<Boo
 
     match values {
         Some(values) => {
-            let headers_indices = get_header_indices(&values[0]).with_context(|| {
+            let header_indices = get_header_indices(&values[0]).with_context(|| {
                 format!(
                     "Headers are missing in sheet '{}' of spreadsheet '{}'",
                     sheet_title, &event.sheet_id,
@@ -125,7 +125,7 @@ fn into_values(
     booking: &EventBooking,
     event: &Event,
     booking_number: &String,
-    headers_indices: Vec<usize>,
+    header_indices: Vec<usize>,
 ) -> Vec<String> {
     let current_date_time = Utc::now()
         .with_timezone(&Berlin)
@@ -159,7 +159,7 @@ fn into_values(
         String::from("N"),
         comments,
     ];
-    sort_by_indices(&mut values, headers_indices);
+    sort_by_indices(&mut values, header_indices);
 
     values
 }
@@ -171,9 +171,9 @@ async fn insert(
     booking_number: &String,
     sheet_title: &str,
     insert_index: usize,
-    headers_indices: Vec<usize>,
+    header_indices: Vec<usize>,
 ) -> Result<()> {
-    let values = into_values(booking, event, booking_number, headers_indices);
+    let values = into_values(booking, event, booking_number, header_indices);
     hub.spreadsheets()
         .values_update(
             ValueRange {
