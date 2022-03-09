@@ -7,7 +7,6 @@ env:
   IMAGE: sve_backend
   REGISTRY_HOSTNAME: eu.gcr.io
 
-
 jobs:
   build-and-deploy-release:
     name: Setup, Build, and Publish
@@ -15,7 +14,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Setup gcloud CLI
       - uses: google-github-actions/setup-gcloud@v0
@@ -28,14 +27,16 @@ jobs:
           # via gcloud command-line tool.
           gcloud auth configure-docker
 
+      - name: Decode base64 secrets
+        run: echo $SVE_CREDENTIALS_ENCODED | base64 -d > secret/credentials.json && \
+             echo $SVE_EMAILS_ENCODED | base64 -d > secret/email.json &&
+
       # Build the Docker image
       - name: Build
         run: |
           export TAG=work
           echo $TAG
-          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" \
-            --build-arg SVE_CREDENTIALS_ENCODED="$SVE_CREDENTIALS_ENCODED" \
-            --build-arg SVE_EMAILS_ENCODED="$SVE_EMAILS_ENCODED" .
+          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" .
 
       # Push the Docker image to Google Container Registry
       - name: Publish
