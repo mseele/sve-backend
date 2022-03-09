@@ -27,6 +27,10 @@ jobs:
           # via gcloud command-line tool.
           gcloud auth configure-docker
 
+      - run: mkdir -p secret
+      - run: echo $SVE_CREDENTIALS_ENCODED | base64 -d > secret/credentials.json
+      - run: echo $SVE_EMAILS_ENCODED | base64 -d > secret/email.json
+
       # Build the Docker image
       - name: Build
         run: |
