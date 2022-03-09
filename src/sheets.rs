@@ -131,11 +131,14 @@ fn into_values(
         .with_timezone(&Berlin)
         .format("%d.%m.%Y %H:%M:%S")
         .to_string();
-    let phone_number = booking.phone.clone().map_or(String::new(), |v| {
+    let phone_number = match &booking.phone {
+        Some(phone_number) if phone_number.trim().len() > 0 => {
         let mut value = String::from("'");
-        value.push_str(&v);
+            value.push_str(phone_number.trim());
         value
-    });
+        }
+        Some(_) | None => String::from(""),
+    };
     let member = match booking.is_member() {
         true => String::from("J"),
         false => String::from("N"),
