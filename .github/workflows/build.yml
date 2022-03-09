@@ -5,7 +5,7 @@ env:
   SVE_CREDENTIALS_ENCODED: ${{ secrets.SVE_CREDENTIALS_ENCODED }} 
   SVE_EMAILS_ENCODED: ${{ secrets.SVE_EMAILS_ENCODED }} 
   IMAGE: sve_backend
-  REGISTRY_HOSTNAME: eu.gcr.io
+  REGISTRY_HOSTNAME: eu.gcr.io/sve-backend
 
 jobs:
   build-and-deploy-release:
