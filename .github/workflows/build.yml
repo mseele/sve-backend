@@ -1,15 +1,47 @@
-name: Push to GCR GitHub Action
+name: Build and Deploy Release
 on: [push]
+
+env:
+  SVE_CREDENTIALS_ENCODED: ${{ secrets.SVE_CREDENTIALS_ENCODED }} 
+  SVE_EMAILS_ENCODED: ${{ secrets.SVE_EMAILS_ENCODED }} 
+  IMAGE: sve_backend
+  REGISTRY_HOSTNAME: eu.gcr.io
+
+
 jobs:
-  build-and-push-to-gcr:
+  build-and-deploy-release:
+    name: Setup, Build, and Publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Setup gcloud CLI
       - uses: google-github-actions/setup-gcloud@v0
-      - uses: RafikFarhad/push-to-gcr-github-action@v4
         with:
-          gcloud_service_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
-          registry: eu.gcr.io
-          project_id: sve-backend
-          image_name: sve_backend
-          build_args: SVE_CREDENTIALS_ENCODED=${{ secrets.SVE_CREDENTIALS_ENCODED }},SVE_EMAILS_ENCODED=${{ secrets.SVE_EMAILS_ENCODED }}
+        service_account_key: ${{ secrets.GCLOUD_SERVICE_KEY }}
+
+      # Configure docker to use the gcloud command-line tool as a credential helper
+      - run: |
+          # Set up docker to authenticate
+          # via gcloud command-line tool.
+          gcloud auth configure-docker
+
+      # Build the Docker image
+      - name: Build
+        run: |
+          export TAG=work
+          echo $TAG
+          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" \
+            --build-arg SVE_CREDENTIALS_ENCODED="$SVE_CREDENTIALS_ENCODED" \
+            --build-arg SVE_EMAILS_ENCODED="$SVE_EMAILS_ENCODED" .
+
+      # Push the Docker image to Google Container Registry
+      - name: Publish
+        run: |
+          export TAG=work
+          echo $TAG
+          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG"
+          docker tag "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" "$REGISTRY_HOSTNAME"/"$IMAGE":latest
+          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":latest
