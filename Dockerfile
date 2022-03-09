@@ -19,7 +19,7 @@ RUN echo "$SVE_EMAILS_ENCODED" | base64 -d > /tmp/base64
 RUN SVE_EMAILS_DECODED=$(cat /tmp/base64)
 ENV SVE_EMAILS=$SVE_EMAILS_DECODED
 
-RUN cargo build --target x86_64-unknown-linux-musl --release
+RUN SVE_CREDENTIALS=$(echo $SVE_CREDENTIALS_ENCODED|base64 -d) SVE_EMAILS=$(echo $SVE_EMAILS_ENCODED|base64 -d) cargo build --target x86_64-unknown-linux-musl --release
 
 ####################################################################################################
 ## Final image
