@@ -19,6 +19,8 @@ pub const CREDENTIALS: &str = env!("SVE_CREDENTIALS");
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
+    println!("{}", CREDENTIALS);
+
     HttpServer::new(|| {
         App::new() //Access-Control-Allow-Origin
             .wrap(
