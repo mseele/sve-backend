@@ -20,6 +20,7 @@ FROM scratch
 
 # Run the web service on container startup
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/sve_backend .
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 USER 1000
 ENV RUST_BACKTRACE=1 RUST_LOG=info
 CMD ["./sve_backend"]
