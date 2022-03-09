@@ -1,9 +1,10 @@
 name: Build and Deploy Release
-on: [push]
+on:
+  push:
+    tags:
+      - *
 
 env:
-  SVE_CREDENTIALS_ENCODED: ${{ secrets.SVE_CREDENTIALS_ENCODED }} 
-  SVE_EMAILS_ENCODED: ${{ secrets.SVE_EMAILS_ENCODED }} 
   IMAGE: sve_backend
   REGISTRY_HOSTNAME: eu.gcr.io/sve-backend
 
@@ -29,21 +30,21 @@ jobs:
           # via gcloud command-line tool.
           gcloud auth configure-docker
 
-      - run: mkdir -p secret
-      - run: echo $SVE_CREDENTIALS_ENCODED | base64 -d > secret/credentials.json
-      - run: echo $SVE_EMAILS_ENCODED | base64 -d > secret/email.json
+      - run: mkdir -p secrets
+      - run: echo ${{ secrets.SVE_CREDENTIALS_ENCODED }} | base64 -d > secrets/credentials.json
+      - run: echo ${{ secrets.SVE_EMAILS_ENCODED }} | base64 -d > secrets/email.json
 
       # Build the Docker image
       - name: Build
         run: |
-          export TAG=work
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
           docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" .
 
       # Push the Docker image to Google Container Registry
       - name: Publish
         run: |
-          export TAG=work
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
           docker push "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG"
           docker tag "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" "$REGISTRY_HOSTNAME"/"$IMAGE":latest
