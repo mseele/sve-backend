@@ -1,7 +1,7 @@
 ####################################################################################################
 ## Builder
 ####################################################################################################
-FROM messense/rust-musl-cross:x86_64-musl AS builder
+FROM rust:latest AS builder
 
 RUN rustup target add x86_64-unknown-linux-musl
 RUN apt update && apt install -y musl-tools musl-dev pkg-config libssl-dev
@@ -18,6 +18,8 @@ ENV SVE_CREDENTIALS=$SVE_CREDENTIALS_ENCODED
 RUN echo "$SVE_EMAILS_ENCODED" | base64 -d > /tmp/base64
 RUN SVE_EMAILS_DECODED=$(cat /tmp/base64)
 ENV SVE_EMAILS=$SVE_EMAILS_DECODED
+
+ENV OPENSSL_DIR '/usr/local/ssl'
 
 RUN cargo build --target x86_64-unknown-linux-musl --release
 
