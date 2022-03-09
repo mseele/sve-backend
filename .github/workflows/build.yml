@@ -40,7 +40,7 @@ jobs:
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE" .
+          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" .
 
       # Push the Docker image to Google Container Registry
       - name: Publish
