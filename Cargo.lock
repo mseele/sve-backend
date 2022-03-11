@@ -822,9 +822,9 @@ dependencies = [
 
 [[package]]
 name = "google-calendar3"
-version = "2.0.8+20210327"
+version = "3.0.0+20220217"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de5a843b9c2380352ef744459a9652be8dbd87a264dba1e2ac3741b05ae02080"
+checksum = "0bebc5ca2560b96efb0b5bbaf2ed3cfe2ba7216e95c01eafb7a56e34d4f75ab2"
 dependencies = [
  "hyper",
  "hyper-rustls",
@@ -839,9 +839,9 @@ dependencies = [
 
 [[package]]
 name = "google-sheets4"
-version = "2.0.8+20210322"
+version = "3.0.0+20220221"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64549198fbe7770604ee532ed24beae3e5a0882bd8c0df8a97a558a9902802f8"
+checksum = "82d768894429e5ab6e5e570eb3373461874597d9eaed7c6bac5097b7e315107f"
 dependencies = [
  "hyper",
  "hyper-rustls",
@@ -2533,16 +2533,19 @@ checksum = "504a2476202769977a040c6364301a3f65d0cc9e3fb08600b2bda150a0488316"
 
 [[package]]
 name = "yup-oauth2"
-version = "5.1.0"
+version = "6.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2573621fa28865489bdf556cdb8703604f4e8498612e3041a212ac20e59c4aeb"
+checksum = "df0647712324d99fab8977022a015feeab311cecd8630ce2cd1e74643b651cf1"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "base64 0.13.0",
  "chrono",
  "futures",
  "http",
  "hyper",
  "hyper-rustls",
+ "itertools",
  "log 0.4.14",
  "percent-encoding 2.1.0",
  "rustls 0.19.1",
