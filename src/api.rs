@@ -99,7 +99,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             )
             .route(
                 "/renew_calendar_watch",
-                web::post().to(renew_calendar_watch),
+                web::get().to(renew_calendar_watch),
             ),
     );
 }
