@@ -98,10 +98,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 "/check_email_connectivity",
                 web::get().to(check_email_connectivity),
             )
-            .route(
-                "/renew_calendar_watch",
-                web::get().to(renew_calendar_watch),
-            ),
+            .route("/renew_calendar_watch", web::get().to(renew_calendar_watch)),
     );
 }
 
