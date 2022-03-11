@@ -41,7 +41,7 @@ pub async fn get_subscriptions() -> Result<HashMap<NewsType, HashSet<String>>> {
     Ok(result)
 }
 
-pub async fn subscribe_to_news(
+pub(in crate::logic) async fn subscribe_to_news(
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     subscription: Subscription,
     send_email: bool,
