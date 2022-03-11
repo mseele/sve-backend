@@ -120,8 +120,8 @@ async fn counter() -> Result<impl Responder, ResponseError> {
     Ok(Json(event_counters))
 }
 
-async fn booking(booking: Json<EventBooking>) -> Result<impl Responder, ResponseError> {
-    let response = events::booking(booking.0).await;
+async fn booking(Json(booking): Json<EventBooking>) -> Result<impl Responder, ResponseError> {
+    let response = events::booking(booking).await;
     Ok(Json(response))
 }
 
@@ -130,27 +130,29 @@ async fn prebooking(hash: String) -> Result<impl Responder, ResponseError> {
     Ok(Json(response))
 }
 
-async fn update(partial_event: Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
-    let event = events::update(partial_event.0).await?;
+async fn update(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
+    let event = events::update(partial_event).await?;
     Ok(Json(event))
 }
 
-async fn delete(partial_event: Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
-    events::delete(partial_event.0).await?;
+async fn delete(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
+    events::delete(partial_event).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 // news
 
-async fn subscribe(subscription: Json<Subscription>) -> Result<impl Responder, ResponseError> {
-    news::subscribe(subscription.0).await?;
+async fn subscribe(
+    Json(subscription): Json<Subscription>,
+) -> Result<impl Responder, ResponseError> {
+    news::subscribe(subscription).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn unsubscribe(
-    subscription: Json<Subscription>,
+    Json(subscription): Json<Subscription>,
 ) -> Result<impl Responder, ResponseError> {
-    news::unsubscribe(subscription.0).await?;
+    news::unsubscribe(subscription).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -205,13 +207,13 @@ async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError
 
 // contact
 
-async fn message(message: Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
-    contact::message(message.0).await?;
+async fn message(Json(message): Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
+    contact::message(message).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn emails(emails: Json<MassEmails>) -> Result<impl Responder, ResponseError> {
-    contact::emails(emails.0.emails).await?;
+async fn emails(Json(emails): Json<MassEmails>) -> Result<impl Responder, ResponseError> {
+    contact::emails(emails.emails).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
