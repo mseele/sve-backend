@@ -29,13 +29,12 @@ pub async fn get_subscriptions() -> Result<HashMap<NewsType, HashSet<String>>> {
     let subscriptions = store::get_subscriptions(&mut client).await?;
 
     let mut result: HashMap<NewsType, HashSet<String>> = HashMap::new();
-    for subscription in subscriptions {
+    for mut subscription in subscriptions {
         for news_type in subscription.types {
-            //TODO: can we avoid clone?
             result
                 .entry(news_type)
                 .or_insert_with(|| HashSet::new())
-                .insert(subscription.email.clone());
+                .insert(std::mem::take(&mut subscription.email));
         }
     }
 
