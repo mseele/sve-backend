@@ -1,6 +1,7 @@
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
 use actix_web::http::header::ContentType;
+use actix_web::web::Json;
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
@@ -114,43 +115,43 @@ pub struct EventsRequest {
 
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     let events = events::get_events(info.all, info.beta).await?;
-    Ok(web::Json(events))
+    Ok(Json(events))
 }
 
 async fn counter() -> Result<impl Responder, ResponseError> {
     let event_counters = events::get_event_counters().await?;
-    Ok(web::Json(event_counters))
+    Ok(Json(event_counters))
 }
 
-async fn booking(booking: web::Json<EventBooking>) -> Result<impl Responder, ResponseError> {
+async fn booking(booking: Json<EventBooking>) -> Result<impl Responder, ResponseError> {
     let response = events::booking(booking.0).await;
-    Ok(web::Json(response))
+    Ok(Json(response))
 }
 
 async fn prebooking(hash: String) -> Result<impl Responder, ResponseError> {
     let response = events::prebooking(hash).await;
-    Ok(web::Json(response))
+    Ok(Json(response))
 }
 
-async fn update(partial_event: web::Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
+async fn update(partial_event: Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
     let event = events::update(partial_event.0).await?;
-    Ok(web::Json(event))
+    Ok(Json(event))
 }
 
-async fn delete(partial_event: web::Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
+async fn delete(partial_event: Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
     events::delete(partial_event.0).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 // news
 
-async fn subscribe(subscription: web::Json<Subscription>) -> Result<impl Responder, ResponseError> {
+async fn subscribe(subscription: Json<Subscription>) -> Result<impl Responder, ResponseError> {
     news::subscribe(subscription.0).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn unsubscribe(
-    subscription: web::Json<Subscription>,
+    subscription: Json<Subscription>,
 ) -> Result<impl Responder, ResponseError> {
     news::unsubscribe(subscription.0).await?;
     Ok(HttpResponse::Ok().finish())
@@ -185,7 +186,7 @@ async fn subscribers() -> Result<impl Responder, ResponseError> {
 
 async fn appointments() -> Result<impl Responder, ResponseError> {
     let result = calendar::appointments().await?;
-    Ok(web::Json(result))
+    Ok(Json(result))
 }
 
 async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError> {
@@ -207,12 +208,12 @@ async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError
 
 // contact
 
-async fn message(message: web::Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
+async fn message(message: Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
     contact::message(message.0).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn emails(emails: web::Json<MassEmails>) -> Result<impl Responder, ResponseError> {
+async fn emails(emails: Json<MassEmails>) -> Result<impl Responder, ResponseError> {
     contact::emails(emails.0.emails).await?;
     Ok(HttpResponse::Ok().finish())
 }
