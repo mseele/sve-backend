@@ -1,5 +1,5 @@
 use crate::models::{Event, EventType, NewsType, PartialEvent, Subscription};
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::{NaiveDateTime, Utc};
 use googapis::{
     google::firestore::v1::{
@@ -73,12 +73,12 @@ pub async fn get_events(
         }))
         .await?;
 
-    let mut events: Vec<Event> = Vec::new();
-
-    // TODO: use into_inner() to avoid borrowing (and clone)
-    for document in &response.get_ref().documents {
-        events.push(to_event(&document)?);
-    }
+    let events = response
+        .into_inner()
+        .documents
+        .into_iter()
+        .map(|mut doc| to_event(&mut doc))
+        .collect::<Result<Vec<_>>>()?;
 
     Ok(events)
 }
@@ -97,8 +97,7 @@ pub async fn get_event(
         }))
         .await?;
 
-    // TODO: use into_inner() to avoid borrowing (and clone)
-    let event = to_event(&response.get_ref())?;
+    let event = to_event(&mut response.into_inner())?;
 
     Ok(event)
 }
@@ -235,10 +234,9 @@ async fn run_book_event_transaction(
         .await?;
 
     // extract and increment counters
-    // TODO: use into_inner() to avoid borrowing (and clone)
-    let doc = response.get_ref();
-    let subscribers = get_integer(doc, subscribers_field)?;
-    let max_subscribers = get_integer(doc, max_subscribers_field)?;
+    let mut doc = response.into_inner();
+    let subscribers = get_integer(&mut doc, subscribers_field)?;
+    let max_subscribers = get_integer(&mut doc, max_subscribers_field)?;
     if max_subscribers == -1 || subscribers < max_subscribers {
         let mut writes = Vec::new();
         // generate booking number
@@ -266,8 +264,8 @@ async fn run_book_event_transaction(
         return Ok(BookingTransaction::Book(writes, booking_number));
     }
 
-    let waiting_list = get_integer(doc, waiting_list_field)?;
-    let max_waiting_list = get_integer(doc, max_waiting_list_field)?;
+    let waiting_list = get_integer(&mut doc, waiting_list_field)?;
+    let max_waiting_list = get_integer(&mut doc, max_waiting_list_field)?;
     if waiting_list < max_waiting_list {
         let mut writes = Vec::new();
 
@@ -318,9 +316,7 @@ async fn get_next_booking_number(
         }))
         .await?;
 
-    // TODO: use into_inner() to avoid borrowing (and clone)
-    let doc = response.get_ref();
-    let id = get_integer(doc, id_field)?;
+    let id = get_integer(&mut response.into_inner(), id_field)?;
 
     // next_id need to be between 1000 & 10000
     let mut next_id = id;
@@ -376,9 +372,8 @@ pub async fn get_subscriptions(
             .await?
             .into_inner();
 
-        // TODO: avoid borrowing (and clone)
-        for document in response.documents {
-            subscriptions.push(to_subscription(&document)?);
+        for mut document in response.documents {
+            subscriptions.push(to_subscription(&mut document)?);
         }
 
         next_page_token = response.next_page_token;
@@ -512,7 +507,7 @@ async fn get_subscription(
         }))
         .await;
     match get_document_result {
-        Ok(response) => Ok(Some(to_subscription(&response.get_ref())?)),
+        Ok(response) => Ok(Some(to_subscription(&mut response.into_inner())?)),
         Err(status) if status.code() == Code::NotFound => Ok(None),
         Err(status) => Err(status.into()),
     }
@@ -532,8 +527,7 @@ async fn create_event(
         }))
         .await?;
 
-    // TODO: use into_inner() to avoid borrowing (and clone)
-    let event = to_event(&response.get_ref())?;
+    let event = to_event(&mut response.into_inner())?;
 
     Ok(event)
 }
@@ -551,8 +545,7 @@ async fn update_event(
         }))
         .await?;
 
-    // TODO: use into_inner() to avoid borrowing (and clone)
-    let event = to_event(&response.get_ref())?;
+    let event = to_event(&mut response.into_inner())?;
 
     Ok(event)
 }
@@ -787,12 +780,12 @@ fn insert_news_type_values(fields: &mut HashMap<String, Value>, key: &str, value
     );
 }
 
-fn to_event(doc: &Document) -> Result<Event> {
-    let name = &doc.name;
-    let index = name
+fn to_event(doc: &mut Document) -> Result<Event> {
+    let index = doc
+        .name
         .rfind('/')
         .with_context(|| format!("Found no / in document name {}", doc.name))?;
-    let id: &str = &name[index + 1..];
+    let id = &doc.name[index + 1..];
 
     let event = Event::new(
         id.into(),
@@ -832,12 +825,12 @@ fn to_event(doc: &Document) -> Result<Event> {
     Ok(event)
 }
 
-fn to_subscription(doc: &Document) -> Result<Subscription> {
-    let name = &doc.name;
-    let index = name
+fn to_subscription(doc: &mut Document) -> Result<Subscription> {
+    let index = doc
+        .name
         .rfind('/')
         .with_context(|| format!("Found no / in document name {}", doc.name))?;
-    let email: &str = &name[index + 1..];
+    let email: &str = &doc.name[index + 1..];
 
     let event = Subscription::new(
         email.into(),
@@ -849,74 +842,90 @@ fn to_subscription(doc: &Document) -> Result<Subscription> {
     Ok(event)
 }
 
-fn get_string(doc: &Document, key: &str) -> Result<String> {
-    match extract_value_type(doc, key, true)? {
-        Some(value_type) => match value_type {
-            ValueType::StringValue(value) => Ok(value.clone()),
-            _ => bail!(
-                "Field {} in document {} has wrong value type ({:?})",
-                key,
-                doc.name,
-                value_type
-            ),
-        },
-        None => bail!("Failed to extract field {} from document {}", key, doc.name),
+fn get_string(doc: &mut Document, key: &str) -> Result<String> {
+    let value_type = extract_value_type_(doc, key)?;
+    if let ValueType::StringValue(value) = value_type {
+        return Ok(value);
     }
+    bail!(
+        "Field {} in document {} has wrong value type ({:?})",
+        key,
+        doc.name,
+        value_type
+    )
 }
 
-fn get_integer(doc: &Document, key: &str) -> Result<i64> {
-    match extract_value_type(doc, key, true)? {
-        Some(value_type) => match value_type {
-            ValueType::IntegerValue(value) => Ok(value.clone()),
-            _ => bail!(
-                "Field {} in document {} has wrong value type ({:?})",
-                key,
-                doc.name,
-                value_type
-            ),
-        },
-        None => bail!("Failed to extract field {} from document {}", key, doc.name),
+fn get_integer(doc: &mut Document, key: &str) -> Result<i64> {
+    let value_type = extract_value_type_(doc, key)?;
+    if let ValueType::IntegerValue(value) = value_type {
+        return Ok(value);
     }
+    bail!(
+        "Field {} in document {} has wrong value type ({:?})",
+        key,
+        doc.name,
+        value_type
+    )
 }
 
-fn get_double(doc: &Document, key: &str) -> Result<f64> {
-    match extract_value_type(doc, key, true)? {
-        Some(value_type) => match value_type {
-            ValueType::DoubleValue(value) => Ok(value.clone()),
-            _ => bail!(
-                "Field {} in document {} has wrong value type ({:?})",
-                key,
-                doc.name,
-                value_type
-            ),
-        },
-        None => bail!("Failed to extract field {} from document {}", key, doc.name),
+fn get_double(doc: &mut Document, key: &str) -> Result<f64> {
+    let value_type = extract_value_type_(doc, key)?;
+    if let ValueType::DoubleValue(value) = value_type {
+        return Ok(value);
     }
+    bail!(
+        "Field {} in document {} has wrong value type ({:?})",
+        key,
+        doc.name,
+        value_type
+    )
 }
 
-fn get_bool(doc: &Document, key: &str) -> Result<bool> {
-    match extract_value_type(doc, key, true)? {
-        Some(value_type) => match value_type {
-            ValueType::BooleanValue(value) => Ok(value.clone()),
-            _ => bail!(
-                "Field {} in document {} has wrong value type ({:?})",
-                key,
-                doc.name,
-                value_type
-            ),
-        },
-        None => bail!("Failed to extract field {} from document {}", key, doc.name),
+fn get_bool(doc: &mut Document, key: &str) -> Result<bool> {
+    let value_type = extract_value_type_(doc, key)?;
+    if let ValueType::BooleanValue(value) = value_type {
+        return Ok(value);
     }
+    bail!(
+        "Field {} in document {} has wrong value type ({:?})",
+        key,
+        doc.name,
+        value_type
+    )
 }
 
-fn get_opt_string(doc: &Document, key: &str) -> Result<Option<String>> {
-    match extract_value_type(doc, key, false)? {
-        Some(value_type) => match value_type {
+fn get_strings(doc: &mut Document, key: &str) -> Result<Vec<String>> {
+    let value_type = extract_value_type_(doc, key)?;
+    if let ValueType::ArrayValue(ArrayValue { values }) = value_type {
+        let mut strings: Vec<String> = Vec::new();
+        for value in values.into_iter() {
+            if let ValueType::StringValue(value) = value.value_type.ok_or_else(|| {
+                anyhow!("Child of field {} in document {} is empty", key, doc.name)
+            })? {
+                strings.push(value);
+            }
+        }
+        return Ok(strings);
+    }
+    bail!(
+        "Field {} in document {} has wrong value type ({:?})",
+        key,
+        doc.name,
+        value_type
+    )
+}
+
+fn get_opt_string(doc: &mut Document, key: &str) -> Result<Option<String>> {
+    if let Some(Value {
+        value_type: Some(value_type),
+    }) = doc.fields.remove(key)
+    {
+        return match value_type {
             ValueType::StringValue(value) => {
                 if value.trim().is_empty() {
                     return Ok(None);
                 }
-                Ok(Some(value.clone()))
+                Ok(Some(value))
             }
             ValueType::NullValue(_) => Ok(None),
             _ => bail!(
@@ -925,57 +934,17 @@ fn get_opt_string(doc: &Document, key: &str) -> Result<Option<String>> {
                 doc.name,
                 value_type
             ),
-        },
-        None => Ok(None),
+        };
     }
+    Ok(None)
 }
 
-fn get_strings(doc: &Document, key: &str) -> Result<Vec<String>> {
-    match extract_value_type(doc, key, true)? {
-        Some(value_type) => match value_type {
-            ValueType::ArrayValue(value) => {
-                let mut vec: Vec<String> = Vec::new();
-                for value in value.values.iter() {
-                    match &value.value_type {
-                        Some(v_value_type) => match v_value_type {
-                            ValueType::StringValue(v) => {
-                                vec.push(v.clone());
-                            }
-                            _ => bail!(
-                                "Child of field {} in document {} has wrong value type ({:?})",
-                                key,
-                                doc.name,
-                                v_value_type
-                            ),
-                        },
-                        None => bail!("Child of field {} in document {} is empty", key, doc.name),
-                    }
-                }
-                Ok(vec)
-            }
-            _ => bail!(
-                "Field {} in document {} has wrong value type ({:?})",
-                key,
-                doc.name,
-                value_type
-            ),
-        },
-        None => bail!("Failed to extract field {} from document {}", key, doc.name),
-    }
-}
-
-fn extract_value_type<'a>(
-    doc: &'a Document,
-    key: &str,
-    required: bool,
-) -> Result<&'a Option<ValueType>> {
-    match doc.fields.get(key).map(|v| &v.value_type) {
-        Some(value_type) => Ok(value_type),
-        None => {
-            if required {
-                bail!("Field {} is missing in document {}", key, doc.name);
-            }
-            return Ok(&None);
-        }
-    }
+fn extract_value_type_(doc: &mut Document, key: &str) -> Result<ValueType> {
+    let value_type = doc
+        .fields
+        .remove(key)
+        .ok_or_else(|| anyhow!("Field {} is missing in document {}", key, doc.name))?
+        .value_type
+        .ok_or_else(|| anyhow!("Field {} is missing in document {}", key, doc.name))?;
+    Ok(value_type)
 }
