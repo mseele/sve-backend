@@ -4,9 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### Bug Fixes
+
+- Reduce visibility
+
 ### Miscellaneous Tasks
 
 - Work on release pipeline
+- Bump dependencies
+
+### Refactor
+
+- Optimize imports
+- Destruct json arg directly as method argument
+- Reduce clones by avoid borrowing
+- Reduce clone by using take
+
+### Styling
+
+- Format code
 
 ## [1.0.4] - 2022-03-11
 
