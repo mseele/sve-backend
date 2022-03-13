@@ -45,4 +45,3 @@ hyper-rustls = "0.22"
 steel-cent = "0.2"
 lettre = { version = "0.10.0-rc.4", features = ["tokio1-native-tls"] }
 regex = "1.5"
-fastrand = "1.7"
