@@ -6,7 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Use message_id with localhost
+
+## [1.0.6] - 2022-03-13
+
+### Bug Fixes
+
 - Add date to emails
+
+### Miscellaneous Tasks
+
+- Release 1.0.6
 
 ## [1.0.5] - 2022-03-12
 
