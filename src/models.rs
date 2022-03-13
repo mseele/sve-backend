@@ -5,7 +5,6 @@ use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Serialize};
-use std::iter;
 use std::str::from_utf8;
 use std::str::FromStr;
 use steel_cent::currency::EUR;
@@ -521,22 +520,13 @@ pub struct EmailAccount {
 
 impl EmailAccount {
     pub fn mailbox(&self) -> Result<Mailbox> {
-        Ok(Mailbox::new(Some(self.name.clone()), self.address.parse()?))
+        Ok(self.address.parse()?)
     }
 
     pub fn new_message(&self) -> Result<MessageBuilder> {
-        // https://tools.ietf.org/html/rfc5322#section-3.6.4
-        let message_id = format!("<{}@localhost>", EmailAccount::make_message_id());
         Ok(Message::builder()
             .from(self.mailbox()?)
-            .date_now()
-            .message_id(Some(message_id)))
-    }
-
-    /// Create a random message id.
-    /// (Not cryptographically random)
-    fn make_message_id() -> String {
-        iter::repeat_with(fastrand::alphanumeric).take(36).collect()
+            .date_now())
     }
 
     pub fn mailer(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
