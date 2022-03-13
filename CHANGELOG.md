@@ -6,12 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Add date to emails
+
+## [1.0.5] - 2022-03-12
+
+### Bug Fixes
+
 - Reduce visibility
 
 ### Miscellaneous Tasks
 
 - Work on release pipeline
 - Bump dependencies
+- Release
 
 ### Refactor
 
