@@ -1,4 +1,5 @@
 name: Setup, Build, and Publish
+on: workflow_dispatch
 on:
   push:
     tags:
