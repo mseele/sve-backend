@@ -327,10 +327,7 @@ impl EventBooking {
             true => event.cost_member,
             false => event.cost_non_member,
         };
-        let fract = cost.fract();
-        let major = (cost - fract) as i64;
-        let minor = (fract * 100_f64) as i64;
-        Money::of_major_minor(EUR, major, minor)
+        cost.to_euro()
     }
 
     pub fn cost_as_string(&self, event: &Event) -> String {
@@ -606,6 +603,24 @@ impl From<MessageType> for EmailType {
             MessageType::Fitness => EmailType::Fitness,
             MessageType::Kunstrasen => EmailType::Kunstrasen,
         }
+    }
+}
+
+pub trait ToEuro {
+    fn to_euro(&self) -> Money;
+    fn to_euro_string(&self) -> String;
+}
+
+impl ToEuro for f64 {
+    fn to_euro(&self) -> Money {
+        let fract = self.fract();
+        let major = (self - fract) as i64;
+        let minor = (fract * 100_f64).round() as i64;
+        Money::of_major_minor(EUR, major, minor)
+    }
+
+    fn to_euro_string(&self) -> String {
+        format(euro_style(), &self.to_euro())
     }
 }
 
