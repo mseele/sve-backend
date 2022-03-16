@@ -12,7 +12,6 @@ publish = false
 
 [package.metadata.release]
 pre-release-replacements = [
-  { file = "README.md", search = "predicates = \".*\"", replace = "predicates = \"{{version}}\"", exactly = 1 },
   { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}", min = 1 },
   { file = "CHANGELOG.md", search = "\\.\\.\\.HEAD", replace = "...{{tag_name}}", exactly = 1 },
   { file = "CHANGELOG.md", search = "ReleaseDate", replace = "{{date}}", min = 1 },
