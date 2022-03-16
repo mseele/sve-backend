@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 
+## [1.1.0] - 2022-03-16
+
 ### Features
 
 - Implement verify_payments
@@ -521,4 +523,5 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/mseele/sve-backend/compare/v1.0.8...v1.1.0
