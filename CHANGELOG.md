@@ -23,24 +23,6 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.8] - 2022-03-13
 
-### Features
-
-- Implement verify_payments
-
-### Miscellaneous Tasks
-
-- Update dependencies
-
-### Refactor
-
-- Introduce ToEuro traid
-
-### Styling
-
-- Format code
-
-## [1.0.8] - 2022-03-13
-
 ### Bug Fixes
 
 - Email bounce from gmx/web.de
