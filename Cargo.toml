@@ -12,12 +12,12 @@ publish = false
 
 [package.metadata.release]
 pre-release-replacements = [
-  {file="README.md", search="predicates = \".*\"", replace="predicates = \"{{version}}\"", exactly=1},
-  {file="CHANGELOG.md", search="Unreleased", replace="{{version}}", min=1},
-  {file="CHANGELOG.md", search="\\.\\.\\.HEAD", replace="...{{tag_name}}", exactly=1},
-  {file="CHANGELOG.md", search="ReleaseDate", replace="{{date}}", min=1},
-  {file="CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\n## [Unreleased] - ReleaseDate\n", exactly=1},
-  {file="CHANGELOG.md", search="<!-- next-url -->", replace="<!-- next-url -->\n[Unreleased]: https://github.com/mseele/sve-backend/compare/{{tag_name}}...HEAD", exactly=1},
+  { file = "README.md", search = "predicates = \".*\"", replace = "predicates = \"{{version}}\"", exactly = 1 },
+  { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}", min = 1 },
+  { file = "CHANGELOG.md", search = "\\.\\.\\.HEAD", replace = "...{{tag_name}}", exactly = 1 },
+  { file = "CHANGELOG.md", search = "ReleaseDate", replace = "{{date}}", min = 1 },
+  { file = "CHANGELOG.md", search = "<!-- next-header -->", replace = "<!-- next-header -->\n## [Unreleased] - ReleaseDate\n", exactly = 1 },
+  { file = "CHANGELOG.md", search = "<!-- next-url -->", replace = "<!-- next-url -->\n[Unreleased]: https://github.com/mseele/sve-backend/compare/{{tag_name}}...HEAD", exactly = 1 },
 ]
 
 [dependencies]
@@ -45,3 +45,7 @@ hyper-rustls = "0.22"
 steel-cent = "0.2"
 lettre = { version = "0.10.0-rc.4", features = ["tokio1-native-tls"] }
 regex = "1.5"
+csv = "1.1"
+
+[dev-dependencies]
+pretty_assertions = "1.2"

@@ -1,8 +1,14 @@
-use crate::models::{Event, EventBooking};
-use anyhow::{bail, Context, Result};
+use std::collections::HashMap;
+
+use crate::models::{Event, EventBooking, VerifyPaymentBookingRecord};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
 use chrono_tz::Europe::Berlin;
-use google_sheets4::{api::ValueRange, Sheets};
+use google_sheets4::{
+    api::{BatchUpdateValuesRequest, SheetProperties, ValueRange},
+    Sheets,
+};
+use steel_cent::{formatting::france_style as euro_style, Money};
 use yup_oauth2::ServiceAccountKey;
 
 const REQUIRED_HEADERS: [&str; 12] = [
@@ -20,7 +26,20 @@ const REQUIRED_HEADERS: [&str; 12] = [
     "kommentar",
 ];
 
-const REQUIRED_PREBOOKING_HEADERS: [usize; 7] = [1, 2, 3, 4, 5, 6, 7];
+const VORNAME: usize = 1;
+const NACHNAME: usize = 2;
+const STRASSE_NR: usize = 3;
+const PLZ_ORT: usize = 4;
+const EMAIL: usize = 5;
+const TELEFON: usize = 6;
+const MITGLIED: usize = 7;
+const BETRAG: usize = 8;
+const BUCHUNGSNR: usize = 9;
+const BEZAHLT: usize = 10;
+
+const REQUIRED_PREBOOKING_HEADERS: [usize; 7] = [
+    VORNAME, NACHNAME, STRASSE_NR, PLZ_ORT, EMAIL, TELEFON, MITGLIED,
+];
 
 async fn sheets_hub() -> Result<Sheets> {
     let secret: ServiceAccountKey =
@@ -128,6 +147,95 @@ pub async fn detect_booking(booking: &EventBooking, event: &Event) -> Result<Boo
     }
 }
 
+pub async fn get_bookings_to_verify_payment(
+    sheet_id: &str,
+) -> Result<Vec<VerifyPaymentBookingRecord>> {
+    let hub = sheets_hub().await?;
+    let sheet_properties = get_sheet_properties(&hub, sheet_id).await?;
+    let mut records = Vec::new();
+    for properties in sheet_properties {
+        if let Some(title) = properties.title {
+            let values = get_values(&hub, sheet_id, &title).await?;
+            if let Some(values) = values {
+                if let Ok(header_indices) = get_header_indices(&values[0]) {
+                    // calculate the payed column as alphabetic character
+                    let payed_column = header_indices
+                        .iter()
+                        .position(|i| i == &BEZAHLT)
+                        .expect("Index {BEZAHLT} is inside header_indices")
+                        as u32;
+                    let payed_column = char::from_u32(
+                        0x0041 + 1 + payed_column,
+                    ).ok_or_else(|| anyhow!("Could not convert index of column {payed_column} into alphanumeric character"))?;
+
+                    // convert bookings
+                    for (index, row) in values.into_iter().enumerate().skip(1) {
+                        let mut values: HashMap<_, _> = row.into_iter().enumerate().collect();
+
+                        let cost = values
+                            .remove(&BETRAG)
+                            .expect("Index {BETRAG} is inside header_indices");
+                        let cost = cost.trim();
+                        let cost: Money = euro_style().parser().parse(cost).with_context(|| {
+                            format!("Could not parse '{cost}' in sheet {title} at row {index}")
+                        })?;
+                        let cost: f64 =
+                            (cost.major_part() as f64) + ((cost.minor_part() as f64) / 100_f64);
+
+                        let booking_number = values
+                            .remove(&BUCHUNGSNR)
+                            .expect("Index {BUCHUNGSNR} is inside header_indices")
+                            .trim()
+                            .into();
+                        let payed_already = values
+                            .remove(&BEZAHLT)
+                            .expect("Index {BEZAHLT} is inside header_indices")
+                            .to_uppercase()
+                            .trim()
+                            .eq("J");
+                        let update_cell = format!("{}{}", payed_column, index + 1);
+
+                        records.push(VerifyPaymentBookingRecord::new(
+                            title.clone(),
+                            update_cell,
+                            cost,
+                            booking_number,
+                            payed_already,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(records)
+}
+
+pub async fn mark_as_payed(
+    sheet_id: &str,
+    bookings: Vec<VerifyPaymentBookingRecord>,
+) -> Result<()> {
+    let hub = sheets_hub().await?;
+
+    let request = BatchUpdateValuesRequest {
+        data: Some(
+            bookings
+                .into_iter()
+                .map(|record| record.into_value_range())
+                .collect(),
+        ),
+        value_input_option: Some("USER_ENTERED".into()),
+        ..Default::default()
+    };
+
+    hub.spreadsheets()
+        .values_batch_update(request, sheet_id)
+        .doit()
+        .await?;
+
+    Ok(())
+}
+
 fn filter_by_indices(values: Vec<String>, indices: &[usize]) -> Vec<String> {
     values
         .into_iter()
@@ -208,7 +316,7 @@ async fn insert(
                 ..Default::default()
             },
             &event.sheet_id,
-            format!("'{0}'!B{1}:M{1}", sheet_title, insert_index,).as_str(),
+            format!("'{0}'!B{1}:M{1}", sheet_title, insert_index).as_str(),
         )
         .value_input_option("USER_ENTERED")
         .doit()
@@ -232,26 +340,18 @@ async fn get_values(
 }
 
 async fn get_sheet_title(hub: &Sheets, event: &Event) -> Result<String> {
-    let (_, spreadsheet) = hub
-        .spreadsheets()
-        .get(&event.sheet_id)
-        .param("fields", "sheets(properties(sheetId,title))")
-        .doit()
-        .await?;
-
-    let title = spreadsheet.sheets.and_then(|sheets| {
-        sheets.into_iter().find_map(|sheet| {
-            sheet.properties.and_then(|properties| {
-                if let Some(sheet_id) = properties.sheet_id {
-                    let sheet_id: i64 = sheet_id.into();
-                    if sheet_id == event.gid {
-                        return properties.title;
-                    }
+    let title = get_sheet_properties(hub, &event.sheet_id)
+        .await?
+        .into_iter()
+        .find_map(|properties| {
+            if let Some(sheet_id) = properties.sheet_id {
+                let sheet_id: i64 = sheet_id.into();
+                if sheet_id == event.gid {
+                    return properties.title;
                 }
-                None
-            })
-        })
-    });
+            }
+            None
+        });
 
     if let Some(value) = title {
         Ok(value)
@@ -262,6 +362,24 @@ async fn get_sheet_title(hub: &Sheets, event: &Event) -> Result<String> {
             event.sheet_id
         )
     }
+}
+
+async fn get_sheet_properties(hub: &Sheets, sheet_id: &str) -> Result<Vec<SheetProperties>> {
+    let (_, spreadsheet) = hub
+        .spreadsheets()
+        .get(sheet_id)
+        .param("fields", "sheets(properties(sheetId,title))")
+        .doit()
+        .await?;
+
+    let properties = spreadsheet
+        .sheets
+        .ok_or_else(|| anyhow!("Could not load properties from spreadsheet {} ", sheet_id))?
+        .into_iter()
+        .filter_map(|sheet| sheet.properties)
+        .collect::<Vec<_>>();
+
+    Ok(properties)
 }
 
 fn get_header_indices(values: &Vec<String>) -> Result<Vec<usize>> {
@@ -301,6 +419,7 @@ fn sort_by_indices<T>(data: &mut [T], mut indices: Vec<usize>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_vec_compare() {

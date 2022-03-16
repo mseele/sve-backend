@@ -74,7 +74,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/booking", web::post().to(booking))
             .route("/prebooking", web::post().to(prebooking))
             .route("/update", web::post().to(update))
-            .route("/delete", web::post().to(delete)),
+            .route("/delete", web::post().to(delete))
+            .route("/verify_payments", web::post().to(verify_payments)),
     );
     cfg.service(
         web::scope("/news")
@@ -110,6 +111,12 @@ pub struct EventsRequest {
     beta: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VerifyPaymentInput {
+    sheet_id: String,
+    csv: String,
+}
+
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     let events = events::get_events(info.all, info.beta).await?;
     Ok(Json(events))
@@ -138,6 +145,13 @@ async fn update(Json(partial_event): Json<PartialEvent>) -> Result<impl Responde
 async fn delete(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
     events::delete(partial_event).await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+async fn verify_payments(
+    Json(input): Json<VerifyPaymentInput>,
+) -> Result<impl Responder, ResponseError> {
+    let result = events::verify_payments(input.sheet_id, input.csv).await?;
+    Ok(Json(result))
 }
 
 // news

@@ -1,6 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use base64::STANDARD;
 use chrono::{NaiveDate, NaiveDateTime};
+use google_sheets4::api::ValueRange;
 use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
@@ -604,6 +605,53 @@ impl From<MessageType> for EmailType {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct VerifyPaymentBookingRecord {
+    sheet_title: String,
+    update_cell: String,
+    pub cost: f64,
+    pub booking_number: String,
+    pub payed_already: bool,
+}
+
+impl VerifyPaymentBookingRecord {
+    pub fn new(
+        sheet_title: String,
+        update_cell: String,
+        cost: f64,
+        booking_number: String,
+        payed_already: bool,
+    ) -> Self {
+        VerifyPaymentBookingRecord {
+            sheet_title,
+            update_cell,
+            cost,
+            booking_number,
+            payed_already,
+        }
+    }
+
+    pub fn into_value_range(self) -> ValueRange {
+        ValueRange {
+            values: Some(vec![vec![String::from("J")]]),
+            range: Some(format!("'{}'!{}", self.sheet_title, self.update_cell)),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct VerifyPaymentResult {
+    title: String,
+    values: Vec<String>,
+}
+
+impl VerifyPaymentResult {
+    pub fn new(title: String, values: Vec<String>) -> Self {
+        VerifyPaymentResult { title, values }
+    }
+}
+
 pub trait ToEuro {
     fn to_euro(&self) -> Money;
     fn to_euro_string(&self) -> String;
@@ -625,6 +673,7 @@ impl ToEuro for f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_cost() {
