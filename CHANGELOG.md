@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 
+## [1.1.1] - 2022-03-18
+
 ## [1.1.0] - 2022-03-16
 
 ### Features
@@ -523,5 +525,6 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/mseele/sve-backend/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/mseele/sve-backend/compare/v1.0.8...v1.1.0
