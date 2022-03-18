@@ -425,6 +425,7 @@ where
 {
     let value = String::deserialize(deserializer)?;
     value
+        .replace(".", "")
         .replace(",", ".")
         .parse::<f64>()
         .map_err(serde::de::Error::custom)
