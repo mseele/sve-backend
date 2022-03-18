@@ -3,6 +3,8 @@ use crate::models::{NewsType, Subscription};
 use crate::store::{self, GouthInterceptor};
 use anyhow::Result;
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
+use lettre::message::header::{self, ContentType};
+use lettre::message::SinglePart;
 use std::collections::{HashMap, HashSet};
 use tonic::codegen::InterceptedService;
 use tonic::transport::Channel;
@@ -103,10 +105,12 @@ async fn send_mail(subscription: Subscription) -> Result<()> {
     let email_account = email::get_account_by_type(primary_news_type.into())?;
     let message = email_account
         .new_message()?
+        .header(header::MIME_VERSION_1_0)
+        .header(ContentType::TEXT_PLAIN)
         .to(subscription.email.parse()?)
         .bcc(email_account.mailbox()?)
         .subject(subject)
-        .body(format!(
+        .singlepart(SinglePart::plain(format!(
             "Lieber Interessent/In,
 
 vielen Dank für Dein Interesse an {}.
@@ -118,7 +122,7 @@ Ab sofort erhältst Du automatisch eine E-Mail{}.
 Herzliche Grüße
 {}",
             topic, kind, UNSUBSCRIBE_MESSAGE, regards
-        ))?;
+        )))?;
 
     email::send_message(&email_account, message).await?;
 

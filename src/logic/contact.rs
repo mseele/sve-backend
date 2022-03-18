@@ -40,7 +40,7 @@ pub async fn message(contact_message: ContactMessage) -> Result<()> {
         ))
         .to(contact_message.to.parse()?)
         .reply_to(email.parse()?)
-        .body(body)?;
+        .singlepart(SinglePart::plain(body))?;
 
     email::send_message(&email_account, message).await?;
 

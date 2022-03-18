@@ -11,6 +11,7 @@ use chrono::{DateTime, Duration, Locale, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
+use lettre::message::SinglePart;
 use log::{error, info, warn};
 use regex::Regex;
 use serde::Deserialize;
@@ -284,7 +285,12 @@ async fn send_mail(
         .to(booking.email.parse()?)
         .bcc(email_account.mailbox()?)
         .subject(subject)
-        .body(create_body(template, booking, event, booking_number))?;
+        .singlepart(SinglePart::plain(create_body(
+            template,
+            booking,
+            event,
+            booking_number,
+        )))?;
 
     email::send_message(&email_account, message).await?;
 
@@ -631,7 +637,7 @@ ${dates}",
 - Sa, 12. März 2022, 19:00 Uhr
 - So, 13. März 2022, 19:00 Uhr",
                 format_payday(Utc::now() + Duration::days(1))
-            )
+            ),
         );
         assert_eq!(
             create_body(
