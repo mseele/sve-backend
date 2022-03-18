@@ -8,6 +8,8 @@ use crate::sheets::{self, BookingDetection};
 use crate::store::{self, BookingResult, GouthInterceptor};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Duration, Locale, Utc};
+use encoding::Encoding;
+use encoding::{all::ISO_8859_1, DecoderTrap};
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use log::{error, info, warn};
 use regex::Regex;
@@ -81,14 +83,12 @@ pub async fn delete(partial_event: PartialEvent) -> Result<()> {
 pub async fn verify_payments(sheet_id: String, csv: String) -> Result<Vec<VerifyPaymentResult>> {
     let bytes = base64::decode(&csv)
         .with_context(|| format!("Error decoding the cvs content: {}", &csv))?;
-    let csv = from_utf8(&bytes).with_context(|| {
-        format!(
-            "Error converting the decoded csv content {} into a string slice",
-            &csv
-        )
-    })?;
+    let csv = match ISO_8859_1.decode(&bytes, DecoderTrap::Strict) {
+        Ok(value) => value,
+        Err(e) => bail!("Decoding csv content with ISO 8859: {}", e.into_owned()),
+    };
     let mut bookings = sheets::get_bookings_to_verify_payment(&sheet_id).await?;
-    let (verified_payment_bookings, result) = compare_csv_with_bookings(csv, &mut bookings)?;
+    let (verified_payment_bookings, result) = compare_csv_with_bookings(&csv, &mut bookings)?;
     if verified_payment_bookings.len() > 0 {
         sheets::mark_as_payed(&sheet_id, verified_payment_bookings).await?;
     }

@@ -45,6 +45,7 @@ steel-cent = "0.2"
 lettre = { version = "0.10.0-rc.4", features = ["tokio1-native-tls"] }
 regex = "1.5"
 csv = "1.1"
+encoding = "0.2"
 
 [dev-dependencies]
 pretty_assertions = "1.2"
