@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Skip phone number prefix (') for prebooking check
+- Log backtraces, finally
 
 ## [1.1.3] - 2022-03-21
 
