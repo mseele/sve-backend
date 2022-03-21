@@ -51,7 +51,7 @@ pub async fn booking(booking: EventBooking) -> BookingResponse {
     match do_booking(booking).await {
         Ok(response) => response,
         Err(e) => {
-            error!("Booking failed: {}", e);
+            error!("Booking failed: {:?}", e);
             BookingResponse::failure(MESSAGE_FAIL)
         }
     }
@@ -61,7 +61,7 @@ pub async fn prebooking(hash: String) -> BookingResponse {
     match do_prebooking(hash).await {
         Ok(response) => response,
         Err(e) => {
-            error!("Prebooking failed: {}", e);
+            error!("Prebooking failed: {:?}", e);
             BookingResponse::failure(MESSAGE_FAIL)
         }
     }
