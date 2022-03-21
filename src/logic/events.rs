@@ -1,6 +1,6 @@
 use crate::email;
 use crate::models::{
-    BookingResponse, EventBooking, EventCounter, EventType, Subscription, ToEuro,
+    BookingResponse, EventBooking, EventCounter, EventType, FromEuro, Subscription, ToEuro,
     VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::models::{Event, PartialEvent};
@@ -308,7 +308,7 @@ fn create_body(
         .replace("${lastname}", booking.last_name.trim())
         .replace("${name}", event.name.trim())
         .replace("${location}", &event.location)
-        .replace("${price}", &booking.cost_as_string(event))
+        .replace("${price}", &booking.cost(event).to_euro())
         .replace("${dates}", &format_dates(&event));
     if let Some(booking_number) = booking_number {
         body = body.replace("${booking_number}", booking_number);
@@ -423,11 +423,8 @@ fn deserialize_float_with_comma<'de, D>(deserializer: D) -> Result<f64, D::Error
 where
     D: serde::Deserializer<'de>,
 {
-    let value = String::deserialize(deserializer)?;
-    value
-        .replace(".", "")
-        .replace(",", ".")
-        .parse::<f64>()
+    String::deserialize(deserializer)?
+        .from_euro_without_symbol()
         .map_err(serde::de::Error::custom)
 }
 
@@ -470,8 +467,8 @@ fn compare_csv_with_bookings(
                     ));
             }
 
-            let record_volumne = record.volumne().to_euro_string();
-            let booking_cost = booking.cost.to_euro_string();
+            let record_volumne = record.volumne().to_euro();
+            let booking_cost = booking.cost.to_euro();
             if !record_volumne.eq(&booking_cost) {
                 payment_bookings_with_errors
                     .entry(booking.booking_number.clone())
@@ -491,7 +488,7 @@ fn compare_csv_with_bookings(
                 record.payee,
                 record.payee_iban,
                 record.purpose,
-                record.volumne().to_euro_string()
+                record.volumne().to_euro()
             ));
         }
     }
@@ -629,7 +626,7 @@ ${dates}",
                 None
             ),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00\u{a0}€ {} ${{booking_number}}
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{booking_number}}
 - Mo, 07. März 2022, 19:00 Uhr
 - Di, 08. März 2022, 19:00 Uhr
 - Mi, 09. März 2022, 19:00 Uhr
@@ -649,7 +646,7 @@ ${dates}",
                 Some(&String::from("22-1012"))
             ),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00\u{a0}€ {} 22-1012
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012
 - Mo, 07. März 2022, 19:00 Uhr
 - Di, 08. März 2022, 19:00 Uhr
 - Mi, 09. März 2022, 19:00 Uhr
@@ -790,12 +787,12 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     ),
                     VerifyPaymentResult::new(
                         "2 Buchungen mit Problemen".into(),
-                        vec!["22-1425 / Betrag falsch: erwartet 27,00\u{a0}€ != überwiesen 33,50\u{a0}€".into(),
+                        vec!["22-1425 / Betrag falsch: erwartet 27,00 € != überwiesen 33,50 €".into(),
                              "22-1456 / Doppelt bezahlt: Buchung war schon als bezahlt markiert".into()]
                     ),
                     VerifyPaymentResult::new(
                         "1 nicht erkannte Buchung".into(),
-                        vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15\u{a0}€".into()]
+                        vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
                     )
                 ]
             )
@@ -863,7 +860,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
                     VerifyPaymentResult::new(
                         "1 nicht erkannte Buchung".into(),
-                        vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15\u{a0}€".into()]
+                        vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
                     )
                 ]
             )
