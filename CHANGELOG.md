@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 
 - Skip phone number prefix (') for prebooking check
 - Log backtraces, finally
+- Use 4 workers
 
 ## [1.1.3] - 2022-03-21
 
