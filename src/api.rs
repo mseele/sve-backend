@@ -38,13 +38,13 @@ impl Error for ResponseError {
 
 impl Debug for ResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.err)
+        write!(f, "{:?}", self.err)
     }
 }
 
 impl Display for ResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.err)
+        write!(f, "{:?}", self.err)
     }
 }
 
