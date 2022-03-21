@@ -20,7 +20,8 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     HttpServer::new(|| {
-        App::new() //Access-Control-Allow-Origin
+        App::new()
+            // Access-Control-Allow-Origin
             .wrap(
                 Cors::default()
                     .send_wildcard()
@@ -29,6 +30,7 @@ async fn main() -> std::io::Result<()> {
                     .allow_any_header()
                     .max_age(3600),
             )
+            // Log errors
             .wrap_fn(|req, srv| {
                 let fut = srv.call(req);
                 async {
@@ -41,6 +43,8 @@ async fn main() -> std::io::Result<()> {
             })
             .service(web::scope("/api").configure(api::config))
     })
+    // Configure workers manually because inside the cloud
+    // the num of cpu cores will return 1
     .workers(4)
     .bind("0.0.0.0:8080")?
     .run()
