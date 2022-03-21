@@ -3,11 +3,35 @@
 All notable changes to this project will be documented in this file.
 
 <!-- next-header -->
-## [Unreleased] - ReleaseDate
+## [Unreleased]
+
+### Bug Fixes
+
+- Remove euro conversion via steel-cent
 
 ## [1.1.2] - 2022-03-18
 
+### Bug Fixes
+
+- Remove thousands separator
+
+### Miscellaneous Tasks
+
+- Fix changelog
+
 ## [1.1.1] - 2022-03-18
+
+### Bug Fixes
+
+- Use ISO 8859 for csv encoding
+
+### Miscellaneous Tasks
+
+- Bump dependencies
+
+### Refactor
+
+- Add encoding & mime-type to emails
 
 ## [1.1.0] - 2022-03-16
 
@@ -18,6 +42,7 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Update dependencies
+- Allow manual action trigger
 
 ### Refactor
 
@@ -33,19 +58,11 @@ All notable changes to this project will be documented in this file.
 
 - Email bounce from gmx/web.de
 
-### Miscellaneous Tasks
-
-- Release
-
 ## [1.0.7] - 2022-03-13
 
 ### Bug Fixes
 
 - Use message_id with localhost
-
-### Miscellaneous Tasks
-
-- Release
 
 ## [1.0.6] - 2022-03-13
 
