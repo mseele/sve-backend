@@ -202,7 +202,11 @@ async fn do_prebooking(hash: String) -> Result<BookingResponse> {
         splitted[3].into(),
         splitted[4].into(),
         splitted[5].into(),
-        Some(splitted[6].into()),
+        // skip ' prefix - if available
+        Some(match splitted[6].starts_with("'") {
+            true => splitted[6][1..].into(),
+            false => splitted[6].into(),
+        }),
         Some("J".eq(splitted[7])),
         Some(false),
         Some(String::from("Pre-Booking")),
