@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+## [1.1.4] - 2022-03-21
+
+### Bug Fixes
+
+- Skip phone number prefix (') for prebooking check
+
+## [1.1.3] - 2022-03-21
+
 ### Bug Fixes
 
 - Remove euro conversion via steel-cent
