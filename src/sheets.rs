@@ -128,7 +128,7 @@ pub async fn detect_booking(booking: &EventBooking, event: &Event) -> Result<Boo
                 .collect::<Vec<_>>();
             // generate booking values and filter by prebooking headers
             let prebooking_values = filter_by_indices(
-                into_values(booking, event, &String::from(""), header_indices),
+                into_values(booking, event, &String::from(""), header_indices, false),
                 &prebooking_header_indices,
             );
             // check prebooking values for existance
@@ -258,17 +258,21 @@ fn into_values(
     event: &Event,
     booking_number: &String,
     header_indices: Vec<usize>,
+    prefix_phone_number: bool,
 ) -> Vec<String> {
     let current_date_time = Utc::now()
         .with_timezone(&Berlin)
         .format("%d.%m.%Y %H:%M:%S")
         .to_string();
     let phone_number = match &booking.phone {
-        Some(phone_number) if phone_number.trim().len() > 0 => {
-            let mut value = String::from("'");
-            value.push_str(phone_number.trim());
-            value
-        }
+        Some(phone_number) if phone_number.trim().len() > 0 => match prefix_phone_number {
+            true => {
+                let mut value = String::from("'");
+                value.push_str(phone_number.trim());
+                value
+            }
+            false => phone_number.trim().into(),
+        },
         Some(_) | None => String::from(""),
     };
     let member = match booking.is_member() {
@@ -304,7 +308,7 @@ async fn insert(
     insert_index: usize,
     header_indices: Vec<usize>,
 ) -> Result<()> {
-    let values = into_values(booking, event, booking_number, header_indices);
+    let values = into_values(booking, event, booking_number, header_indices, true);
     hub.spreadsheets()
         .values_update(
             ValueRange {
