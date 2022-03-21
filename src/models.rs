@@ -6,11 +6,9 @@ use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Serialize};
+use std::num::ParseFloatError;
 use std::str::from_utf8;
 use std::str::FromStr;
-use steel_cent::currency::EUR;
-use steel_cent::formatting::{format, france_style as euro_style};
-use steel_cent::Money;
 
 base64_serde_type!(Base64Standard, STANDARD);
 
@@ -323,16 +321,11 @@ impl EventBooking {
         self.member.unwrap_or(false)
     }
 
-    pub fn cost(&self, event: &Event) -> Money {
-        let cost = match self.is_member() {
+    pub fn cost(&self, event: &Event) -> f64 {
+        match self.is_member() {
             true => event.cost_member,
             false => event.cost_non_member,
-        };
-        cost.to_euro()
-    }
-
-    pub fn cost_as_string(&self, event: &Event) -> String {
-        format(euro_style(), &self.cost(event))
+        }
     }
 }
 
@@ -653,20 +646,34 @@ impl VerifyPaymentResult {
 }
 
 pub trait ToEuro {
-    fn to_euro(&self) -> Money;
-    fn to_euro_string(&self) -> String;
+    fn to_euro_without_symbol(&self) -> String;
+    fn to_euro(&self) -> String;
+}
+
+pub trait FromEuro {
+    fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError>;
 }
 
 impl ToEuro for f64 {
-    fn to_euro(&self) -> Money {
-        let fract = self.fract();
-        let major = (self - fract) as i64;
-        let minor = (fract * 100_f64).round() as i64;
-        Money::of_major_minor(EUR, major, minor)
+    fn to_euro_without_symbol(&self) -> String {
+        let formatted = format!("{:.2}", self);
+        formatted.replace(".", ",")
     }
 
-    fn to_euro_string(&self) -> String {
-        format(euro_style(), &self.to_euro())
+    fn to_euro(&self) -> String {
+        format!("{} €", &self.to_euro_without_symbol())
+    }
+}
+
+impl FromEuro for String {
+    fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError> {
+        self.replace(".", "").replace(",", ".").parse::<f64>()
+    }
+}
+
+impl FromEuro for &str {
+    fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError> {
+        self.to_string().from_euro_without_symbol()
     }
 }
 
@@ -704,23 +711,19 @@ mod tests {
 
         let event = new_event(59.0, 69_f64);
         let cost = member.cost(&event);
-        assert_eq!(cost.major_part(), 59);
-        assert_eq!(cost.minor_part(), 0);
-        assert_eq!(member.cost_as_string(&event), "59,00\u{a0}€");
+        assert_eq!(cost, 59_f64);
+        assert_eq!(cost.to_euro(), "59,00 €");
         let cost = no_member.cost(&event);
-        assert_eq!(cost.major_part(), 69);
-        assert_eq!(cost.minor_part(), 0);
-        assert_eq!(no_member.cost_as_string(&event), "69,00\u{a0}€");
+        assert_eq!(cost, 69_f64);
+        assert_eq!(cost.to_euro(), "69,00 €");
 
         let event = new_event(5.99, 9.99);
         let cost = member.cost(&event);
-        assert_eq!(cost.major_part(), 5);
-        assert_eq!(cost.minor_part(), 99);
-        assert_eq!(member.cost_as_string(&event), "5,99\u{a0}€");
+        assert_eq!(cost, 5.99);
+        assert_eq!(cost.to_euro(), "5,99 €");
         let cost = no_member.cost(&event);
-        assert_eq!(cost.major_part(), 9);
-        assert_eq!(cost.minor_part(), 99);
-        assert_eq!(no_member.cost_as_string(&event), "9,99\u{a0}€");
+        assert_eq!(cost, 9.99);
+        assert_eq!(cost.to_euro(), "9,99 €");
     }
 
     fn new_event(cost_member: f64, cost_non_member: f64) -> Event {

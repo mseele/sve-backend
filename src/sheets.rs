@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::models::{Event, EventBooking, VerifyPaymentBookingRecord};
+use crate::models::{Event, EventBooking, FromEuro, ToEuro, VerifyPaymentBookingRecord};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
 use chrono_tz::Europe::Berlin;
@@ -8,7 +8,6 @@ use google_sheets4::{
     api::{BatchUpdateValuesRequest, SheetProperties, ValueRange},
     Sheets,
 };
-use steel_cent::{formatting::france_style as euro_style, Money};
 use yup_oauth2::ServiceAccountKey;
 
 const REQUIRED_HEADERS: [&str; 12] = [
@@ -176,11 +175,9 @@ pub async fn get_bookings_to_verify_payment(
                             .remove(&BETRAG)
                             .expect("Index {BETRAG} is inside header_indices");
                         let cost = cost.trim();
-                        let cost: Money = euro_style().parser().parse(cost).with_context(|| {
+                        let cost = cost.from_euro_without_symbol().with_context(|| {
                             format!("Could not parse '{cost}' in sheet {title} at row {index}")
                         })?;
-                        let cost: f64 =
-                            (cost.major_part() as f64) + ((cost.minor_part() as f64) / 100_f64);
 
                         let booking_number = values
                             .remove(&BUCHUNGSNR)
@@ -278,7 +275,6 @@ fn into_values(
         true => String::from("J"),
         false => String::from("N"),
     };
-    let cost = booking.cost_as_string(event);
     let comments = booking.comments.clone().unwrap_or(String::new());
     let mut values = vec![
         current_date_time,
@@ -289,7 +285,7 @@ fn into_values(
         booking.email.clone(),
         phone_number,
         member,
-        cost,
+        booking.cost(event).to_euro_without_symbol(),
         booking_number.clone(),
         String::from("N"),
         comments,
