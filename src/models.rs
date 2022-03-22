@@ -647,7 +647,10 @@ impl VerifyPaymentResult {
 
 pub trait ToEuro {
     fn to_euro_without_symbol(&self) -> String;
-    fn to_euro(&self) -> String;
+
+    fn to_euro(&self) -> String {
+        format!("{} €", &self.to_euro_without_symbol())
+    }
 }
 
 pub trait FromEuro {
@@ -658,10 +661,6 @@ impl ToEuro for f64 {
     fn to_euro_without_symbol(&self) -> String {
         let formatted = format!("{:.2}", self);
         formatted.replace(".", ",")
-    }
-
-    fn to_euro(&self) -> String {
-        format!("{} €", &self.to_euro_without_symbol())
     }
 }
 
