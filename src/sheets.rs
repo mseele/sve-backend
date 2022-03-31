@@ -174,8 +174,7 @@ pub async fn get_bookings_to_verify_payment(
                         let cost = values
                             .remove(&BETRAG)
                             .expect("Index {BETRAG} is inside header_indices");
-                        let cost = cost.trim();
-                        let cost = cost.from_euro_without_symbol().with_context(|| {
+                        let cost = cost.trim().from_euro_with_symbol().with_context(|| {
                             format!("Could not parse '{cost}' in sheet {title} at row {index}")
                         })?;
 

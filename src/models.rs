@@ -655,6 +655,7 @@ pub trait ToEuro {
 
 pub trait FromEuro {
     fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError>;
+    fn from_euro_with_symbol(self) -> Result<f64, ParseFloatError>;
 }
 
 impl ToEuro for f64 {
@@ -668,11 +669,21 @@ impl FromEuro for String {
     fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError> {
         self.replace(".", "").replace(",", ".").parse::<f64>()
     }
+    fn from_euro_with_symbol(self) -> Result<f64, ParseFloatError> {
+        self.trim_end_matches("€")
+            .trim_end_matches(char::is_whitespace)
+            .from_euro_without_symbol()
+    }
 }
 
 impl FromEuro for &str {
     fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError> {
         self.to_string().from_euro_without_symbol()
+    }
+    fn from_euro_with_symbol(self) -> Result<f64, ParseFloatError> {
+        self.trim_end_matches("€")
+            .trim_end_matches(char::is_whitespace)
+            .from_euro_without_symbol()
     }
 }
 
