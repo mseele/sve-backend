@@ -1,0 +1,54 @@
+[package]
+name = "sve_backend"
+version = "1.1.6"
+edition = "2021"
+description = "Backend for the SVE website"
+authors = ["Michael Seele <mseele@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mseele/sve-backend"
+homepage = "https://github.com/mseele/sve-backend"
+readme = "README.md"
+publish = false
+
+[package.metadata.release]
+pre-release-replacements = [
+  { file = "CHANGELOG.md", search = "Unreleased", replace = "{{version}}", min = 1 },
+  { file = "CHANGELOG.md", search = "\\.\\.\\.HEAD", replace = "...{{tag_name}}", exactly = 1 },
+  { file = "CHANGELOG.md", search = "ReleaseDate", replace = "{{date}}", min = 1 },
+  { file = "CHANGELOG.md", search = "<!-- next-header -->", replace = "<!-- next-header -->\n## [Unreleased] - ReleaseDate\n", exactly = 1 },
+  { file = "CHANGELOG.md", search = "<!-- next-url -->", replace = "<!-- next-url -->\n[Unreleased]: https://github.com/mseele/sve-backend/compare/{{tag_name}}...HEAD", exactly = 1 },
+]
+
+[dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+env_logger = "0.9"
+log = "0.4"
+actix-web = "4.0"
+actix-cors = "0.6"
+anyhow = { version = "1.0", features = ["backtrace"] }
+mime = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.13"
+base64-serde = "0.6"
+chrono = { version = "0.4", features = ["serde", "unstable-locales"] }
+chrono-tz = { version = "0.6" }
+googapis = { version = "0.6", features = ["google-firestore-v1"] }
+gouth = { version = "0.2" }
+tonic = { version = "0.6", features = ["tls"] }
+google-sheets4 = "3.0"
+google-calendar3 = "3.0"
+yup-oauth2 = "6.3"
+hyper = "0.14"
+hyper-rustls = "0.22"
+lettre = { version = "0.10.0-rc.5", features = ["tokio1-native-tls"] }
+regex = "1.5"
+csv = "1.1"
+encoding = "0.2"
+
+[dev-dependencies]
+pretty_assertions = "1.2"
+
+[profile.release]
+# 2/true is too much, 0 is not enough, 1 is just right for backtraces
+debug = 1

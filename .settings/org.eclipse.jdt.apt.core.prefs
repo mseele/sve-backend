@@ -1,7 +1,0 @@
-#
-#Fri Jan 14 22:34:13 CET 2022
-org.eclipse.jdt.apt.aptEnabled=true
-org.eclipse.jdt.apt.genTestSrcDir=.apt_generated_tests
-org.eclipse.jdt.apt.reconcileEnabled=true
-org.eclipse.jdt.apt.genSrcDir=.apt_generated
-eclipse.preferences.version=1

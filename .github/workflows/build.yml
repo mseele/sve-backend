@@ -1,0 +1,53 @@
+name: Setup, Build, and Publish
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+env:
+  IMAGE: sve_backend
+  REGISTRY_HOSTNAME: eu.gcr.io/sve-backend
+
+jobs:
+  setup-build-and-publish:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Setup gcloud CLI
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          credentials_json: ${{ secrets.GCLOUD_SERVICE_KEY }}
+      - uses: 'google-github-actions/setup-gcloud@v0'
+
+      # Configure docker to use the gcloud command-line tool as a credential helper
+      - run: |
+          # Set up docker to authenticate
+          # via gcloud command-line tool.
+          gcloud auth configure-docker
+
+      # Extract secrets into files
+      - run: mkdir -p secrets
+      - run: echo ${{ secrets.SVE_CREDENTIALS_ENCODED }} | base64 -d > secrets/credentials.json
+      - run: echo ${{ secrets.SVE_EMAILS_ENCODED }} | base64 -d > secrets/email.json
+
+      # Build the Docker image
+      - name: Build
+        run: |
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $TAG
+          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" .
+
+      # Push the Docker image to Google Container Registry
+      - name: Publish
+        run: |
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $TAG
+          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG"
+          docker tag "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" "$REGISTRY_HOSTNAME"/"$IMAGE":latest
+          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":latest
