@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+## [1.1.6] - 2022-04-04
+
+### Refactor
+
+- Switch to json from plain text
+
 ## [1.1.5] - 2022-03-31
 
 ### Bug Fixes
@@ -560,7 +566,8 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.1.5...HEAD
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.1.6...HEAD
+[1.1.6]: https://github.com/mseele/sve-backend/compare/v1.1.6...v1.1.6
 [1.1.5]: https://github.com/mseele/sve-backend/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/mseele/sve-backend/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/mseele/sve-backend/compare/v1.1.2...v1.1.3
