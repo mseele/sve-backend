@@ -117,6 +117,11 @@ pub struct VerifyPaymentInput {
     csv: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PrebookingInput {
+    hash: String,
+}
+
 async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
     let events = events::get_events(info.all, info.beta).await?;
     Ok(Json(events))
@@ -132,8 +137,8 @@ async fn booking(Json(booking): Json<EventBooking>) -> Result<impl Responder, Re
     Ok(Json(response))
 }
 
-async fn prebooking(hash: String) -> Result<impl Responder, ResponseError> {
-    let response = events::prebooking(hash).await;
+async fn prebooking(Json(input): Json<PrebookingInput>) -> Result<impl Responder, ResponseError> {
+    let response = events::prebooking(input.hash).await;
     Ok(Json(response))
 }
 
