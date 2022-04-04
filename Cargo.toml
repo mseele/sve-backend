@@ -41,7 +41,7 @@ google-calendar3 = "3.0"
 yup-oauth2 = "6.3"
 hyper = "0.14"
 hyper-rustls = "0.22"
-lettre = { version = "0.10.0-rc.4", features = ["tokio1-native-tls"] }
+lettre = { version = "0.10.0-rc.5", features = ["tokio1-native-tls"] }
 regex = "1.5"
 csv = "1.1"
 encoding = "0.2"
