@@ -343,7 +343,7 @@ fn format_dates(event: &Event) -> String {
         .iter()
         .map(|d| {
             DateTime::<Utc>::from_utc(*d, Utc)
-                .format_localized("- %a, %d. %B %Y, %H:%M Uhr", Locale::de_DE)
+                .format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
                 .to_string()
         })
         .collect::<Vec<_>>()
@@ -631,13 +631,13 @@ ${dates}",
             ),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{booking_number}}
-- Mo, 07. März 2022, 19:00 Uhr
-- Di, 08. März 2022, 19:00 Uhr
-- Mi, 09. März 2022, 19:00 Uhr
-- Do, 10. März 2022, 19:00 Uhr
-- Fr, 11. März 2022, 19:00 Uhr
-- Sa, 12. März 2022, 19:00 Uhr
-- So, 13. März 2022, 19:00 Uhr",
+- Mo., 07. März 2022, 19:00 Uhr
+- Di., 08. März 2022, 19:00 Uhr
+- Mi., 09. März 2022, 19:00 Uhr
+- Do., 10. März 2022, 19:00 Uhr
+- Fr., 11. März 2022, 19:00 Uhr
+- Sa., 12. März 2022, 19:00 Uhr
+- So., 13. März 2022, 19:00 Uhr",
                 format_payday(Utc::now() + Duration::days(1))
             ),
         );
@@ -651,13 +651,13 @@ ${dates}",
             ),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012
-- Mo, 07. März 2022, 19:00 Uhr
-- Di, 08. März 2022, 19:00 Uhr
-- Mi, 09. März 2022, 19:00 Uhr
-- Do, 10. März 2022, 19:00 Uhr
-- Fr, 11. März 2022, 19:00 Uhr
-- Sa, 12. März 2022, 19:00 Uhr
-- So, 13. März 2022, 19:00 Uhr",
+- Mo., 07. März 2022, 19:00 Uhr
+- Di., 08. März 2022, 19:00 Uhr
+- Mi., 09. März 2022, 19:00 Uhr
+- Do., 10. März 2022, 19:00 Uhr
+- Fr., 11. März 2022, 19:00 Uhr
+- Sa., 12. März 2022, 19:00 Uhr
+- So., 13. März 2022, 19:00 Uhr",
                 format_payday(Utc::now() + Duration::days(1))
             )
         );
