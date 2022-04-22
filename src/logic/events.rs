@@ -7,7 +7,7 @@ use crate::models::{Event, PartialEvent};
 use crate::sheets::{self, BookingDetection};
 use crate::store::{self, BookingResult, GouthInterceptor};
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{DateTime, Duration, Locale, Utc};
+use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
 use googapis::google::firestore::v1::firestore_client::FirestoreClient;
@@ -81,7 +81,11 @@ pub async fn delete(partial_event: PartialEvent) -> Result<()> {
     Ok(())
 }
 
-pub async fn verify_payments(sheet_id: String, csv: String) -> Result<Vec<VerifyPaymentResult>> {
+pub async fn verify_payments(
+    sheet_id: String,
+    csv: String,
+    csv_start_date: Option<NaiveDate>,
+) -> Result<Vec<VerifyPaymentResult>> {
     let bytes = base64::decode(&csv)
         .with_context(|| format!("Error decoding the cvs content: {}", &csv))?;
     let csv = match ISO_8859_1.decode(&bytes, DecoderTrap::Strict) {
@@ -89,7 +93,8 @@ pub async fn verify_payments(sheet_id: String, csv: String) -> Result<Vec<Verify
         Err(e) => bail!("Decoding csv content with ISO 8859: {}", e.into_owned()),
     };
     let mut bookings = sheets::get_bookings_to_verify_payment(&sheet_id).await?;
-    let (verified_payment_bookings, result) = compare_csv_with_bookings(&csv, &mut bookings)?;
+    let (verified_payment_bookings, result) =
+        compare_csv_with_bookings(&csv, csv_start_date, &mut bookings)?;
     if verified_payment_bookings.len() > 0 {
         sheets::mark_as_payed(&sheet_id, verified_payment_bookings).await?;
     }
@@ -384,8 +389,11 @@ fn replace_payday(body: String, event: &Event) -> String {
 
 #[derive(Debug, Deserialize)]
 struct PaymentRecord {
-    #[serde(rename = "Buchungstag")]
-    _date: String,
+    #[serde(
+        rename = "Buchungstag",
+        deserialize_with = "deserialize_date_with_german_format"
+    )]
+    date: NaiveDate,
     #[serde(rename = "Valuta")]
     _valuta: String,
     #[serde(rename = "Textschlüssel")]
@@ -432,8 +440,17 @@ where
         .map_err(serde::de::Error::custom)
 }
 
+fn deserialize_date_with_german_format<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let string = String::deserialize(deserializer)?;
+    NaiveDate::parse_from_str(&string, "%d.%m.%Y").map_err(serde::de::Error::custom)
+}
+
 fn compare_csv_with_bookings(
     csv: &str,
+    csv_start_date: Option<NaiveDate>,
     bookings: &mut Vec<VerifyPaymentBookingRecord>,
 ) -> Result<(Vec<VerifyPaymentBookingRecord>, Vec<VerifyPaymentResult>)> {
     let csv_records_prefix = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben";
@@ -456,6 +473,12 @@ fn compare_csv_with_bookings(
 
     for result in reader.deserialize() {
         let record: PaymentRecord = result?;
+        // skip all records that are older than the start date
+        if let Some(start_date) = csv_start_date {
+            if record.date < start_date {
+                continue;
+            }
+        }
         let position = bookings.iter().position(|booking| {
             booking.booking_number.len() > 0 && record.purpose.contains(&booking.booking_number)
         });
@@ -766,7 +789,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, &mut bookings).unwrap(),
+            compare_csv_with_bookings(csv, None, &mut bookings).unwrap(),
             (
                 vec![
                     VerifyPaymentBookingRecord::new(
@@ -856,7 +879,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, &mut bookings).unwrap(),
+            compare_csv_with_bookings(csv, None, &mut bookings).unwrap(),
             (
                 vec![],
                 vec![
@@ -866,6 +889,95 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                         "1 nicht erkannte Buchung".into(),
                         vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
                     )
+                ]
+            )
+        );
+
+        // matching bookings with and without errors
+        let csv = ";;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Umsatzanzeige;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+BLZ:;10517962;;Datum:;12.03.2022;;;;;;;;;;;;
+Konto:;25862911;;Uhrzeit:;14:17:19;;;;;;;;;;;;
+Abfrage von:;Paul Ehrlich;;Kontoinhaber:;Sportverein Eutingen im Gäu e.V;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Zeitraum:;;von:;01.03.2022;bis:;12.03.2022;;;;;;;;;;;
+Betrag in Euro:;;von:;;bis:;;;;;;;;;;;;
+Primanotanummer:;;von:;;bis:;;;;;;;;;;;;
+Textschlüssel:;;von:;;bis:;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben
+09.03.2022;09.03.2022;16 Euro-Überweisung;801;Test GmbH;0;DE92500105174132432988;58629112;GENODES1VBH;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;;EUR;24,15;S
+09.03.2022;09.03.2022;51 Überweisungsgutschr.;931;Max Mustermann;0;DE62500105176261449571;10517962;SOLADES1FDS;22-1423;;EUR;27,00;H
+10.03.2022;10.03.2022;54 Überweisungsgutschr.;931;Erika Mustermann;0;DE91500105176171781279;10517962;SOLADES1FDS;Erika 22-1425 Mustermann;;EUR;33,50;H
+10.03.2022;10.03.2022;78 Euro-Überweisung;931;Lieschen Müller;0;DE21500105179625862911;10517962;GENODES1VBH;Lieschen Müller 22-1456;;EUR;27,00;H
+11.03.2022;11.03.2022;90 Euro-Überweisung;931;Otto Normalverbraucher;0;DE21500105179625862911;10517962;GENODES1VBH;Otto Normalverbraucher, Test-Kurs,22-1467;;EUR;45,90;H
+;;;;;;;;;;;;;
+01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
+09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
+";
+        let mut bookings = vec![
+            VerifyPaymentBookingRecord::new(
+                "Test-Kurs".into(),
+                "F10".into(),
+                27.0,
+                "22-1423".into(),
+                false,
+            ),
+            VerifyPaymentBookingRecord::new(
+                "Test-Kurs".into(),
+                "F11".into(),
+                27.0,
+                "22-1425".into(),
+                false,
+            ),
+            VerifyPaymentBookingRecord::new(
+                "Test-Kurs".into(),
+                "F12".into(),
+                27.0,
+                "22-1456".into(),
+                true,
+            ),
+            VerifyPaymentBookingRecord::new(
+                "Test-Kurs".into(),
+                "F12".into(),
+                45.90,
+                "22-1467".into(),
+                false,
+            ),
+        ];
+
+        assert_eq!(
+            compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 11), &mut bookings)
+                .unwrap(),
+            (
+                vec![VerifyPaymentBookingRecord::new(
+                    "Test-Kurs".into(),
+                    "F12".into(),
+                    45.90,
+                    "22-1467".into(),
+                    false,
+                )],
+                vec![
+                    VerifyPaymentResult::new("1 bezahlte Buchung".into(), vec!["22-1467".into()]),
+                    VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
+                    VerifyPaymentResult::new("0 nicht erkannte Buchungen".into(), vec![])
+                ]
+            )
+        );
+
+        assert_eq!(
+            compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 12), &mut bookings)
+                .unwrap(),
+            (
+                vec![],
+                vec![
+                    VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
+                    VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
+                    VerifyPaymentResult::new("0 nicht erkannte Buchungen".into(), vec![])
                 ]
             )
         );

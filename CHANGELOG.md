@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+### Features
+
+- Add support for csv start date
+
 ## [1.1.6] - 2022-04-04
 
 ### Refactor

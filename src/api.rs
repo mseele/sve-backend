@@ -5,6 +5,7 @@ use actix_web::web::Json;
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
+use chrono::NaiveDate;
 use log::error;
 use serde::Deserialize;
 use std::error::Error;
@@ -115,6 +116,7 @@ pub struct EventsRequest {
 pub struct VerifyPaymentInput {
     sheet_id: String,
     csv: String,
+    start_date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -155,7 +157,7 @@ async fn delete(Json(partial_event): Json<PartialEvent>) -> Result<impl Responde
 async fn verify_payments(
     Json(input): Json<VerifyPaymentInput>,
 ) -> Result<impl Responder, ResponseError> {
-    let result = events::verify_payments(input.sheet_id, input.csv).await?;
+    let result = events::verify_payments(input.sheet_id, input.csv, input.start_date).await?;
     Ok(Json(result))
 }
 
