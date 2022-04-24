@@ -87,7 +87,7 @@ fn map(email_account: &EmailAccount, email: MassEmail) -> Result<Message> {
             }
             message_builder.multipart(multi_part)
         }
-        None => message_builder.body(email.content),
+        None => message_builder.singlepart(SinglePart::plain(email.content)),
     }?;
 
     Ok(message)
