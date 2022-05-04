@@ -9,7 +9,6 @@ pub fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PaymentRecord {
-    pub id: String,
     pub date: NaiveDate,
     pub payee: String,
     pub payee_iban: String,
@@ -19,7 +18,6 @@ pub struct PaymentRecord {
 
 impl PaymentRecord {
     fn new(
-        id: String,
         date: NaiveDate,
         payee: String,
         payee_iban: String,
@@ -27,7 +25,6 @@ impl PaymentRecord {
         volumne: f64,
     ) -> Self {
         Self {
-            id,
             date,
             payee,
             payee_iban,
@@ -57,7 +54,7 @@ struct VobaRichPaymentRecord {
     #[serde(rename = "Textschlüssel")]
     _textkey: String,
     #[serde(rename = "Primanota")]
-    primanota: String,
+    _primanota: String,
     #[serde(rename = "Zahlungsempfänger")]
     payee: String,
     #[serde(rename = "ZahlungsempfängerKto")]
@@ -84,7 +81,6 @@ impl From<VobaRichPaymentRecord> for PaymentRecord {
     fn from(record: VobaRichPaymentRecord) -> Self {
         let volumne = record.volumne();
         PaymentRecord::new(
-            record.primanota,
             record.date,
             record.payee,
             record.payee_iban,
@@ -185,7 +181,6 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
             VobaRichCSVReader::read(csv).unwrap(),
             vec![
                 PaymentRecord::new(
-                    String::from("801"),
                     NaiveDate::from_ymd(2022, 3, 9),
                     String::from("Test GmbH"),
                     String::from("DE92500105174132432988"),
@@ -193,7 +188,6 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     -24.15
                 ),
                 PaymentRecord::new(
-                    String::from("931"),
                     NaiveDate::from_ymd(2022, 3, 9),
                     String::from("Max Mustermann"),
                     String::from("DE62500105176261449571"),
@@ -201,7 +195,6 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     27.00
                 ),
                 PaymentRecord::new(
-                    String::from("932"),
                     NaiveDate::from_ymd(2022, 3, 10),
                     String::from("Erika Mustermann"),
                     String::from("DE91500105176171781279"),
@@ -209,7 +202,6 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     33.50
                 ),
                 PaymentRecord::new(
-                    String::from("941"),
                     NaiveDate::from_ymd(2022, 3, 10),
                     String::from("Lieschen Müller"),
                     String::from("DE21500105179625862911"),
@@ -217,7 +209,6 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     -27.00
                 ),
                 PaymentRecord::new(
-                    String::from("951"),
                     NaiveDate::from_ymd(2022, 3, 10),
                     String::from("Otto Normalverbraucher"),
                     String::from("DE21500105179625862911"),

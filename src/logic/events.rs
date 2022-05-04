@@ -433,8 +433,7 @@ fn compare_csv_with_bookings(
             }
         } else {
             non_matching_payment_records.push(format!(
-                "{} / {} / {} / {} / {}",
-                record.id,
+                "{} / {} / {} / {}",
                 record.payee,
                 record.payee_iban,
                 record.purpose,
@@ -742,7 +741,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     ),
                     VerifyPaymentResult::new(
                         "1 nicht erkannte Buchung".into(),
-                        vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
+                        vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
                     )
                 ]
             )
@@ -810,7 +809,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
                     VerifyPaymentResult::new(
                         "1 nicht erkannte Buchung".into(),
-                        vec!["801 / Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
+                        vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
                     )
                 ]
             )
