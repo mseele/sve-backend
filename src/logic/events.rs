@@ -1,12 +1,12 @@
 use crate::email;
 use crate::models::{
-    BookingResponse, EventBooking, EventCounter, EventType, FromEuro, Subscription, ToEuro,
+    BookingResponse, EventBooking, EventCounter, EventType, Subscription, ToEuro,
     VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::models::{Event, PartialEvent};
 use crate::sheets::{self, BookingDetection};
 use crate::store::{self, BookingResult, GouthInterceptor};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
@@ -14,7 +14,6 @@ use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use lettre::message::SinglePart;
 use log::{error, info, warn};
 use regex::Regex;
-use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::str::from_utf8;
 use tonic::codegen::InterceptedService;
@@ -387,92 +386,16 @@ fn replace_payday(body: String, event: &Event) -> String {
     body
 }
 
-#[derive(Debug, Deserialize)]
-struct PaymentRecord {
-    #[serde(
-        rename = "Buchungstag",
-        deserialize_with = "deserialize_date_with_german_format"
-    )]
-    date: NaiveDate,
-    #[serde(rename = "Valuta")]
-    _valuta: String,
-    #[serde(rename = "Textschlüssel")]
-    _textkey: String,
-    #[serde(rename = "Primanota")]
-    primanota: String,
-    #[serde(rename = "Zahlungsempfänger")]
-    payee: String,
-    #[serde(rename = "ZahlungsempfängerKto")]
-    _payee_account: String,
-    #[serde(rename = "ZahlungsempfängerIBAN")]
-    payee_iban: String,
-    #[serde(rename = "ZahlungsempfängerBLZ")]
-    _payee_blz: String,
-    #[serde(rename = "ZahlungsempfängerBIC")]
-    _payee_bic: String,
-    #[serde(rename = "Vorgang/Verwendungszweck")]
-    purpose: String,
-    #[serde(rename = "Kundenreferenz")]
-    _customer_reference: String,
-    #[serde(rename = "Währung")]
-    _currency: String,
-    #[serde(rename = "Umsatz", deserialize_with = "deserialize_float_with_comma")]
-    volumne: f64,
-    #[serde(rename = "Soll/Haben")]
-    debit_credit: String,
-}
-
-impl PaymentRecord {
-    fn volumne(&self) -> f64 {
-        match self.debit_credit.as_str() {
-            "H" => self.volumne,
-            _ => -self.volumne,
-        }
-    }
-}
-
-fn deserialize_float_with_comma<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    String::deserialize(deserializer)?
-        .from_euro_without_symbol()
-        .map_err(serde::de::Error::custom)
-}
-
-fn deserialize_date_with_german_format<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let string = String::deserialize(deserializer)?;
-    NaiveDate::parse_from_str(&string, "%d.%m.%Y").map_err(serde::de::Error::custom)
-}
-
 fn compare_csv_with_bookings(
     csv: &str,
     csv_start_date: Option<NaiveDate>,
     bookings: &mut Vec<VerifyPaymentBookingRecord>,
 ) -> Result<(Vec<VerifyPaymentBookingRecord>, Vec<VerifyPaymentResult>)> {
-    let csv_records_prefix = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben";
-    let csv_records_suffix = ";;;;;;;;;;;;;";
-    let start = csv
-        .find(csv_records_prefix)
-        .ok_or_else(|| anyhow!("Found no title row in uploaded csv:\n\n{}", csv))?;
-    let end = csv[start..].find(csv_records_suffix).ok_or_else(|| {
-        anyhow!(
-            "Found no end sequence in uploaded csv:\n\n{}",
-            &csv[start..]
-        )
-    })?;
-    let mut reader = csv::ReaderBuilder::new()
-        .delimiter(b';')
-        .from_reader(csv[start..(start + end)].as_bytes());
     let mut verified_payment_bookings = Vec::new();
     let mut payment_bookings_with_errors = BTreeMap::new();
     let mut non_matching_payment_records = Vec::new();
 
-    for result in reader.deserialize() {
-        let record: PaymentRecord = result?;
+    for record in super::csv::read(csv)? {
         // skip all records that are older than the start date
         if let Some(start_date) = csv_start_date {
             if record.date < start_date {
@@ -494,7 +417,7 @@ fn compare_csv_with_bookings(
                     ));
             }
 
-            let record_volumne = record.volumne().to_euro();
+            let record_volumne = record.volumne.to_euro();
             let booking_cost = booking.cost.to_euro();
             if !record_volumne.eq(&booking_cost) {
                 payment_bookings_with_errors
@@ -511,11 +434,11 @@ fn compare_csv_with_bookings(
         } else {
             non_matching_payment_records.push(format!(
                 "{} / {} / {} / {} / {}",
-                record.primanota,
+                record.id,
                 record.payee,
                 record.payee_iban,
                 record.purpose,
-                record.volumne().to_euro()
+                record.volumne.to_euro()
             ));
         }
     }
