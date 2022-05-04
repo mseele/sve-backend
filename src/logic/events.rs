@@ -748,27 +748,10 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         );
 
         // no matching bookings
-        let csv = ";;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-Umsatzanzeige;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-BLZ:;10517962;;Datum:;12.03.2022;;;;;;;;;;;;
-Konto:;25862911;;Uhrzeit:;14:17:19;;;;;;;;;;;;
-Abfrage von:;Paul Ehrlich;;Kontoinhaber:;Sportverein Eutingen im Gäu e.V;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-Zeitraum:;;von:;01.03.2022;bis:;12.03.2022;;;;;;;;;;;
-Betrag in Euro:;;von:;;bis:;;;;;;;;;;;;
-Primanotanummer:;;von:;;bis:;;;;;;;;;;;;
-Textschlüssel:;;von:;;bis:;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;
-Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben
-09.03.2022;09.03.2022;16 Euro-Überweisung;801;Test GmbH;0;DE92500105174132432988;58629112;GENODES1VBH;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;;EUR;24,15;S
-;;;;;;;;;;;;;
-01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
-09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
+        let csv = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz
+Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;09.03.2022;09.03.2022;Test GmbH;DE92500105174132432988;GENODES1VBH;16 Euro-Überweisung;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;-24,15;EUR;260,00;;;;;
 ";
+
         let mut bookings = vec![
             VerifyPaymentBookingRecord::new(
                 "Test-Kurs".into(),

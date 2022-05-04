@@ -1,10 +1,18 @@
 use crate::models::FromEuro;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use chrono::NaiveDate;
 use serde::Deserialize;
 
 pub fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
-    VobaRichCSVReader::read(csv)
+    let readers: Vec<Box<dyn CSVReader>> = vec![
+        Box::new(VobaClassicCSVReader::default()),
+        Box::new(VobaRichCSVReader::default()),
+    ];
+    readers
+        .into_iter()
+        .find(|reader| reader.is_valid_reader(csv))
+        .map(|reader| reader.read(csv))
+        .unwrap_or_else(|| bail!("Unknown CSV format"))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,11 +43,13 @@ impl PaymentRecord {
 }
 
 trait CSVReader {
-    fn read(csv: &str) -> Result<Vec<PaymentRecord>>;
+    fn is_valid_reader(self: &Self, csv: &str) -> bool;
+    fn read(self: &Self, csv: &str) -> Result<Vec<PaymentRecord>>;
 }
 
 // impl for voba csv file with header and footer
 
+#[derive(Default)]
 struct VobaRichCSVReader {}
 
 #[derive(Deserialize)]
@@ -97,14 +107,21 @@ impl VobaRichPaymentRecord {
             _ => -self.volumne,
         }
     }
+
+    fn find_start(csv: &str) -> Option<usize> {
+        let csv_records_prefix = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben";
+        csv.find(csv_records_prefix)
+    }
 }
 
 impl CSVReader for VobaRichCSVReader {
-    fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
-        let csv_records_prefix = "Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben";
+    fn is_valid_reader(self: &Self, csv: &str) -> bool {
+        VobaRichPaymentRecord::find_start(csv).is_some()
+    }
+
+    fn read(self: &Self, csv: &str) -> Result<Vec<PaymentRecord>> {
         let csv_records_suffix = ";;;;;;;;;;;;;";
-        let start = csv
-            .find(csv_records_prefix)
+        let start = VobaRichPaymentRecord::find_start(csv)
             .ok_or_else(|| anyhow!("Title row in csv did not match:\n\n{}", csv))?;
         let end = csv[start..].find(csv_records_suffix).ok_or_else(|| {
             anyhow!(
@@ -119,6 +136,85 @@ impl CSVReader for VobaRichCSVReader {
         let mut result = Vec::new();
         for record in reader.deserialize() {
             let record: VobaRichPaymentRecord = record?;
+            result.push(record.into());
+        }
+        Ok(result)
+    }
+}
+
+// impl for voba csv file without header and footer
+
+#[derive(Default)]
+struct VobaClassicCSVReader {}
+
+#[derive(Deserialize)]
+struct VobaClassicPaymentRecord {
+    #[serde(rename = "Bezeichnung Auftragskonto")]
+    _description_order_account: String,
+    #[serde(rename = "IBAN Auftragskonto")]
+    _description_order_iban: String,
+    #[serde(rename = "BIC Auftragskonto")]
+    _description_order_bic: String,
+    #[serde(rename = "Bankname Auftragskonto")]
+    _description_order_bank_name: String,
+    #[serde(
+        rename = "Buchungstag",
+        deserialize_with = "deserialize_date_with_german_format"
+    )]
+    date: NaiveDate,
+    #[serde(rename = "Valutadatum")]
+    _valuta: String,
+    #[serde(rename = "Name Zahlungsbeteiligter")]
+    payee: String,
+    #[serde(rename = "IBAN Zahlungsbeteiligter")]
+    payee_iban: String,
+    #[serde(rename = "BIC (SWIFT-Code) Zahlungsbeteiligter")]
+    _payee_bic: String,
+    #[serde(rename = "Buchungstext")]
+    _textkey: String,
+    #[serde(rename = "Verwendungszweck")]
+    purpose: String,
+    #[serde(rename = "Betrag", deserialize_with = "deserialize_float_with_comma")]
+    volumne: f64,
+    #[serde(rename = "Waehrung")]
+    _currency: String,
+    #[serde(rename = "Saldo nach Buchung")]
+    _saldo_after_record: String,
+    #[serde(rename = "Bemerkung")]
+    _description: String,
+    #[serde(rename = "Steuerrelevant")]
+    _tax_relevant: String,
+    #[serde(rename = "Glaeubiger ID")]
+    _creditor_id: String,
+    #[serde(rename = "Mandatsreferenz")]
+    _mandate_reference: String,
+}
+
+impl From<VobaClassicPaymentRecord> for PaymentRecord {
+    fn from(record: VobaClassicPaymentRecord) -> Self {
+        PaymentRecord::new(
+            record.date,
+            record.payee,
+            record.payee_iban,
+            record.purpose,
+            record.volumne,
+        )
+    }
+}
+
+impl CSVReader for VobaClassicCSVReader {
+    fn is_valid_reader(self: &Self, csv: &str) -> bool {
+        csv.starts_with("Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz")
+    }
+
+    fn read(self: &Self, csv: &str) -> Result<Vec<PaymentRecord>> {
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(b';')
+            .from_reader(csv.as_bytes());
+
+        let mut result = Vec::new();
+        for record in reader.deserialize() {
+            let record: VobaClassicPaymentRecord = record?;
             result.push(record.into());
         }
         Ok(result)
@@ -178,7 +274,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 ";
 
         assert_eq!(
-            VobaRichCSVReader::read(csv).unwrap(),
+            VobaRichCSVReader::default().read(csv).unwrap(),
             vec![
                 PaymentRecord::new(
                     NaiveDate::from_ymd(2022, 3, 9),
@@ -224,7 +320,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         let mut csv = "Valuta;Textschlüssel";
 
         assert_eq!(
-            format!("{}", VobaRichCSVReader::read(csv).unwrap_err()),
+            format!("{}", VobaRichCSVReader::default().read(csv).unwrap_err()),
             "Title row in csv did not match:
 
 Valuta;Textschlüssel"
@@ -234,11 +330,89 @@ Valuta;Textschlüssel"
 ;;;;;";
 
         assert_eq!(
-            format!("{}", VobaRichCSVReader::read(csv).unwrap_err()),
+            format!("{}", VobaRichCSVReader::default().read(csv).unwrap_err()),
             "Found no valid end sequence in uploaded csv:
 
 Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben
 ;;;;;"  
         );
+    }
+
+    #[test]
+    fn test_voba_classic_csv_success() {
+        let csv = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz
+Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;09.03.2022;09.03.2022;Test GmbH;DE92500105174132432988;GENODES1VBH;16 Euro-Überweisung;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;-24,15;EUR;260,00;;;;;
+Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;09.03.2022;09.03.2022;Max Mustermann;DE62500105176261449571;SOLADES1FDS;Überweisungsgutschr.;22-1423;27,00;EUR;152,00;;;;;
+Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;10.03.2022;10.03.2022;Erika Mustermann;DE91500105176171781279;SOLADES1FDS;Überweisungsgutschr.;Erika 22-1425 Mustermann;33,50;EUR;98,00;;;;;
+Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;10.03.2022;10.03.2022;Lieschen Müller;DE21500105179625862911;GENODES1VBH;Überweisungsgutschr.;Lieschen Müller 22-1456;-27,00;EUR;54,00;;;;;
+Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;10.03.2022;10.03.2022;Otto Normalverbraucher;DE21500105179625862911;GENODES1VBH;Überweisungsgutschr.;Otto Normalverbraucher, Test-Kurs,22-1467;45,90;EUR;0,00;;;;;
+";
+
+        assert_eq!(
+            VobaClassicCSVReader::default().read(csv).unwrap(),
+            vec![
+                PaymentRecord::new(
+                    NaiveDate::from_ymd(2022, 3, 9),
+                    String::from("Test GmbH"),
+                    String::from("DE92500105174132432988"),
+                    String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
+                    -24.15
+                ),
+                PaymentRecord::new(
+                    NaiveDate::from_ymd(2022, 3, 9),
+                    String::from("Max Mustermann"),
+                    String::from("DE62500105176261449571"),
+                    String::from("22-1423"),
+                    27.00
+                ),
+                PaymentRecord::new(
+                    NaiveDate::from_ymd(2022, 3, 10),
+                    String::from("Erika Mustermann"),
+                    String::from("DE91500105176171781279"),
+                    String::from("Erika 22-1425 Mustermann"),
+                    33.50
+                ),
+                PaymentRecord::new(
+                    NaiveDate::from_ymd(2022, 3, 10),
+                    String::from("Lieschen Müller"),
+                    String::from("DE21500105179625862911"),
+                    String::from("Lieschen Müller 22-1456"),
+                    -27.00
+                ),
+                PaymentRecord::new(
+                    NaiveDate::from_ymd(2022, 3, 10),
+                    String::from("Otto Normalverbraucher"),
+                    String::from("DE21500105179625862911"),
+                    String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),
+                    45.90
+                )
+            ]
+        );
+    }
+
+    #[test]
+    fn test_voba_classic_csv_error() {
+        let csv = ";;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Umsatzanzeige;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+BLZ:;10517962;;Datum:;12.03.2022;;;;;;;;;;;;
+Konto:;25862911;;Uhrzeit:;14:17:19;;;;;;;;;;;;
+Abfrage von:;Paul Ehrlich;;Kontoinhaber:;Sportverein Eutingen im Gäu e.V;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Zeitraum:;;von:;01.03.2022;bis:;12.03.2022;;;;;;;;;;;
+Betrag in Euro:;;von:;;bis:;;;;;;;;;;;;
+Primanotanummer:;;von:;;bis:;;;;;;;;;;;;
+Textschlüssel:;;von:;;bis:;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;
+Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben
+09.03.2022;09.03.2022;16 Euro-Überweisung;801;Test GmbH;0;DE92500105174132432988;58629112;GENODES1VBH;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;;EUR;24,15;S
+;;;;;;;;;;;;;
+01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
+09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
+";
+        assert!(VobaClassicCSVReader::default().read(csv).is_err());
     }
 }
