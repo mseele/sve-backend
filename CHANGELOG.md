@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+## [1.3.0] - 2022-05-04
+
+### Features
+
+- Add support for different csv formats
+
+## [1.2.1] - 2022-04-22
+
+### Bug Fixes
+
+- Use utf-8 for all emails
+
+## [1.2.0] - 2022-04-20
+
 ### Features
 
 - Add support for csv start date
@@ -570,8 +584,11 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.1.6...HEAD
-[1.1.6]: https://github.com/mseele/sve-backend/compare/v1.1.6...v1.1.6
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/mseele/sve-backend/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/mseele/sve-backend/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/mseele/sve-backend/compare/v1.1.6...v1.2.0
+[1.1.6]: https://github.com/mseele/sve-backend/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/mseele/sve-backend/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/mseele/sve-backend/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/mseele/sve-backend/compare/v1.1.2...v1.1.3
