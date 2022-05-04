@@ -18,7 +18,13 @@ async fn calendar_hub() -> Result<CalendarHub> {
         .await?;
 
     let hub = CalendarHub::new(
-        hyper::Client::builder().build(hyper_rustls::HttpsConnector::with_native_roots()),
+        hyper::Client::builder().build(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .https_only()
+                .enable_http2()
+                .build(),
+        ),
         auth,
     );
 

@@ -36,12 +36,12 @@ chrono-tz = { version = "0.6" }
 googapis = { version = "0.6", features = ["google-firestore-v1"] }
 gouth = { version = "0.2" }
 tonic = { version = "0.6", features = ["tls"] }
-google-sheets4 = "3.0"
-google-calendar3 = "3.0"
-yup-oauth2 = "6.3"
+google-sheets4 = "3.1"
+google-calendar3 = "3.1"
+yup-oauth2 = "6.6"
 hyper = "0.14"
-hyper-rustls = "0.22"
-lettre = { version = "0.10.0-rc.5", features = ["tokio1-native-tls"] }
+hyper-rustls = "0.23"
+lettre = { version = "0.10.0-rc.6", features = ["tokio1-native-tls"] }
 regex = "1.5"
 csv = "1.1"
 encoding = "0.2"

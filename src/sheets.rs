@@ -49,7 +49,13 @@ async fn sheets_hub() -> Result<Sheets> {
         .await?;
 
     let hub = Sheets::new(
-        hyper::Client::builder().build(hyper_rustls::HttpsConnector::with_native_roots()),
+        hyper::Client::builder().build(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .https_only()
+                .enable_http2()
+                .build(),
+        ),
         auth,
     );
 
