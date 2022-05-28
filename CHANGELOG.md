@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+## [1.3.2] - 2022-05-28
+
+### Refactor
+
+- Move subscriber data into postgresql database
+
 ## [1.3.1] - 2022-05-25
 
 ### Bug Fixes
@@ -590,7 +596,8 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/mseele/sve-backend/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/mseele/sve-backend/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/mseele/sve-backend/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/mseele/sve-backend/compare/v1.2.0...v1.2.1
