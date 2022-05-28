@@ -3,6 +3,7 @@ extern crate base64_serde;
 
 mod api;
 mod calendar;
+mod db;
 mod email;
 mod logic;
 mod models;
@@ -16,10 +17,12 @@ use log::error;
 pub const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    HttpServer::new(|| {
+    let pool = db::init_pool().await?;
+
+    HttpServer::new(move || {
         App::new()
             // Access-Control-Allow-Origin
             .wrap(
@@ -41,6 +44,7 @@ async fn main() -> std::io::Result<()> {
                     Ok(res)
                 }
             })
+            .app_data(web::Data::new(pool.clone()))
             .service(web::scope("/api").configure(api::config))
     })
     // Configure workers manually because inside the cloud
@@ -48,5 +52,7 @@ async fn main() -> std::io::Result<()> {
     .workers(4)
     .bind("0.0.0.0:8080")?
     .run()
-    .await
+    .await?;
+
+    Ok(())
 }

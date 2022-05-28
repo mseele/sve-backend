@@ -1,13 +1,14 @@
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
 use actix_web::http::header::ContentType;
-use actix_web::web::Json;
+use actix_web::web::{Data, Json};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
 use chrono::NaiveDate;
 use log::error;
 use serde::Deserialize;
+use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -134,13 +135,19 @@ async fn counter() -> Result<impl Responder, ResponseError> {
     Ok(Json(event_counters))
 }
 
-async fn booking(Json(booking): Json<EventBooking>) -> Result<impl Responder, ResponseError> {
-    let response = events::booking(booking).await;
+async fn booking(
+    pool: Data<PgPool>,
+    Json(booking): Json<EventBooking>,
+) -> Result<impl Responder, ResponseError> {
+    let response = events::booking(&pool, booking).await;
     Ok(Json(response))
 }
 
-async fn prebooking(Json(input): Json<PrebookingInput>) -> Result<impl Responder, ResponseError> {
-    let response = events::prebooking(input.hash).await;
+async fn prebooking(
+    pool: Data<PgPool>,
+    Json(input): Json<PrebookingInput>,
+) -> Result<impl Responder, ResponseError> {
+    let response = events::prebooking(&pool, input.hash).await;
     Ok(Json(response))
 }
 
@@ -164,27 +171,29 @@ async fn verify_payments(
 // news
 
 async fn subscribe(
+    pool: Data<PgPool>,
     Json(subscription): Json<Subscription>,
 ) -> Result<impl Responder, ResponseError> {
-    news::subscribe(subscription).await?;
+    news::subscribe(&pool, subscription).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn unsubscribe(
+    pool: Data<PgPool>,
     Json(subscription): Json<Subscription>,
 ) -> Result<impl Responder, ResponseError> {
-    news::unsubscribe(subscription).await?;
+    news::unsubscribe(&pool, subscription).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn subscribers() -> Result<impl Responder, ResponseError> {
-    let subscriptions = news::get_subscriptions().await?;
+async fn subscribers(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+    let subscriptions = news::get_subscriptions(&pool).await?;
     let result = subscriptions
         .into_iter()
-        .map(|(news_type, emails)| {
+        .map(|(topic, emails)| {
             let title: &str = &format!(
                 "---------- {}: {} ----------",
-                news_type.display_name(),
+                topic.display_name(),
                 emails.len()
             );
             vec![

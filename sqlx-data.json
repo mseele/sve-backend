@@ -1,0 +1,119 @@
+{
+  "db": "PostgreSQL",
+  "19bd943180899dc6f06d9c1378a82086f78f972ef53f10b2a22d3039a44c0ab3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "general",
+          "ordinal": 1,
+          "type_info": "Bool"
+        },
+        {
+          "name": "events",
+          "ordinal": 2,
+          "type_info": "Bool"
+        },
+        {
+          "name": "fitness",
+          "ordinal": 3,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT s.id, s.general, s.events, s.fitness FROM news_subscribers s WHERE s.email = $1"
+  },
+  "1e71981121c3d553d53478f7a12d39f98065eeb64df506e035e8d572230c5843": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Bool",
+          "Bool",
+          "Bool"
+        ]
+      }
+    },
+    "query": "INSERT INTO news_subscribers (email, general, events, fitness) VALUES($1, $2, $3, $4)"
+  },
+  "80f5a6e6bf8c85c7b7965deefaf1147d7632dc416c298010616158d5c4526dc9": {
+    "describe": {
+      "columns": [
+        {
+          "name": "email",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "general",
+          "ordinal": 1,
+          "type_info": "Bool"
+        },
+        {
+          "name": "events",
+          "ordinal": 2,
+          "type_info": "Bool"
+        },
+        {
+          "name": "fitness",
+          "ordinal": 3,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"
+  },
+  "b67221832717c24ee8815db51f53d07e70329dd8afb327ae5329f349abd247d0": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Bool",
+          "Bool",
+          "Bool"
+        ]
+      }
+    },
+    "query": "UPDATE news_subscribers SET general = $2, events = $3, fitness = $4 WHERE id = $1"
+  },
+  "b6a695aed7e93a7f6783baf9e6906e66e820de271c20f68ca992b8d02b6a32c6": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "DELETE FROM news_subscribers WHERE id = $1"
+  }
+}
