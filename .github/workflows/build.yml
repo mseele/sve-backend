@@ -35,6 +35,7 @@ jobs:
       - run: mkdir -p secrets
       - run: echo ${{ secrets.SVE_CREDENTIALS_ENCODED }} | base64 -d > secrets/credentials.json
       - run: echo ${{ secrets.SVE_EMAILS_ENCODED }} | base64 -d > secrets/email.json
+      - run: echo ${{ secrets.SVE_DB_ENCODED }} | base64 -d > secrets/database_url.env
 
       # Build the Docker image
       - name: Build
