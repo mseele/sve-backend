@@ -45,6 +45,12 @@ lettre = { version = "0.10.0-rc.6", features = ["tokio1-native-tls"] }
 regex = "1.5"
 csv = "1.1"
 encoding = "0.2"
+sqlx = { version = "0.5", features = [
+  "postgres",
+  "runtime-tokio-rustls",
+  "chrono",
+  "offline",
+] }
 
 [dev-dependencies]
 pretty_assertions = "1.2"

@@ -1,0 +1,8 @@
+CREATE TABLE news_subscribers (
+    id SERIAL PRIMARY KEY,
+    created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    email TEXT NOT NULL UNIQUE,
+    general BOOLEAN NOT NULL,
+    events BOOLEAN NOT NULL,
+    fitness BOOLEAN NOT NULL
+);

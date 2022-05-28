@@ -245,11 +245,11 @@ impl From<EventType> for &str {
     }
 }
 
-impl From<EventType> for NewsType {
+impl From<EventType> for NewsTopic {
     fn from(event_type: EventType) -> Self {
         match event_type {
-            EventType::Fitness => NewsType::Fitness,
-            EventType::Events => NewsType::Events,
+            EventType::Fitness => NewsTopic::Fitness,
+            EventType::Events => NewsTopic::Events,
         }
     }
 }
@@ -399,61 +399,62 @@ impl BookingResponse {
 #[serde(rename_all = "camelCase")]
 pub struct Subscription {
     pub email: String,
-    pub types: Vec<NewsType>,
+    #[serde(rename = "types")]
+    pub topics: Vec<NewsTopic>,
 }
 
 impl Subscription {
-    pub fn new(email: String, types: Vec<NewsType>) -> Subscription {
-        Subscription { email, types }
+    pub fn new(email: String, topics: Vec<NewsTopic>) -> Subscription {
+        Subscription { email, topics }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Copy, Hash)]
-pub enum NewsType {
+pub enum NewsTopic {
     General,
     Events,
     Fitness,
 }
 
-impl NewsType {
+impl NewsTopic {
     pub fn display_name(self: &Self) -> &str {
         match self {
-            NewsType::General => "Allgemein",
-            NewsType::Events => "Events",
-            NewsType::Fitness => "Fitness",
+            NewsTopic::General => "Allgemein",
+            NewsTopic::Events => "Events",
+            NewsTopic::Fitness => "Fitness",
         }
     }
 }
 
-impl From<NewsType> for &str {
-    fn from(news_type: NewsType) -> Self {
-        match news_type {
-            NewsType::General => "General",
-            NewsType::Events => "Events",
-            NewsType::Fitness => "Fitness",
+impl From<NewsTopic> for &str {
+    fn from(topic: NewsTopic) -> Self {
+        match topic {
+            NewsTopic::General => "General",
+            NewsTopic::Events => "Events",
+            NewsTopic::Fitness => "Fitness",
         }
     }
 }
 
-impl FromStr for NewsType {
+impl FromStr for NewsTopic {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "General" => Ok(NewsType::General),
-            "Events" => Ok(NewsType::Events),
-            "Fitness" => Ok(NewsType::Fitness),
-            other => bail!("Invalid type {}", other),
+            "General" => Ok(NewsTopic::General),
+            "Events" => Ok(NewsTopic::Events),
+            "Fitness" => Ok(NewsTopic::Fitness),
+            other => bail!("Invalid topic {}", other),
         }
     }
 }
 
-impl From<NewsType> for EmailType {
-    fn from(news_type: NewsType) -> Self {
-        match news_type {
-            NewsType::General => EmailType::Info,
-            NewsType::Events => EmailType::Events,
-            NewsType::Fitness => EmailType::Fitness,
+impl From<NewsTopic> for EmailType {
+    fn from(topic: NewsTopic) -> Self {
+        match topic {
+            NewsTopic::General => EmailType::Info,
+            NewsTopic::Events => EmailType::Events,
+            NewsTopic::Fitness => EmailType::Fitness,
         }
     }
 }

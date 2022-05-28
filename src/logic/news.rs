@@ -1,40 +1,34 @@
-use crate::email;
-use crate::models::{NewsType, Subscription};
-use crate::store::{self, GouthInterceptor};
+use crate::models::{NewsTopic, Subscription};
+use crate::{db, email};
 use anyhow::Result;
-use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use lettre::message::header::{self, ContentType};
 use lettre::message::SinglePart;
+use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
-use tonic::codegen::InterceptedService;
-use tonic::transport::Channel;
 
 pub const UNSUBSCRIBE_MESSAGE: &str = "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
 https://www.sv-eutingen.de/newsletter";
 
-pub async fn subscribe(subscription: Subscription) -> Result<()> {
-    let mut client = store::get_client().await?;
-    subscribe_to_news(&mut client, subscription, true).await?;
+pub async fn subscribe(pool: &PgPool, subscription: Subscription) -> Result<()> {
+    subscribe_to_news(pool, subscription, true).await?;
 
     Ok(())
 }
 
-pub async fn unsubscribe(subscription: Subscription) -> Result<()> {
-    let mut client = store::get_client().await?;
-    store::unsubscribe(&mut client, &subscription).await?;
+pub async fn unsubscribe(pool: &PgPool, subscription: Subscription) -> Result<()> {
+    db::unsubscribe(pool, &subscription).await?;
 
     Ok(())
 }
 
-pub async fn get_subscriptions() -> Result<HashMap<NewsType, HashSet<String>>> {
-    let mut client = store::get_client().await?;
-    let subscriptions = store::get_subscriptions(&mut client).await?;
+pub async fn get_subscriptions(pool: &PgPool) -> Result<HashMap<NewsTopic, HashSet<String>>> {
+    let subscriptions = db::get_subscriptions(pool).await?;
 
-    let mut result: HashMap<NewsType, HashSet<String>> = HashMap::new();
+    let mut result: HashMap<NewsTopic, HashSet<String>> = HashMap::new();
     for subscription in subscriptions {
-        for news_type in subscription.types {
+        for topic in subscription.topics {
             result
-                .entry(news_type)
+                .entry(topic)
                 .or_insert_with(|| HashSet::new())
                 .insert(subscription.email.clone());
         }
@@ -44,11 +38,11 @@ pub async fn get_subscriptions() -> Result<HashMap<NewsType, HashSet<String>>> {
 }
 
 pub(in crate::logic) async fn subscribe_to_news(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
+    pool: &PgPool,
     subscription: Subscription,
     send_email: bool,
 ) -> Result<()> {
-    let subscription = store::subscribe(client, &subscription).await?;
+    let subscription = db::subscribe(pool, subscription).await?;
     if send_email {
         send_mail(subscription).await?
     }
@@ -57,18 +51,18 @@ pub(in crate::logic) async fn subscribe_to_news(
 }
 
 async fn send_mail(subscription: Subscription) -> Result<()> {
-    let primary_news_type;
+    let primary_news_topic;
     let multiple_topics;
-    if subscription.types.len() == 1 {
-        primary_news_type = *subscription.types.get(0).unwrap();
+    if subscription.topics.len() == 1 {
+        primary_news_topic = *subscription.topics.get(0).unwrap();
         multiple_topics = None
     } else {
-        primary_news_type = NewsType::General;
+        primary_news_topic = NewsTopic::General;
         multiple_topics = Some(
             subscription
-                .types
+                .topics
                 .iter()
-                .map(|news_type| news_type.display_name())
+                .map(|topic| topic.display_name())
                 .collect::<Vec<&str>>()
                 .join(", "),
         );
@@ -77,8 +71,8 @@ async fn send_mail(subscription: Subscription) -> Result<()> {
     let topic;
     let kind;
     let regards;
-    match primary_news_type {
-        NewsType::General => {
+    match primary_news_topic {
+        NewsTopic::General => {
             subject = "[Fitness@SVE] Bestätigung Fitness-News Anmeldung";
             topic = "News rund um den SVE";
             if let Some(multiple_topics) = multiple_topics {
@@ -88,13 +82,13 @@ async fn send_mail(subscription: Subscription) -> Result<()> {
             }
             regards = "SV Eutingen";
         }
-        NewsType::Events => {
+        NewsTopic::Events => {
             subject = "[Events@SVE] Bestätigung Event-News Anmeldung";
             topic = "unseren Events";
             kind = ", sobald neue Events online sind".into();
             regards = "Team Events@SVE";
         }
-        NewsType::Fitness => {
+        NewsTopic::Fitness => {
             subject = "[Infos@SVE] Bestätigung Newsletter Anmeldung";
             topic = "unseren Fitnesskursen";
             kind = ", sobald neue Kurse online sind".into();
@@ -102,7 +96,7 @@ async fn send_mail(subscription: Subscription) -> Result<()> {
         }
     };
 
-    let email_account = email::get_account_by_type(primary_news_type.into())?;
+    let email_account = email::get_account_by_type(primary_news_topic.into())?;
     let message = email_account
         .new_message()?
         .header(header::MIME_VERSION_1_0)

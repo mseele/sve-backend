@@ -14,6 +14,7 @@ use googapis::google::firestore::v1::firestore_client::FirestoreClient;
 use lettre::message::SinglePart;
 use log::{error, info, warn};
 use regex::Regex;
+use sqlx::PgPool;
 use std::collections::BTreeMap;
 use std::str::from_utf8;
 use tonic::codegen::InterceptedService;
@@ -46,8 +47,8 @@ pub async fn get_event_counters() -> Result<Vec<EventCounter>> {
     Ok(event_counters)
 }
 
-pub async fn booking(booking: EventBooking) -> BookingResponse {
-    match do_booking(booking).await {
+pub async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
+    match do_booking(pool, booking).await {
         Ok(response) => response,
         Err(e) => {
             error!("Booking failed: {:?}", e);
@@ -56,8 +57,8 @@ pub async fn booking(booking: EventBooking) -> BookingResponse {
     }
 }
 
-pub async fn prebooking(hash: String) -> BookingResponse {
-    match do_prebooking(hash).await {
+pub async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
+    match do_prebooking(pool, hash).await {
         Ok(response) => response,
         Err(e) => {
             error!("Prebooking failed: {:?}", e);
@@ -142,12 +143,13 @@ async fn create_event_counters(
     Ok(event_counters)
 }
 
-async fn do_booking(booking: EventBooking) -> Result<BookingResponse> {
+async fn do_booking(pool: &PgPool, booking: EventBooking) -> Result<BookingResponse> {
     let mut client = store::get_client().await?;
-    Ok(book_event(&mut client, booking).await?)
+    Ok(book_event(pool, &mut client, booking).await?)
 }
 
 async fn book_event(
+    pool: &PgPool,
     client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
     booking: EventBooking,
 ) -> Result<BookingResponse> {
@@ -156,7 +158,7 @@ async fn book_event(
         BookingResult::Booked(event, booking_number)
         | BookingResult::WaitingList(event, booking_number) => {
             sheets::save_booking(&booking, event, booking_number).await?;
-            subscribe_to_updates(client, &booking, event).await?;
+            subscribe_to_updates(pool, &booking, event).await?;
             send_mail(&booking, event, booking_result).await?;
             info!("Booking of Event {} was successfull", booking.event_id);
             let message;
@@ -179,7 +181,7 @@ async fn book_event(
     Ok(result)
 }
 
-async fn do_prebooking(hash: String) -> Result<BookingResponse> {
+async fn do_prebooking(pool: &PgPool, hash: String) -> Result<BookingResponse> {
     let bytes = base64::decode(&hash)
         .with_context(|| format!("Error decoding the prebooking hash {}", &hash))?;
     let decoded = from_utf8(&bytes).with_context(|| {
@@ -239,14 +241,10 @@ async fn do_prebooking(hash: String) -> Result<BookingResponse> {
         ));
     }
 
-    Ok(book_event(&mut client, booking).await?)
+    Ok(book_event(pool, &mut client, booking).await?)
 }
 
-async fn subscribe_to_updates(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    booking: &EventBooking,
-    event: &Event,
-) -> Result<()> {
+async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Event) -> Result<()> {
     // only subscribe to updates if updates field is true
     if booking.updates.unwrap_or(false) == false {
         return Ok(());
@@ -254,7 +252,7 @@ async fn subscribe_to_updates(
     // TODO: try to get rid of clone
     let subscription =
         Subscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
-    super::news::subscribe_to_news(client, subscription, false).await?;
+    super::news::subscribe_to_news(pool, subscription, false).await?;
 
     Ok(())
 }
