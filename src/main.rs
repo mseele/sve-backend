@@ -47,9 +47,6 @@ async fn main() -> anyhow::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .service(web::scope("/api").configure(api::config))
     })
-    // Configure workers manually because inside the cloud
-    // the num of cpu cores will return 1
-    .workers(4)
     .bind("0.0.0.0:8080")?
     .run()
     .await?;
