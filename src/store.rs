@@ -640,7 +640,7 @@ fn to_event(doc: &mut Document) -> Result<Event> {
         get_string(doc, "location")?,
         get_string(doc, "bookingTemplate")?,
         get_string(doc, "waitingTemplate")?,
-        get_opt_string(doc, "altBookingButtnText")?,
+        get_opt_string(doc, "altBookingButtonText")?,
         get_opt_string(doc, "altEmailAddress")?,
         get_bool(doc, "externalOperator")?,
     );
