@@ -45,10 +45,12 @@ lettre = { version = "0.10.0-rc.6", features = ["tokio1-native-tls"] }
 regex = "1.5"
 csv = "1.1"
 encoding = "0.2"
+bigdecimal = { version = "0.3", features = ["serde"] }
 sqlx = { version = "0.6", features = [
   "postgres",
   "runtime-tokio-rustls",
   "chrono",
+  "bigdecimal",
   "offline",
 ] }
 

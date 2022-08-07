@@ -1,16 +1,133 @@
 use anyhow::{anyhow, bail, Context, Result};
 use base64::STANDARD;
-use chrono::{NaiveDate, NaiveDateTime};
+use bigdecimal::BigDecimal;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use google_sheets4::api::ValueRange;
 use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::num::ParseFloatError;
 use std::str::from_utf8;
 use std::str::FromStr;
 
 base64_serde_type!(Base64Standard, STANDARD);
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EventNew {
+    pub id: i32,
+    pub created: DateTime<Utc>,
+    pub closed: Option<DateTime<Utc>>,
+    #[serde(rename = "type")]
+    pub event_type: EventType,
+    #[serde(rename = "status")]
+    pub lifecycle_status: LifecycleStatus,
+    pub name: String,
+    pub sort_index: i16,
+    pub short_description: String,
+    pub description: String,
+    pub image: String,
+    pub light: bool,
+    pub dates: Vec<DateTime<Utc>>,
+    pub custom_date: Option<String>,
+    pub duration_in_minutes: i16,
+    pub max_subscribers: i16,
+    pub max_waiting_list: i16,
+    pub cost_member: BigDecimal,
+    pub cost_non_member: BigDecimal,
+    pub location: String,
+    pub booking_template: String,
+    pub waiting_template: String,
+    pub alt_booking_button_text: Option<String>,
+    pub alt_email_address: Option<String>,
+    pub external_operator: bool,
+}
+
+impl EventNew {
+    pub fn new(
+        id: i32,
+        created: DateTime<Utc>,
+        closed: Option<DateTime<Utc>>,
+        event_type: EventType,
+        lifecycle_status: LifecycleStatus,
+        name: String,
+        sort_index: i16,
+        short_description: String,
+        description: String,
+        image: String,
+        light: bool,
+        dates: Vec<DateTime<Utc>>,
+        custom_date: Option<String>,
+        duration_in_minutes: i16,
+        max_subscribers: i16,
+        max_waiting_list: i16,
+        cost_member: BigDecimal,
+        cost_non_member: BigDecimal,
+        location: String,
+        booking_template: String,
+        waiting_template: String,
+        alt_booking_button_text: Option<String>,
+        alt_email_address: Option<String>,
+        external_operator: bool,
+    ) -> Self {
+        Self {
+            id,
+            created,
+            closed,
+            event_type,
+            lifecycle_status,
+            name,
+            sort_index,
+            short_description,
+            description,
+            image,
+            light,
+            dates,
+            custom_date,
+            duration_in_minutes,
+            max_subscribers,
+            max_waiting_list,
+            cost_member,
+            cost_non_member,
+            location,
+            booking_template,
+            waiting_template,
+            alt_booking_button_text,
+            alt_email_address,
+            external_operator,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub struct PartialEventNew {
+    pub id: Option<i32>,
+    pub closed: Option<DateTime<Utc>>,
+    #[serde(rename = "type")]
+    pub event_type: Option<EventType>,
+    #[serde(rename = "status")]
+    pub lifecycle_status: Option<LifecycleStatus>,
+    pub name: Option<String>,
+    pub sort_index: Option<i16>,
+    pub short_description: Option<String>,
+    pub description: Option<String>,
+    pub image: Option<String>,
+    pub light: Option<bool>,
+    pub dates: Option<Vec<DateTime<Utc>>>,
+    pub custom_date: Option<String>,
+    pub duration_in_minutes: Option<i16>,
+    pub max_subscribers: Option<i16>,
+    pub max_waiting_list: Option<i16>,
+    pub cost_member: Option<BigDecimal>,
+    pub cost_non_member: Option<BigDecimal>,
+    pub location: Option<String>,
+    pub booking_template: Option<String>,
+    pub waiting_template: Option<String>,
+    pub alt_booking_button_text: Option<String>,
+    pub alt_email_address: Option<String>,
+    pub external_operator: Option<bool>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -230,7 +347,8 @@ impl TryFrom<PartialEvent> for Event {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
+#[sqlx(type_name = "event_type")]
 pub enum EventType {
     Fitness,
     Events,
@@ -273,6 +391,30 @@ impl FromStr for EventType {
             other => bail!("Invalid type {}", other),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
+#[sqlx(type_name = "lifecycle_status")]
+pub enum LifecycleStatus {
+    /// Not visible and not bookable.
+    /// Used to prepare a new event - deletion is possible
+    Draft,
+
+    /// Visible and bookable via next.sv-eutingen.de (previous beta).
+    /// No longer deletable - can only be archived by closing the event
+    Review,
+
+    /// Visible and bookable via sv-eutingen.de.
+    /// No longer deletable - can only be archived by closing the event
+    Published,
+
+    /// No longer visible and no longer bookable.
+    /// Communication (Confirmation email, etc.) is still possible.
+    /// No longer deletable - can only be archived by closing the event
+    Finished,
+
+    /// Archived and only usable as draft for new events.
+    Closed,
 }
 
 #[derive(Deserialize, Debug)]

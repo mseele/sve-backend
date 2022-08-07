@@ -53,6 +53,282 @@
     },
     "query": "INSERT INTO news_subscribers (email, general, events, fitness) VALUES($1, $2, $3, $4)"
   },
+  "21495e06ac61e1d2e4d378f83b66b86616e06312772f89ac764d2aec9404529c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "lifecycle_status: LifecycleStatus",
+          "ordinal": 0,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          }
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "SELECT e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\" FROM events e WHERE e.id = $1"
+  },
+  "3393ef408cc9a46f5a6912aca406b6a42853ac80e3abec33da8257f4dbedc3a5": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "DELETE FROM event_dates WHERE event_id = $1"
+  },
+  "3d076d722b747977196c6cf0b3d4dad81ecc74d951b32cb7b3f1832af3649064": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4Array",
+          "TimestamptzArray"
+        ]
+      }
+    },
+    "query": "INSERT INTO event_dates (event_id, date) SELECT * FROM UNNEST ($1::int4[], $2::timestamptz[])"
+  },
+  "53d4f2435d29a44e359e5aaef2fbd63896e7e05335a589d3cf9109cc0e2af7c3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "created",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "closed",
+          "ordinal": 2,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "event_type: EventType",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Fitness",
+                  "Events"
+                ]
+              },
+              "name": "event_type"
+            }
+          }
+        },
+        {
+          "name": "lifecycle_status: LifecycleStatus",
+          "ordinal": 4,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "sort_index",
+          "ordinal": 6,
+          "type_info": "Int2"
+        },
+        {
+          "name": "short_description",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "description",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "image",
+          "ordinal": 9,
+          "type_info": "Text"
+        },
+        {
+          "name": "light",
+          "ordinal": 10,
+          "type_info": "Bool"
+        },
+        {
+          "name": "custom_date",
+          "ordinal": 11,
+          "type_info": "Text"
+        },
+        {
+          "name": "duration_in_minutes",
+          "ordinal": 12,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_subscribers",
+          "ordinal": 13,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_waiting_list",
+          "ordinal": 14,
+          "type_info": "Int2"
+        },
+        {
+          "name": "cost_member",
+          "ordinal": 15,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "cost_non_member",
+          "ordinal": 16,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "location",
+          "ordinal": 17,
+          "type_info": "Text"
+        },
+        {
+          "name": "booking_template",
+          "ordinal": 18,
+          "type_info": "Text"
+        },
+        {
+          "name": "waiting_template",
+          "ordinal": 19,
+          "type_info": "Text"
+        },
+        {
+          "name": "alt_booking_button_text",
+          "ordinal": 20,
+          "type_info": "Text"
+        },
+        {
+          "name": "alt_email_address",
+          "ordinal": 21,
+          "type_info": "Text"
+        },
+        {
+          "name": "external_operator",
+          "ordinal": 22,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Fitness",
+                  "Events"
+                ]
+              },
+              "name": "event_type"
+            }
+          },
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          },
+          "Text",
+          "Int2",
+          "Text",
+          "Text",
+          "Text",
+          "Bool",
+          "Text",
+          "Int2",
+          "Int2",
+          "Int2",
+          "Numeric",
+          "Numeric",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Bool"
+        ]
+      }
+    },
+    "query": "\nINSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)\nRETURNING id, created, closed, event_type AS \"event_type: EventType\", lifecycle_status AS \"lifecycle_status: LifecycleStatus\", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator"
+  },
   "80f5a6e6bf8c85c7b7965deefaf1147d7632dc416c298010616158d5c4526dc9": {
     "describe": {
       "columns": [
@@ -89,6 +365,191 @@
     },
     "query": "SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"
   },
+  "91092a9a0e93550a4397d9475bc61710916273a523de3a51b25e0d6dba6a86a4": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "DELETE FROM events e WHERE e.id = $1"
+  },
+  "ad2bfe8a554a6aeda43a01530b1b09b6396bcbbdedc45911dd265f609c69a4ff": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "created",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "closed",
+          "ordinal": 2,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "event_type: EventType",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Fitness",
+                  "Events"
+                ]
+              },
+              "name": "event_type"
+            }
+          }
+        },
+        {
+          "name": "lifecycle_status: LifecycleStatus",
+          "ordinal": 4,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "sort_index",
+          "ordinal": 6,
+          "type_info": "Int2"
+        },
+        {
+          "name": "short_description",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "description",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "image",
+          "ordinal": 9,
+          "type_info": "Text"
+        },
+        {
+          "name": "light",
+          "ordinal": 10,
+          "type_info": "Bool"
+        },
+        {
+          "name": "custom_date",
+          "ordinal": 11,
+          "type_info": "Text"
+        },
+        {
+          "name": "duration_in_minutes",
+          "ordinal": 12,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_subscribers",
+          "ordinal": 13,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_waiting_list",
+          "ordinal": 14,
+          "type_info": "Int2"
+        },
+        {
+          "name": "cost_member",
+          "ordinal": 15,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "cost_non_member",
+          "ordinal": 16,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "location",
+          "ordinal": 17,
+          "type_info": "Text"
+        },
+        {
+          "name": "booking_template",
+          "ordinal": 18,
+          "type_info": "Text"
+        },
+        {
+          "name": "waiting_template",
+          "ordinal": 19,
+          "type_info": "Text"
+        },
+        {
+          "name": "alt_booking_button_text",
+          "ordinal": 20,
+          "type_info": "Text"
+        },
+        {
+          "name": "alt_email_address",
+          "ordinal": 21,
+          "type_info": "Text"
+        },
+        {
+          "name": "external_operator",
+          "ordinal": 22,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\nSELECT\n    e.id,\n    e.created,\n    e.closed,\n    e.event_type AS \"event_type: EventType\",\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\",\n    e.name,\n    e.sort_index,\n    e.short_description,\n    e.description,\n    e.image,\n    e.light,\n    e.custom_date,\n    e.duration_in_minutes,\n    e.max_subscribers,\n    e.max_waiting_list,\n    e.cost_member,\n    e.cost_non_member,\n    e.location,\n    e.booking_template,\n    e.waiting_template,\n    e.alt_booking_button_text,\n    e.alt_email_address,\n    e.external_operator\nFROM\n    events e\nWHERE\n    e.closed IS NULL\nORDER BY\n    e.sort_index,\n    e.created"
+  },
   "b67221832717c24ee8815db51f53d07e70329dd8afb327ae5329f349abd247d0": {
     "describe": {
       "columns": [],
@@ -115,5 +576,180 @@
       }
     },
     "query": "DELETE FROM news_subscribers WHERE id = $1"
+  },
+  "c483652ac7e24ffd8b585771839cf61f43f809d07e514cd838529aba13ddf6f9": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "created",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "closed",
+          "ordinal": 2,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "event_type: EventType",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Fitness",
+                  "Events"
+                ]
+              },
+              "name": "event_type"
+            }
+          }
+        },
+        {
+          "name": "lifecycle_status: LifecycleStatus",
+          "ordinal": 4,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          }
+        },
+        {
+          "name": "name",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "sort_index",
+          "ordinal": 6,
+          "type_info": "Int2"
+        },
+        {
+          "name": "short_description",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "description",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "image",
+          "ordinal": 9,
+          "type_info": "Text"
+        },
+        {
+          "name": "light",
+          "ordinal": 10,
+          "type_info": "Bool"
+        },
+        {
+          "name": "custom_date",
+          "ordinal": 11,
+          "type_info": "Text"
+        },
+        {
+          "name": "duration_in_minutes",
+          "ordinal": 12,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_subscribers",
+          "ordinal": 13,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_waiting_list",
+          "ordinal": 14,
+          "type_info": "Int2"
+        },
+        {
+          "name": "cost_member",
+          "ordinal": 15,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "cost_non_member",
+          "ordinal": 16,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "location",
+          "ordinal": 17,
+          "type_info": "Text"
+        },
+        {
+          "name": "booking_template",
+          "ordinal": 18,
+          "type_info": "Text"
+        },
+        {
+          "name": "waiting_template",
+          "ordinal": 19,
+          "type_info": "Text"
+        },
+        {
+          "name": "alt_booking_button_text",
+          "ordinal": 20,
+          "type_info": "Text"
+        },
+        {
+          "name": "alt_email_address",
+          "ordinal": 21,
+          "type_info": "Text"
+        },
+        {
+          "name": "external_operator",
+          "ordinal": 22,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n    e.id,\n    e.created,\n    e.closed,\n    e.event_type AS \"event_type: EventType\",\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\",\n    e.name,\n    e.sort_index,\n    e.short_description,\n    e.description,\n    e.image,\n    e.light,\n    e.custom_date,\n    e.duration_in_minutes,\n    e.max_subscribers,\n    e.max_waiting_list,\n    e.cost_member,\n    e.cost_non_member,\n    e.location,\n    e.booking_template,\n    e.waiting_template,\n    e.alt_booking_button_text,\n    e.alt_email_address,\n    e.external_operator\nFROM\n    events e\nWHERE\n    e.id = $1"
   }
 }
