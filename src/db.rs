@@ -1,4 +1,4 @@
-use crate::models::{NewsTopic, Subscription};
+use crate::models::{NewsTopic, NewsSubscription};
 use anyhow::Result;
 use sqlx::{postgres::PgPoolOptions, query, query_as, Executor, FromRow, PgPool, Postgres};
 
@@ -9,7 +9,7 @@ pub async fn init_pool() -> Result<PgPool> {
     Ok(pool)
 }
 
-pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<Subscription>> {
+pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
     let subscriptions =
         query!(r#"SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"#)
             .map(|row| {
@@ -23,7 +23,7 @@ pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<Subscription>> {
                 if row.fitness {
                     types.push(NewsTopic::Fitness);
                 }
-                return Subscription::new(row.email, types);
+                return NewsSubscription::new(row.email, types);
             })
             .fetch_all(pool)
             .await?;
@@ -31,7 +31,7 @@ pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<Subscription>> {
     Ok(subscriptions)
 }
 
-pub async fn subscribe(pool: &PgPool, subscription: Subscription) -> Result<Subscription> {
+pub async fn subscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<NewsSubscription> {
     let mut tx = pool.begin().await?;
     let current_subscription = get_current_subscription(&mut tx, &subscription.email).await?;
 
@@ -64,7 +64,7 @@ pub async fn subscribe(pool: &PgPool, subscription: Subscription) -> Result<Subs
     Ok(subscription)
 }
 
-pub async fn unsubscribe(pool: &PgPool, subscription: &Subscription) -> Result<()> {
+pub async fn unsubscribe(pool: &PgPool, subscription: &NewsSubscription) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     let current_subscription = get_current_subscription(&mut tx, &subscription.email).await?;

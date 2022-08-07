@@ -1,6 +1,6 @@
 use crate::email;
 use crate::models::{
-    BookingResponse, EventBooking, EventCounter, EventType, Subscription, ToEuro,
+    BookingResponse, EventBooking, EventCounter, EventType, NewsSubscription, ToEuro,
     VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::models::{Event, PartialEvent};
@@ -251,7 +251,7 @@ async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Eve
     }
     // TODO: try to get rid of clone
     let subscription =
-        Subscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
+        NewsSubscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
     super::news::subscribe_to_news(pool, subscription, false).await?;
 
     Ok(())

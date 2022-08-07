@@ -1,4 +1,4 @@
-use crate::models::{NewsTopic, Subscription};
+use crate::models::{NewsTopic, NewsSubscription};
 use crate::{db, email};
 use anyhow::Result;
 use lettre::message::header::{self, ContentType};
@@ -9,13 +9,13 @@ use std::collections::{HashMap, HashSet};
 pub const UNSUBSCRIBE_MESSAGE: &str = "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
 https://www.sv-eutingen.de/newsletter";
 
-pub async fn subscribe(pool: &PgPool, subscription: Subscription) -> Result<()> {
+pub async fn subscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<()> {
     subscribe_to_news(pool, subscription, true).await?;
 
     Ok(())
 }
 
-pub async fn unsubscribe(pool: &PgPool, subscription: Subscription) -> Result<()> {
+pub async fn unsubscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<()> {
     db::unsubscribe(pool, &subscription).await?;
 
     Ok(())
@@ -39,7 +39,7 @@ pub async fn get_subscriptions(pool: &PgPool) -> Result<HashMap<NewsTopic, HashS
 
 pub(in crate::logic) async fn subscribe_to_news(
     pool: &PgPool,
-    subscription: Subscription,
+    subscription: NewsSubscription,
     send_email: bool,
 ) -> Result<()> {
     let subscription = db::subscribe(pool, subscription).await?;
@@ -50,7 +50,7 @@ pub(in crate::logic) async fn subscribe_to_news(
     Ok(())
 }
 
-async fn send_mail(subscription: Subscription) -> Result<()> {
+async fn send_mail(subscription: NewsSubscription) -> Result<()> {
     let primary_news_topic;
     let multiple_topics;
     if subscription.topics.len() == 1 {

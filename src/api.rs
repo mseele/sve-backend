@@ -1,5 +1,5 @@
 use crate::logic::{calendar, contact, events, news, tasks};
-use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
+use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, NewsSubscription};
 use actix_web::http::header::ContentType;
 use actix_web::web::{Data, Json};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
@@ -172,7 +172,7 @@ async fn verify_payments(
 
 async fn subscribe(
     pool: Data<PgPool>,
-    Json(subscription): Json<Subscription>,
+    Json(subscription): Json<NewsSubscription>,
 ) -> Result<impl Responder, ResponseError> {
     news::subscribe(&pool, subscription).await?;
     Ok(HttpResponse::Ok().finish())
@@ -180,7 +180,7 @@ async fn subscribe(
 
 async fn unsubscribe(
     pool: Data<PgPool>,
-    Json(subscription): Json<Subscription>,
+    Json(subscription): Json<NewsSubscription>,
 ) -> Result<impl Responder, ResponseError> {
     news::unsubscribe(&pool, subscription).await?;
     Ok(HttpResponse::Ok().finish())

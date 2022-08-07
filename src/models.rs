@@ -397,15 +397,15 @@ impl BookingResponse {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Subscription {
+pub struct NewsSubscription {
     pub email: String,
     #[serde(rename = "types")]
     pub topics: Vec<NewsTopic>,
 }
 
-impl Subscription {
-    pub fn new(email: String, topics: Vec<NewsTopic>) -> Subscription {
-        Subscription { email, topics }
+impl NewsSubscription {
+    pub fn new(email: String, topics: Vec<NewsTopic>) -> NewsSubscription {
+        NewsSubscription { email, topics }
     }
 }
 
