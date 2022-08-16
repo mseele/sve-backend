@@ -419,6 +419,53 @@ pub enum LifecycleStatus {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct EventBookingNew {
+    pub event_id: i32,
+    pub first_name: String,
+    pub last_name: String,
+    pub street: String,
+    pub city: String,
+    pub email: String,
+    pub phone: Option<String>,
+    pub member: Option<bool>,
+    pub updates: Option<bool>,
+    pub comments: Option<String>,
+}
+
+impl EventBookingNew {
+    pub fn new(
+        event_id: i32,
+        first_name: String,
+        last_name: String,
+        street: String,
+        city: String,
+        email: String,
+        phone: Option<String>,
+        member: Option<bool>,
+        updates: Option<bool>,
+        comments: Option<String>,
+    ) -> Self {
+        Self {
+            event_id,
+            first_name,
+            last_name,
+            street,
+            city,
+            email,
+            phone,
+            member,
+            updates,
+            comments,
+        }
+    }
+
+    pub fn is_member(&self) -> bool {
+        self.member.unwrap_or(false)
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct EventBooking {
     pub event_id: String,
     pub first_name: String,

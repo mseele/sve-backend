@@ -1,12 +1,12 @@
 use crate::models::{
-    EventCounterNew, EventNew, EventType, LifecycleStatus, NewsSubscription,
+    EventBookingNew, EventCounterNew, EventNew, EventType, LifecycleStatus, NewsSubscription,
     NewsTopic, PartialEventNew,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
 use sqlx::{
-    postgres::PgPoolOptions, query, query_as, query_builder::Separated, FromRow, PgConnection,
-    PgPool, Postgres, QueryBuilder, Row,
+    postgres::PgPoolOptions, query, query_as, query_builder::Separated, query_scalar, FromRow,
+    PgConnection, PgPool, Postgres, QueryBuilder, Row,
 };
 use std::collections::HashMap;
 
@@ -563,6 +563,194 @@ WHERE
     Ok(event_counters)
 }
 
+pub enum BookingResult {
+    Booked(EventNew, Vec<EventCounterNew>, String),
+    WaitingList(EventNew, Vec<EventCounterNew>, String),
+    BookedOut,
+}
+
+pub async fn book_event(
+    pool: &PgPool,
+    booking: EventBookingNew,
+    pre_booking: bool,
+    lifecycle_status: LifecycleStatus,
+) -> Result<BookingResult> {
+    let mut tx = pool.begin().await?;
+
+    let event_counter: Option<EventCounterNew> = query!(
+        r#"
+SELECT
+    v.id,
+    v.max_subscribers,
+    v.max_waiting_list,
+    v.subscribers,
+    v.waiting_list
+FROM
+    v_event_counters v
+WHERE
+    v.id = $1"#,
+        booking.event_id
+    )
+    .map(|row| {
+        // unwrap is needed because view columns are always "nullable"
+        // try_into is needed to convert the i64 into a i16
+        // both unwraps can never fail
+        EventCounterNew::new(
+            row.id.unwrap(),
+            row.max_subscribers.unwrap(),
+            row.max_waiting_list.unwrap(),
+            row.subscribers.unwrap().try_into().unwrap(),
+            row.waiting_list.unwrap().try_into().unwrap(),
+        )
+    })
+    .fetch_optional(&mut tx)
+    .await?;
+
+    let event_counter = event_counter
+        .ok_or_else(|| anyhow!("Found no event with id '{}' for booking", booking.event_id))?;
+
+    let result = if event_counter.max_subscribers == -1
+        || event_counter.subscribers < event_counter.max_subscribers
+    {
+        insert_booking(&mut tx, booking, true, pre_booking, lifecycle_status).await?
+    } else if event_counter.waiting_list < event_counter.max_waiting_list {
+        insert_booking(&mut tx, booking, false, pre_booking, lifecycle_status).await?
+    } else {
+        BookingResult::BookedOut
+    };
+    tx.commit().await?;
+    Ok(result)
+}
+
+async fn insert_booking(
+    conn: &mut PgConnection,
+    booking: EventBookingNew,
+    enrolled: bool,
+    pre_booking: bool,
+    lifecycle_status: LifecycleStatus,
+) -> Result<BookingResult> {
+    let subscriber_id = insert_event_subscriber(conn, &booking).await?;
+
+    let payment_id: Option<i64> = query_scalar!("SELECT nextval('payment_id')")
+        .fetch_one(&mut *conn)
+        .await?;
+
+    let year = Utc::now().format("%y");
+    let payment_id = format!("{}-{}", year, payment_id.unwrap());
+
+    query!(
+        r#"
+INSERT INTO public.event_bookings
+(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)
+VALUES($1, $2, $3, $4, $5, $6)"#,
+        booking.event_id,
+        enrolled,
+        pre_booking,
+        subscriber_id,
+        booking.comments,
+        payment_id
+    )
+    .execute(&mut *conn)
+    .await?;
+
+    let event = fetch_event(&mut *conn, booking.event_id)
+        .await?
+        .ok_or_else(|| anyhow!("Found no event with id '{}'", booking.event_id))?;
+    let event_counters = fetch_event_counters(&mut *conn, lifecycle_status).await?;
+
+    if let true = enrolled {
+        Ok(BookingResult::Booked(event, event_counters, payment_id))
+    } else {
+        Ok(BookingResult::WaitingList(
+            event,
+            event_counters,
+            payment_id,
+        ))
+    }
+}
+
+async fn insert_event_subscriber(
+    conn: &mut PgConnection,
+    booking: &EventBookingNew,
+) -> Result<i32> {
+    if let Some(id) = get_event_subscriber_id(conn, &booking).await? {
+        return Ok(id);
+    }
+
+    let id = query!(
+        r#"
+INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+VALUES($1, $2, $3, $4, $5, $6, $7)
+RETURNING id"#,
+        booking.first_name,
+        booking.last_name,
+        booking.street,
+        booking.city,
+        booking.email,
+        booking.phone,
+        booking.member
+    )
+    .map(|row| row.id)
+    .fetch_one(conn)
+    .await?;
+
+    Ok(id)
+}
+
+async fn get_event_subscriber_id(
+    conn: &mut PgConnection,
+    booking: &EventBookingNew,
+) -> Result<Option<i32>> {
+    let mut query_builder: QueryBuilder<Postgres> =
+        QueryBuilder::new("SELECT e.id FROM event_subscribers e WHERE ");
+
+    let mut separated = query_builder.separated(" AND ");
+
+    separated
+        .push("e.first_name = ")
+        .push_bind_unseparated(booking.first_name.clone());
+
+    separated
+        .push("e.last_name = ")
+        .push_bind_unseparated(booking.last_name.clone());
+
+    separated
+        .push("e.street = ")
+        .push_bind_unseparated(booking.street.clone());
+
+    separated
+        .push("e.city = ")
+        .push_bind_unseparated(booking.city.clone());
+
+    separated
+        .push("e.email = ")
+        .push_bind_unseparated(booking.email.clone());
+
+    separated.push("e.phone ");
+    match &booking.phone {
+        Some(phone) => separated
+            .push_unseparated(" = ")
+            .push_bind_unseparated(phone.clone()),
+        None => separated.push_unseparated(" IS NULL"),
+    };
+
+    separated.push("e.member ");
+    match booking.member {
+        Some(member) => separated
+            .push_unseparated(" = ")
+            .push_bind_unseparated(member),
+        None => separated.push_unseparated(" IS NULL"),
+    };
+
+    let id = query_builder
+        .build()
+        .map(|row| row.get("id"))
+        .fetch_optional(conn)
+        .await?;
+
+    Ok(id)
+}
+
 pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
     let subscriptions =
         query!(r#"SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"#)
@@ -655,19 +843,16 @@ struct CurrentSubscription {
     fitness: bool,
 }
 
-async fn get_current_subscription<'a, E>(
-    executor: E,
+async fn get_current_subscription(
+    conn: &mut PgConnection,
     email: &str,
-) -> Result<Option<CurrentSubscription>>
-where
-    E: Executor<'a, Database = Postgres>,
-{
+) -> Result<Option<CurrentSubscription>> {
     let current_subscription: Option<CurrentSubscription> = query_as!(
         CurrentSubscription,
         r#"SELECT s.id, s.general, s.events, s.fitness FROM news_subscribers s WHERE s.email = $1"#,
         email
     )
-    .fetch_optional(executor)
+    .fetch_optional(conn)
     .await?;
 
     Ok(current_subscription)

@@ -386,6 +386,23 @@
     },
     "query": "\nINSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)\nRETURNING id, created, closed, event_type AS \"event_type: EventType\", lifecycle_status AS \"lifecycle_status: LifecycleStatus\", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator"
   },
+  "6a879d2036b5885360d3b0e137afdba8677d4eee7d28a8d9d13ff097014812a2": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Bool",
+          "Bool",
+          "Int4",
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\nINSERT INTO public.event_bookings\n(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)\nVALUES($1, $2, $3, $4, $5, $6)"
+  },
   "80f5a6e6bf8c85c7b7965deefaf1147d7632dc416c298010616158d5c4526dc9": {
     "describe": {
       "columns": [
@@ -422,6 +439,24 @@
     },
     "query": "SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"
   },
+  "81f7618d9dbc4276c903be0b0beb9f10c29aef18167f2ec55dc371dcf13a703e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "nextval",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT nextval('payment_id')"
+  },
   "91092a9a0e93550a4397d9475bc61710916273a523de3a51b25e0d6dba6a86a4": {
     "describe": {
       "columns": [],
@@ -433,6 +468,50 @@
       }
     },
     "query": "DELETE FROM events e WHERE e.id = $1"
+  },
+  "92921a0fcc12176b4b0fca6aa9e34a7a434227fde8fbc18bdabdf127aa34c163": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "max_subscribers",
+          "ordinal": 1,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_waiting_list",
+          "ordinal": 2,
+          "type_info": "Int2"
+        },
+        {
+          "name": "subscribers",
+          "ordinal": 3,
+          "type_info": "Int8"
+        },
+        {
+          "name": "waiting_list",
+          "ordinal": 4,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n    v.id,\n    v.max_subscribers,\n    v.max_waiting_list,\n    v.subscribers,\n    v.waiting_list\nFROM\n    v_event_counters v\nWHERE\n    v.id = $1"
   },
   "ad2bfe8a554a6aeda43a01530b1b09b6396bcbbdedc45911dd265f609c69a4ff": {
     "describe": {
@@ -808,5 +887,31 @@
       }
     },
     "query": "\nSELECT\n    e.id,\n    e.created,\n    e.closed,\n    e.event_type AS \"event_type: EventType\",\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\",\n    e.name,\n    e.sort_index,\n    e.short_description,\n    e.description,\n    e.image,\n    e.light,\n    e.custom_date,\n    e.duration_in_minutes,\n    e.max_subscribers,\n    e.max_waiting_list,\n    e.cost_member,\n    e.cost_non_member,\n    e.location,\n    e.booking_template,\n    e.waiting_template,\n    e.alt_booking_button_text,\n    e.alt_email_address,\n    e.external_operator\nFROM\n    events e\nWHERE\n    e.id = $1"
+  },
+  "d50216fc4c99fdfcf588679281047007917ad0a13e1153e081e6a5d606f02371": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Text",
+          "Bool"
+        ]
+      }
+    },
+    "query": "\nINSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)\nVALUES($1, $2, $3, $4, $5, $6, $7)\nRETURNING id"
   }
 }
