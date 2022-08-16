@@ -1,5 +1,6 @@
 use crate::models::{
-    EventNew, EventType, LifecycleStatus, NewsSubscription, NewsTopic, PartialEventNew,
+    EventCounterNew, EventNew, EventType, LifecycleStatus, NewsSubscription,
+    NewsTopic, PartialEventNew,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -512,6 +513,44 @@ pub async fn delete_event(pool: &PgPool, id: i32) -> Result<()> {
     tx.commit().await?;
 
     Ok(())
+}
+
+pub async fn get_event_counters(
+    pool: &PgPool,
+    lifecycle_status: LifecycleStatus,
+) -> Result<Vec<EventCounterNew>> {
+    let event_counters = query!(
+        r#"
+SELECT
+    e.id,
+    v.max_subscribers,
+    v.max_waiting_list,
+    v.subscribers,
+    v.waiting_list
+FROM
+    events e,
+    v_event_counters v
+WHERE
+    e.id = v.id
+    AND e.lifecycle_status = $1"#,
+        lifecycle_status as LifecycleStatus
+    )
+    .map(|row| {
+        // unwrap is needed because view columns are always "nullable"
+        // try_into is needed to convert the i64 into a i16
+        // both unwraps can never fail
+        EventCounterNew::new(
+            row.id,
+            row.max_subscribers.unwrap(),
+            row.max_waiting_list.unwrap(),
+            row.subscribers.unwrap().try_into().unwrap(),
+            row.waiting_list.unwrap().try_into().unwrap(),
+        )
+    })
+    .fetch_all(pool)
+    .await?;
+
+    Ok(event_counters)
 }
 
 pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {

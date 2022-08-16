@@ -111,6 +111,63 @@
     },
     "query": "INSERT INTO event_dates (event_id, date) SELECT * FROM UNNEST ($1::int4[], $2::timestamptz[])"
   },
+  "46b6b5eb0969a6c3020f52cd5be128ea49595d89616d85ea4babc8acadab06ef": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "max_subscribers",
+          "ordinal": 1,
+          "type_info": "Int2"
+        },
+        {
+          "name": "max_waiting_list",
+          "ordinal": 2,
+          "type_info": "Int2"
+        },
+        {
+          "name": "subscribers",
+          "ordinal": 3,
+          "type_info": "Int8"
+        },
+        {
+          "name": "waiting_list",
+          "ordinal": 4,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          }
+        ]
+      }
+    },
+    "query": "\nSELECT\n    e.id,\n    v.max_subscribers,\n    v.max_waiting_list,\n    v.subscribers,\n    v.waiting_list\nFROM\n    events e,\n    v_event_counters v\nWHERE\n    e.id = v.id\n    AND e.lifecycle_status = $1"
+  },
   "53d4f2435d29a44e359e5aaef2fbd63896e7e05335a589d3cf9109cc0e2af7c3": {
     "describe": {
       "columns": [

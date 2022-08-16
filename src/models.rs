@@ -511,6 +511,34 @@ impl From<Event> for EventCounter {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EventCounterNew {
+    pub id: i32,
+    pub max_subscribers: i16,
+    pub max_waiting_list: i16,
+    pub subscribers: i16,
+    pub waiting_list: i16,
+}
+
+impl EventCounterNew {
+    pub fn new(
+        id: i32,
+        max_subscribers: i16,
+        max_waiting_list: i16,
+        subscribers: i16,
+        waiting_list: i16,
+    ) -> Self {
+        Self {
+            id,
+            max_subscribers,
+            max_waiting_list,
+            subscribers,
+            waiting_list,
+        }
+    }
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BookingResponse {
