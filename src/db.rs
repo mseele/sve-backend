@@ -5,8 +5,8 @@ use crate::models::{
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
 use sqlx::{
-    postgres::PgPoolOptions, query, query_as, query_builder::Separated, Executor, FromRow, PgPool,
-    Postgres, QueryBuilder, Row,
+    postgres::PgPoolOptions, query, query_as, query_builder::Separated, FromRow, PgConnection,
+    PgPool, Postgres, QueryBuilder, Row,
 };
 use std::collections::HashMap;
 
@@ -18,6 +18,8 @@ pub async fn init_pool() -> Result<PgPool> {
 }
 
 pub async fn get_events(pool: &PgPool) -> Result<Vec<EventNew>> {
+    let mut conn = pool.acquire().await?;
+
     let mut events: Vec<EventNew> = query!(
         r#"
 SELECT
@@ -80,15 +82,20 @@ ORDER BY
             row.external_operator,
         )
     })
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
-    fetch_dates(pool, &mut events).await?;
+    fetch_dates(&mut conn, &mut events).await?;
 
     Ok(events)
 }
 
 pub async fn get_event(pool: &PgPool, id: i32) -> Result<Option<EventNew>> {
+    let mut conn = pool.acquire().await?;
+    Ok(fetch_event(&mut conn, id).await?)
+}
+
+async fn fetch_event(conn: &mut PgConnection, id: i32) -> Result<Option<EventNew>> {
     let mut event: Option<EventNew> = query!(
         r#"
 SELECT
@@ -149,18 +156,18 @@ WHERE
             row.external_operator,
         )
     })
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
 
     if let Some(value) = event {
-        event = fetch_dates(pool, &mut vec![value]).await?.pop();
+        event = fetch_dates(&mut *conn, &mut vec![value]).await?.pop();
     }
 
     Ok(event)
 }
 
 async fn fetch_dates<'a>(
-    pool: &'a PgPool,
+    conn: &mut PgConnection,
     events: &'a mut Vec<EventNew>,
 ) -> Result<&'a mut Vec<EventNew>> {
     if events.is_empty() {
@@ -189,7 +196,7 @@ ORDER BY
     );
 
     let mut result = HashMap::new();
-    for row in query_builder.build().fetch_all(pool).await? {
+    for row in query_builder.build().fetch_all(conn).await? {
         let id: i32 = row.try_get("event_id")?;
         let date: DateTime<Utc> = row.try_get("date")?;
         result.entry(id).or_insert_with(|| Vec::new()).push(date);
@@ -451,32 +458,26 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     Ok(new_event)
 }
 
-async fn delete_event_dates<'a, E>(executor: E, event_id: i32) -> Result<()>
-where
-    E: Executor<'a, Database = Postgres>,
-{
+async fn delete_event_dates(conn: &mut PgConnection, event_id: i32) -> Result<()> {
     query!(r#"DELETE FROM event_dates WHERE event_id = $1"#, event_id)
-        .execute(executor)
+        .execute(conn)
         .await?;
 
     Ok(())
 }
 
-async fn insert_event_dates<'a, E>(
-    executor: E,
+async fn insert_event_dates(
+    conn: &mut PgConnection,
     event_id: i32,
     dates: Vec<DateTime<Utc>>,
-) -> Result<Vec<DateTime<Utc>>>
-where
-    E: Executor<'a, Database = Postgres>,
-{
+) -> Result<Vec<DateTime<Utc>>> {
     let ids = vec![event_id; dates.len()];
     query!(
         r#"INSERT INTO event_dates (event_id, date) SELECT * FROM UNNEST ($1::int4[], $2::timestamptz[])"#,
         &ids,
         &dates
     )
-    .execute(executor)
+    .execute(conn)
     .await?;
 
     Ok(dates)
@@ -519,6 +520,15 @@ pub async fn get_event_counters(
     pool: &PgPool,
     lifecycle_status: LifecycleStatus,
 ) -> Result<Vec<EventCounterNew>> {
+    let mut conn = pool.acquire().await?;
+
+    Ok(fetch_event_counters(&mut conn, lifecycle_status).await?)
+}
+
+async fn fetch_event_counters(
+    conn: &mut PgConnection,
+    lifecycle_status: LifecycleStatus,
+) -> Result<Vec<EventCounterNew>> {
     let event_counters = query!(
         r#"
 SELECT
@@ -547,7 +557,7 @@ WHERE
             row.waiting_list.unwrap().try_into().unwrap(),
         )
     })
-    .fetch_all(pool)
+    .fetch_all(conn)
     .await?;
 
     Ok(event_counters)
@@ -663,16 +673,13 @@ where
     Ok(current_subscription)
 }
 
-async fn update_subscription<'a, E>(
-    executor: E,
+async fn update_subscription(
+    conn: &mut PgConnection,
     id: i32,
     general: bool,
     events: bool,
     fitness: bool,
-) -> Result<()>
-where
-    E: Executor<'a, Database = Postgres>,
-{
+) -> Result<()> {
     query!(
         r#"UPDATE news_subscribers SET general = $2, events = $3, fitness = $4 WHERE id = $1"#,
         id,
@@ -680,7 +687,7 @@ where
         events,
         fitness
     )
-    .execute(executor)
+    .execute(conn)
     .await?;
 
     Ok(())
