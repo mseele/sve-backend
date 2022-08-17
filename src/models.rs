@@ -584,6 +584,14 @@ impl EventCounterNew {
             waiting_list,
         }
     }
+
+    pub fn is_booked_up(&self) -> bool {
+        if self.max_subscribers == -1 {
+            return false;
+        }
+        return self.subscribers >= self.max_subscribers
+            && self.waiting_list >= self.max_waiting_list;
+    }
 }
 
 #[derive(Serialize, Debug)]

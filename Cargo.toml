@@ -53,6 +53,7 @@ sqlx = { version = "0.6", features = [
   "bigdecimal",
   "offline",
 ] }
+itertools = "0.10"
 
 [dev-dependencies]
 pretty_assertions = "1.2"
