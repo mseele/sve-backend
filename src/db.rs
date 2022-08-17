@@ -25,7 +25,7 @@ pub async fn get_events(
 ) -> Result<Vec<EventNew>> {
     let mut conn = pool.acquire().await?;
 
-    let events_with_counters: Vec<(EventNew, EventCounterNew)> = match lifecycle_status {
+    let mut iter = match lifecycle_status {
         Some(lifecycle_status) => {
             query!(
                 r#"
@@ -186,10 +186,10 @@ ORDER BY
             .fetch_all(&mut *conn)
             .await?
         }
-    };
+    }
+    .into_iter();
 
     let mut events: Vec<EventNew>;
-    let mut iter = events_with_counters.into_iter();
     if sort {
         iter = iter.sorted_by(|(a, ca), (b, cb)| {
             let is_a_booked_up = ca.is_booked_up();
@@ -200,7 +200,7 @@ ORDER BY
             return is_a_booked_up.cmp(&is_b_booked_up);
         })
     }
-    events = iter.map(|(event, counter)| event).collect();
+    events = iter.map(|(event, _)| event).collect();
 
     fetch_dates(&mut conn, &mut events).await?;
 
