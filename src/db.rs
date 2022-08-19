@@ -419,9 +419,13 @@ async fn update_event(pool: &PgPool, id: i32, partial_event: PartialEventNew) ->
         insert_event_dates(&mut tx, id, dates).await?;
     }
 
+    let event = fetch_event(&mut tx, id)
+        .await?
+        .ok_or_else(|| anyhow!("Error fetching event with id '{}'", id))?;
+
     tx.commit().await?;
 
-    Ok(get_event(pool, id).await?.unwrap())
+    Ok(event)
 }
 
 fn push_bind<'gb, 'args, T>(
