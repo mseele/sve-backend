@@ -694,7 +694,6 @@ pub async fn book_event(
     pool: &PgPool,
     booking: EventBookingNew,
     pre_booking: bool,
-    lifecycle_status: LifecycleStatus,
 ) -> Result<BookingResult> {
     let mut tx = pool.begin().await?;
 
@@ -733,9 +732,9 @@ WHERE
     let result = if event_counter.max_subscribers == -1
         || event_counter.subscribers < event_counter.max_subscribers
     {
-        insert_booking(&mut tx, booking, true, pre_booking, lifecycle_status).await?
+        insert_booking(&mut tx, booking, true, pre_booking).await?
     } else if event_counter.waiting_list < event_counter.max_waiting_list {
-        insert_booking(&mut tx, booking, false, pre_booking, lifecycle_status).await?
+        insert_booking(&mut tx, booking, false, pre_booking).await?
     } else {
         BookingResult::BookedOut
     };
@@ -748,7 +747,6 @@ async fn insert_booking(
     booking: EventBookingNew,
     enrolled: bool,
     pre_booking: bool,
-    lifecycle_status: LifecycleStatus,
 ) -> Result<BookingResult> {
     let subscriber_id = insert_event_subscriber(conn, &booking).await?;
 
@@ -777,7 +775,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
     let event = fetch_event(&mut *conn, booking.event_id)
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", booking.event_id))?;
-    let event_counters = fetch_event_counters(&mut *conn, lifecycle_status).await?;
+    let event_counters = fetch_event_counters(&mut *conn, event.lifecycle_status).await?;
 
     if let true = enrolled {
         Ok(BookingResult::Booked(event, event_counters, payment_id))
