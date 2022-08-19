@@ -509,7 +509,7 @@ pub struct EventBookingNew {
 
 impl EventBookingNew {
     pub fn new(
-        event_id: EventId,
+        event_id: i32,
         first_name: String,
         last_name: String,
         street: String,
@@ -521,7 +521,7 @@ impl EventBookingNew {
         comments: Option<String>,
     ) -> Self {
         Self {
-            event_id,
+            event_id: event_id.into(),
             first_name,
             last_name,
             street,
