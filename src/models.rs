@@ -3,20 +3,95 @@ use base64::STANDARD;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use google_sheets4::api::ValueRange;
+use harsh::Harsh;
 use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt::{Debug, Display};
 use std::num::ParseFloatError;
+use std::ops::Deref;
 use std::str::from_utf8;
 use std::str::FromStr;
 
 base64_serde_type!(Base64Standard, STANDARD);
 
+fn harsh() -> Harsh {
+    return Harsh::builder()
+        .salt("#mehralseinverein")
+        .length(10)
+        .alphabet("abcdefghijklmnopqrstuvwxyz")
+        .build()
+        .unwrap();
+}
+
+/// Special i32 that is encoded / decoded to a short 
+/// unique id on json serialization / deserialization.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct EventId(i32);
+
+impl EventId {
+    pub fn get_ref(&self) -> &i32 {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> i32 {
+        self.0
+    }
+}
+
+impl Debug for EventId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
+}
+
+impl Display for EventId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl Deref for EventId {
+    type Target = i32;
+
+    fn deref(&self) -> &i32 {
+        &self.0
+    }
+}
+
+impl Serialize for EventId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: base64_serde::Serializer,
+    {
+        serializer.serialize_str(&harsh().encode(&[self.0 as u64]))
+    }
+}
+
+impl<'de> Deserialize<'de> for EventId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        return Ok(EventId(
+            harsh()
+                .decode(String::deserialize(deserializer)?)
+                .map_err(serde::de::Error::custom)?[0] as i32,
+        ));
+    }
+}
+
+impl From<i32> for EventId {
+    fn from(value: i32) -> Self {
+        EventId(value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventNew {
-    pub id: i32,
+    pub id: EventId,
     pub created: DateTime<Utc>,
     pub closed: Option<DateTime<Utc>>,
     #[serde(rename = "type")]
@@ -72,7 +147,7 @@ impl EventNew {
         external_operator: bool,
     ) -> Self {
         Self {
-            id,
+            id: id.into(),
             created,
             closed,
             event_type,
@@ -102,7 +177,7 @@ impl EventNew {
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct PartialEventNew {
-    pub id: Option<i32>,
+    pub id: Option<EventId>,
     pub closed: Option<DateTime<Utc>>,
     #[serde(rename = "type")]
     pub event_type: Option<EventType>,
@@ -420,7 +495,7 @@ pub enum LifecycleStatus {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EventBookingNew {
-    pub event_id: i32,
+    pub event_id: EventId,
     pub first_name: String,
     pub last_name: String,
     pub street: String,
@@ -434,7 +509,7 @@ pub struct EventBookingNew {
 
 impl EventBookingNew {
     pub fn new(
-        event_id: i32,
+        event_id: EventId,
         first_name: String,
         last_name: String,
         street: String,
@@ -561,7 +636,7 @@ impl From<Event> for EventCounter {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EventCounterNew {
-    pub id: i32,
+    pub id: EventId,
     pub max_subscribers: i16,
     pub max_waiting_list: i16,
     pub subscribers: i16,
@@ -577,7 +652,7 @@ impl EventCounterNew {
         waiting_list: i16,
     ) -> Self {
         Self {
-            id,
+            id: id.into(),
             max_subscribers,
             max_waiting_list,
             subscribers,

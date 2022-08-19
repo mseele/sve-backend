@@ -1,6 +1,6 @@
 use crate::models::{
-    EventBookingNew, EventCounterNew, EventNew, EventType, LifecycleStatus, NewsSubscription,
-    NewsTopic, PartialEventNew,
+    EventBookingNew, EventCounterNew, EventId, EventNew, EventType, LifecycleStatus,
+    NewsSubscription, NewsTopic, PartialEventNew,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -207,12 +207,12 @@ ORDER BY
     Ok(events)
 }
 
-pub async fn get_event(pool: &PgPool, id: i32) -> Result<Option<EventNew>> {
+pub async fn get_event(pool: &PgPool, id: EventId) -> Result<Option<EventNew>> {
     let mut conn = pool.acquire().await?;
-    Ok(fetch_event(&mut conn, id).await?)
+    Ok(fetch_event(&mut conn, &id).await?)
 }
 
-async fn fetch_event(conn: &mut PgConnection, id: i32) -> Result<Option<EventNew>> {
+async fn fetch_event(conn: &mut PgConnection, id: &EventId) -> Result<Option<EventNew>> {
     let mut event: Option<EventNew> = query!(
         r#"
 SELECT
@@ -243,7 +243,7 @@ FROM
     events e
 WHERE
     e.id = $1"#,
-        id
+        id.get_ref()
     )
     .map(|row| {
         EventNew::new(
@@ -303,7 +303,7 @@ WHERE
     );
     let mut separated = query_builder.separated(", ");
     for event in events.iter() {
-        separated.push_bind(event.id);
+        separated.push_bind(event.id.get_ref());
     }
     separated.push_unseparated(
         r#")
@@ -320,7 +320,7 @@ ORDER BY
     }
 
     for event in events.iter_mut() {
-        if let Some(dates) = result.remove(&event.id) {
+        if let Some(dates) = result.remove(&event.id.get_ref()) {
             event.dates = dates;
         }
     }
@@ -330,12 +330,16 @@ ORDER BY
 
 pub async fn write_event(pool: &PgPool, partial_event: PartialEventNew) -> Result<EventNew> {
     match partial_event.id {
-        Some(v) => update_event(pool, v, partial_event).await,
+        Some(id) => update_event(pool, &id, partial_event).await,
         None => save_new_event(pool, partial_event).await,
     }
 }
 
-async fn update_event(pool: &PgPool, id: i32, partial_event: PartialEventNew) -> Result<EventNew> {
+async fn update_event(
+    pool: &PgPool,
+    id: &EventId,
+    partial_event: PartialEventNew,
+) -> Result<EventNew> {
     let mut tx = pool.begin().await?;
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("UPDATE events SET ");
@@ -409,7 +413,7 @@ async fn update_event(pool: &PgPool, id: i32, partial_event: PartialEventNew) ->
 
     if update_is_needed {
         query_builder.push("WHERE id = ");
-        query_builder.push_bind(id);
+        query_builder.push_bind(id.get_ref());
 
         query_builder.build().execute(&mut tx).await?;
     }
@@ -542,7 +546,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     )
     .map(|row| {
         EventNew::new(
-            row.id,
+            row.id.into(),
             row.created,
             row.closed,
             row.event_type,
@@ -571,28 +575,31 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     .fetch_one(&mut tx)
     .await?;
 
-    delete_event_dates(&mut tx, new_event.id).await?;
-    new_event.dates = insert_event_dates(&mut tx, new_event.id, dates).await?;
+    delete_event_dates(&mut tx, &new_event.id).await?;
+    new_event.dates = insert_event_dates(&mut tx, &new_event.id, dates).await?;
 
     tx.commit().await?;
 
     Ok(new_event)
 }
 
-async fn delete_event_dates(conn: &mut PgConnection, event_id: i32) -> Result<()> {
-    query!(r#"DELETE FROM event_dates WHERE event_id = $1"#, event_id)
-        .execute(conn)
-        .await?;
+async fn delete_event_dates(conn: &mut PgConnection, event_id: &EventId) -> Result<()> {
+    query!(
+        r#"DELETE FROM event_dates WHERE event_id = $1"#,
+        event_id.get_ref()
+    )
+    .execute(conn)
+    .await?;
 
     Ok(())
 }
 
 async fn insert_event_dates(
     conn: &mut PgConnection,
-    event_id: i32,
+    event_id: &EventId,
     dates: Vec<DateTime<Utc>>,
 ) -> Result<Vec<DateTime<Utc>>> {
-    let ids = vec![event_id; dates.len()];
+    let ids = vec![event_id.into_inner(); dates.len()];
     query!(
         r#"INSERT INTO event_dates (event_id, date) SELECT * FROM UNNEST ($1::int4[], $2::timestamptz[])"#,
         &ids,
@@ -604,12 +611,12 @@ async fn insert_event_dates(
     Ok(dates)
 }
 
-pub async fn delete_event(pool: &PgPool, id: i32) -> Result<()> {
+pub async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     let lifecycle_status: Option<LifecycleStatus> = query!(
         r#"SELECT e.lifecycle_status AS "lifecycle_status: LifecycleStatus" FROM events e WHERE e.id = $1"#,
-        id
+        id.get_ref()
     )
     .map(|row| row.lifecycle_status)
     .fetch_optional(&mut tx)
@@ -626,9 +633,9 @@ pub async fn delete_event(pool: &PgPool, id: i32) -> Result<()> {
         )
     }
 
-    delete_event_dates(&mut tx, id).await?;
+    delete_event_dates(&mut tx, &id).await?;
 
-    query!(r#"DELETE FROM events e WHERE e.id = $1"#, id)
+    query!(r#"DELETE FROM events e WHERE e.id = $1"#, id.get_ref())
         .execute(&mut tx)
         .await?;
 
@@ -671,7 +678,7 @@ WHERE
         // try_into is needed to convert the i64 into a i16
         // both unwraps can never fail
         EventCounterNew::new(
-            row.id,
+            row.id.into(),
             row.max_subscribers.unwrap(),
             row.max_waiting_list.unwrap(),
             row.subscribers.unwrap().try_into().unwrap(),
@@ -692,7 +699,7 @@ pub enum BookingResult {
 
 pub async fn book_event(
     pool: &PgPool,
-    booking: EventBookingNew,
+    booking: &EventBookingNew,
     pre_booking: bool,
 ) -> Result<BookingResult> {
     let mut tx = pool.begin().await?;
@@ -709,7 +716,7 @@ FROM
     v_event_counters v
 WHERE
     v.id = $1"#,
-        booking.event_id
+        booking.event_id.get_ref(),
     )
     .map(|row| {
         // unwrap is needed because view columns are always "nullable"
@@ -744,11 +751,11 @@ WHERE
 
 async fn insert_booking(
     conn: &mut PgConnection,
-    booking: EventBookingNew,
+    booking: &EventBookingNew,
     enrolled: bool,
     pre_booking: bool,
 ) -> Result<BookingResult> {
-    let subscriber_id = insert_event_subscriber(conn, &booking).await?;
+    let subscriber_id = insert_event_subscriber(conn, booking).await?;
 
     let payment_id: Option<i64> = query_scalar!("SELECT nextval('payment_id')")
         .fetch_one(&mut *conn)
@@ -762,7 +769,7 @@ async fn insert_booking(
 INSERT INTO public.event_bookings
 (event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)
 VALUES($1, $2, $3, $4, $5, $6)"#,
-        booking.event_id,
+        booking.event_id.get_ref(),
         enrolled,
         pre_booking,
         subscriber_id,
@@ -772,7 +779,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
     .execute(&mut *conn)
     .await?;
 
-    let event = fetch_event(&mut *conn, booking.event_id)
+    let event = fetch_event(&mut *conn, &booking.event_id)
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", booking.event_id))?;
     let event_counters = fetch_event_counters(&mut *conn, event.lifecycle_status).await?;
