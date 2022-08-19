@@ -249,7 +249,6 @@ async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Eve
     if booking.updates.unwrap_or(false) == false {
         return Ok(());
     }
-    // TODO: try to get rid of clone
     let subscription =
         NewsSubscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
     super::news::subscribe_to_news(pool, subscription, false).await?;
