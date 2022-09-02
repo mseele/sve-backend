@@ -1,8 +1,7 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use base64::STANDARD;
 use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
-use google_sheets4::api::ValueRange;
 use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
@@ -81,7 +80,7 @@ impl From<i32> for EventId {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct EventNew {
+pub struct Event {
     pub id: EventId,
     pub created: DateTime<Utc>,
     pub closed: Option<DateTime<Utc>>,
@@ -110,7 +109,7 @@ pub struct EventNew {
     pub external_operator: bool,
 }
 
-impl EventNew {
+impl Event {
     pub fn new(
         id: i32,
         created: DateTime<Utc>,
@@ -174,7 +173,7 @@ impl EventNew {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
-pub struct PartialEventNew {
+pub struct PartialEvent {
     pub id: Option<EventId>,
     pub closed: Option<DateTime<Utc>>,
     #[serde(rename = "type")]
@@ -200,224 +199,6 @@ pub struct PartialEventNew {
     pub alt_booking_button_text: Option<String>,
     pub alt_email_address: Option<String>,
     pub external_operator: Option<bool>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Event {
-    pub id: String,
-    pub sheet_id: String,
-    pub gid: i64,
-    #[serde(rename = "type")]
-    pub event_type: EventType,
-    pub name: String,
-    pub sort_index: i64,
-    pub visible: bool,
-    pub beta: bool,
-    pub short_description: String,
-    pub description: String,
-    pub image: String,
-    pub light: bool,
-    pub dates: Vec<NaiveDateTime>,
-    pub custom_date: Option<String>,
-    pub duration_in_minutes: i64,
-    pub max_subscribers: i64,
-    pub subscribers: i64,
-    pub cost_member: f64,
-    pub cost_non_member: f64,
-    pub waiting_list: i64,
-    pub max_waiting_list: i64,
-    pub location: String,
-    pub booking_template: String,
-    pub waiting_template: String,
-    pub alt_booking_button_text: Option<String>,
-    pub alt_email_address: Option<String>,
-    pub external_operator: bool,
-}
-
-impl Event {
-    pub fn new(
-        id: String,
-        sheet_id: String,
-        gid: i64,
-        event_type: EventType,
-        name: String,
-        sort_index: i64,
-        visible: bool,
-        beta: bool,
-        short_description: String,
-        description: String,
-        image: String,
-        light: bool,
-        dates: Vec<NaiveDateTime>,
-        custom_date: Option<String>,
-        duration_in_minutes: i64,
-        max_subscribers: i64,
-        subscribers: i64,
-        cost_member: f64,
-        cost_non_member: f64,
-        waiting_list: i64,
-        max_waiting_list: i64,
-        location: String,
-        booking_template: String,
-        waiting_template: String,
-        alt_booking_button_text: Option<String>,
-        alt_email_address: Option<String>,
-        external_operator: bool,
-    ) -> Self {
-        Self {
-            id,
-            sheet_id,
-            gid,
-            event_type,
-            name,
-            sort_index,
-            visible,
-            beta,
-            short_description,
-            description,
-            image,
-            light,
-            dates,
-            custom_date,
-            duration_in_minutes,
-            max_subscribers,
-            subscribers,
-            cost_member,
-            cost_non_member,
-            waiting_list,
-            max_waiting_list,
-            location,
-            booking_template,
-            waiting_template,
-            alt_booking_button_text,
-            alt_email_address,
-            external_operator,
-        }
-    }
-
-    pub fn is_booked_up(&self) -> bool {
-        if self.max_subscribers == -1 {
-            return false;
-        }
-        return self.subscribers >= self.max_subscribers
-            && self.waiting_list >= self.max_waiting_list;
-    }
-}
-
-#[derive(Serialize, Deserialize, Default, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct PartialEvent {
-    pub id: String,
-    pub sheet_id: Option<String>,
-    pub gid: Option<i64>,
-    #[serde(rename = "type")]
-    pub event_type: Option<EventType>,
-    pub name: Option<String>,
-    pub sort_index: Option<i64>,
-    pub visible: Option<bool>,
-    pub beta: Option<bool>,
-    pub short_description: Option<String>,
-    pub description: Option<String>,
-    pub image: Option<String>,
-    pub light: Option<bool>,
-    pub dates: Option<Vec<NaiveDateTime>>,
-    pub custom_date: Option<String>,
-    pub duration_in_minutes: Option<i64>,
-    pub max_subscribers: Option<i64>,
-    pub subscribers: Option<i64>,
-    pub cost_member: Option<f64>,
-    pub cost_non_member: Option<f64>,
-    pub waiting_list: Option<i64>,
-    pub max_waiting_list: Option<i64>,
-    pub location: Option<String>,
-    pub booking_template: Option<String>,
-    pub waiting_template: Option<String>,
-    pub alt_booking_button_text: Option<String>,
-    pub alt_email_address: Option<String>,
-    pub external_operator: Option<bool>,
-}
-
-impl TryFrom<PartialEvent> for Event {
-    type Error = anyhow::Error;
-
-    fn try_from(value: PartialEvent) -> Result<Self, Self::Error> {
-        return Ok(Event::new(
-            value.id,
-            value
-                .sheet_id
-                .ok_or_else(|| anyhow!("Attribute 'sheet_id' is missing"))?,
-            value
-                .gid
-                .ok_or_else(|| anyhow!("Attribute 'gid' is missing"))?,
-            value
-                .event_type
-                .ok_or_else(|| anyhow!("Attribute 'event_type' is missing"))?,
-            value
-                .name
-                .ok_or_else(|| anyhow!("Attribute 'name' is missing"))?,
-            value
-                .sort_index
-                .ok_or_else(|| anyhow!("Attribute 'sort_index' is missing"))?,
-            value
-                .visible
-                .ok_or_else(|| anyhow!("Attribute 'visible' is missing"))?,
-            value
-                .beta
-                .ok_or_else(|| anyhow!("Attribute 'beta' is missing"))?,
-            value
-                .short_description
-                .ok_or_else(|| anyhow!("Attribute 'short_description' is missing"))?,
-            value
-                .description
-                .ok_or_else(|| anyhow!("Attribute 'description' is missing"))?,
-            value
-                .image
-                .ok_or_else(|| anyhow!("Attribute 'image' is missing"))?,
-            value
-                .light
-                .ok_or_else(|| anyhow!("Attribute 'light' is missing"))?,
-            value
-                .dates
-                .ok_or_else(|| anyhow!("Attribute 'dates' is missing"))?,
-            value.custom_date,
-            value
-                .duration_in_minutes
-                .ok_or_else(|| anyhow!("Attribute 'duration_in_minutes' is missing"))?,
-            value
-                .max_subscribers
-                .ok_or_else(|| anyhow!("Attribute 'max_subscribers' is missing"))?,
-            value
-                .subscribers
-                .ok_or_else(|| anyhow!("Attribute 'subscribers' is missing"))?,
-            value
-                .cost_member
-                .ok_or_else(|| anyhow!("Attribute 'cost_member' is missing"))?,
-            value
-                .cost_non_member
-                .ok_or_else(|| anyhow!("Attribute 'cost_non_member' is missing"))?,
-            value
-                .waiting_list
-                .ok_or_else(|| anyhow!("Attribute 'waiting_list' is missing"))?,
-            value
-                .max_waiting_list
-                .ok_or_else(|| anyhow!("Attribute 'max_waiting_list' is missing"))?,
-            value
-                .location
-                .ok_or_else(|| anyhow!("Attribute 'location' is missing"))?,
-            value
-                .booking_template
-                .ok_or_else(|| anyhow!("Attribute 'booking_template' is missing"))?,
-            value
-                .waiting_template
-                .ok_or_else(|| anyhow!("Attribute 'waiting_template' is missing"))?,
-            value.alt_booking_button_text,
-            value.alt_email_address,
-            value
-                .external_operator
-                .ok_or_else(|| anyhow!("Attribute 'external_operator' is missing"))?,
-        ));
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
@@ -492,7 +273,7 @@ pub enum LifecycleStatus {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct EventBookingNew {
+pub struct EventBooking {
     pub event_id: EventId,
     pub first_name: String,
     pub last_name: String,
@@ -505,7 +286,7 @@ pub struct EventBookingNew {
     pub comments: Option<String>,
 }
 
-impl EventBookingNew {
+impl EventBooking {
     pub fn new(
         event_id: i32,
         first_name: String,
@@ -536,108 +317,14 @@ impl EventBookingNew {
         self.member.unwrap_or(false)
     }
 
-    pub fn cost<'a>(&'a self, event: &'a EventNew) -> &BigDecimal {
+    pub fn cost<'a>(&'a self, event: &'a Event) -> &BigDecimal {
         event.cost(self.is_member())
-    }
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct EventBooking {
-    pub event_id: String,
-    pub first_name: String,
-    pub last_name: String,
-    pub street: String,
-    pub city: String,
-    pub email: String,
-    pub phone: Option<String>,
-    pub member: Option<bool>,
-    pub updates: Option<bool>,
-    pub comments: Option<String>,
-}
-
-impl EventBooking {
-    pub fn new(
-        event_id: String,
-        first_name: String,
-        last_name: String,
-        street: String,
-        city: String,
-        email: String,
-        phone: Option<String>,
-        member: Option<bool>,
-        updates: Option<bool>,
-        comments: Option<String>,
-    ) -> Self {
-        Self {
-            event_id,
-            first_name,
-            last_name,
-            street,
-            city,
-            email,
-            phone,
-            member,
-            updates,
-            comments,
-        }
-    }
-
-    pub fn is_member(&self) -> bool {
-        self.member.unwrap_or(false)
-    }
-
-    pub fn cost(&self, event: &Event) -> f64 {
-        match self.is_member() {
-            true => event.cost_member,
-            false => event.cost_non_member,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct EventCounter {
-    pub id: String,
-    pub max_subscribers: i64,
-    pub subscribers: i64,
-    pub waiting_list: i64,
-    pub max_waiting_list: i64,
-}
-
-impl EventCounter {
-    pub fn new(
-        id: String,
-        max_subscribers: i64,
-        subscribers: i64,
-        waiting_list: i64,
-        max_waiting_list: i64,
-    ) -> Self {
-        Self {
-            id,
-            max_subscribers,
-            subscribers,
-            waiting_list,
-            max_waiting_list,
-        }
-    }
-}
-
-impl From<Event> for EventCounter {
-    fn from(event: Event) -> Self {
-        EventCounter::new(
-            event.id,
-            event.max_subscribers,
-            event.subscribers,
-            event.waiting_list,
-            event.max_waiting_list,
-        )
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct EventCounterNew {
+pub struct EventCounter {
     pub id: EventId,
     pub max_subscribers: i16,
     pub max_waiting_list: i16,
@@ -645,7 +332,7 @@ pub struct EventCounterNew {
     pub waiting_list: i16,
 }
 
-impl EventCounterNew {
+impl EventCounter {
     pub fn new(
         id: i32,
         max_subscribers: i16,
@@ -676,11 +363,11 @@ impl EventCounterNew {
 pub struct BookingResponse {
     success: bool,
     message: String,
-    counter: Vec<EventCounterNew>,
+    counter: Vec<EventCounter>,
 }
 
 impl BookingResponse {
-    pub fn success(message: &str, counter: Vec<EventCounterNew>) -> Self {
+    pub fn success(message: &str, counter: Vec<EventCounter>) -> Self {
         Self {
             success: true,
             message: message.into(),
@@ -902,7 +589,7 @@ impl From<MessageType> for EmailType {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct VerifyPaymentBookingRecordNew {
+pub struct VerifyPaymentBookingRecord {
     pub booking_id: i32,
     event_name: String,
     pub full_name: String,
@@ -913,7 +600,7 @@ pub struct VerifyPaymentBookingRecordNew {
     pub payed: Option<DateTime<Utc>>,
 }
 
-impl VerifyPaymentBookingRecordNew {
+impl VerifyPaymentBookingRecord {
     pub fn new(
         booking_id: i32,
         event_name: String,
@@ -924,7 +611,7 @@ impl VerifyPaymentBookingRecordNew {
         enrolled: bool,
         payed: Option<DateTime<Utc>>,
     ) -> Self {
-        VerifyPaymentBookingRecordNew {
+        VerifyPaymentBookingRecord {
             booking_id,
             event_name,
             full_name,
@@ -933,41 +620,6 @@ impl VerifyPaymentBookingRecordNew {
             canceled,
             enrolled,
             payed,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct VerifyPaymentBookingRecord {
-    sheet_title: String,
-    update_cell: String,
-    pub cost: BigDecimal,
-    pub booking_number: String,
-    pub payed_already: bool,
-}
-
-impl VerifyPaymentBookingRecord {
-    pub fn new(
-        sheet_title: String,
-        update_cell: String,
-        cost: BigDecimal,
-        booking_number: String,
-        payed_already: bool,
-    ) -> Self {
-        VerifyPaymentBookingRecord {
-            sheet_title,
-            update_cell,
-            cost,
-            booking_number,
-            payed_already,
-        }
-    }
-
-    pub fn into_value_range(self) -> ValueRange {
-        ValueRange {
-            values: Some(vec![vec![String::from("J")]]),
-            range: Some(format!("'{}'!{}", self.sheet_title, self.update_cell)),
-            ..Default::default()
         }
     }
 }
@@ -1035,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_cost() {
-        let member = EventBookingNew::new(
+        let member = EventBooking::new(
             0,
             String::from("first_name"),
             String::from("last_name"),
@@ -1047,7 +699,7 @@ mod tests {
             None,
             None,
         );
-        let no_member = EventBookingNew::new(
+        let no_member = EventBooking::new(
             0,
             String::from("first_name"),
             String::from("last_name"),
@@ -1077,8 +729,8 @@ mod tests {
         assert_eq!(cost.to_euro(), "9,99 €");
     }
 
-    fn new_event(cost_member: &str, cost_non_member: &str) -> EventNew {
-        EventNew::new(
+    fn new_event(cost_member: &str, cost_non_member: &str) -> Event {
+        Event::new(
             0,
             Utc::now(),
             None,

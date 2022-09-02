@@ -1,6 +1,6 @@
 use crate::models::{
-    EventBookingNew, EventCounterNew, EventId, EventNew, EventType, LifecycleStatus,
-    NewsSubscription, NewsTopic, PartialEventNew, VerifyPaymentBookingRecordNew,
+    Event, EventBooking, EventCounter, EventId, EventType, LifecycleStatus, NewsSubscription,
+    NewsTopic, PartialEvent, VerifyPaymentBookingRecord,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -22,7 +22,7 @@ pub async fn get_events(
     pool: &PgPool,
     sort: bool,
     lifecycle_status: Option<LifecycleStatus>,
-) -> Result<Vec<EventNew>> {
+) -> Result<Vec<Event>> {
     let mut conn = pool.acquire().await?;
 
     let mut iter = match lifecycle_status {
@@ -68,7 +68,7 @@ ORDER BY
             )
             .map(|row| {
                 (
-                    EventNew::new(
+                    Event::new(
                         row.id,
                         row.created,
                         row.closed,
@@ -95,7 +95,7 @@ ORDER BY
                         row.external_operator,
                     ),
                     // try_into is needed to convert the i64 into a i16
-                    EventCounterNew::new(
+                    EventCounter::new(
                         row.id,
                         row.max_subscribers,
                         row.max_waiting_list,
@@ -147,7 +147,7 @@ ORDER BY
             )
             .map(|row| {
                 (
-                    EventNew::new(
+                    Event::new(
                         row.id,
                         row.created,
                         row.closed,
@@ -174,7 +174,7 @@ ORDER BY
                         row.external_operator,
                     ),
                     // try_into is needed to convert the i64 into a i16
-                    EventCounterNew::new(
+                    EventCounter::new(
                         row.id,
                         row.max_subscribers,
                         row.max_waiting_list,
@@ -189,7 +189,7 @@ ORDER BY
     }
     .into_iter();
 
-    let mut events: Vec<EventNew>;
+    let mut events: Vec<Event>;
     if sort {
         iter = iter.sorted_by(|(a, ca), (b, cb)| {
             let is_a_booked_up = ca.is_booked_up();
@@ -207,13 +207,13 @@ ORDER BY
     Ok(events)
 }
 
-pub async fn get_event(pool: &PgPool, id: EventId) -> Result<Option<EventNew>> {
+pub async fn get_event(pool: &PgPool, id: EventId) -> Result<Option<Event>> {
     let mut conn = pool.acquire().await?;
     Ok(fetch_event(&mut conn, &id).await?)
 }
 
-async fn fetch_event(conn: &mut PgConnection, id: &EventId) -> Result<Option<EventNew>> {
-    let mut event: Option<EventNew> = query!(
+async fn fetch_event(conn: &mut PgConnection, id: &EventId) -> Result<Option<Event>> {
+    let mut event: Option<Event> = query!(
         r#"
 SELECT
     e.id,
@@ -246,7 +246,7 @@ WHERE
         id.get_ref()
     )
     .map(|row| {
-        EventNew::new(
+        Event::new(
             row.id,
             row.created,
             row.closed,
@@ -285,8 +285,8 @@ WHERE
 
 async fn fetch_dates<'a>(
     conn: &mut PgConnection,
-    events: &'a mut Vec<EventNew>,
-) -> Result<&'a mut Vec<EventNew>> {
+    events: &'a mut Vec<Event>,
+) -> Result<&'a mut Vec<Event>> {
     if events.is_empty() {
         return Ok(events);
     }
@@ -328,18 +328,14 @@ ORDER BY
     Ok(events)
 }
 
-pub async fn write_event(pool: &PgPool, partial_event: PartialEventNew) -> Result<EventNew> {
+pub async fn write_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
     match partial_event.id {
         Some(id) => update_event(pool, &id, partial_event).await,
         None => save_new_event(pool, partial_event).await,
     }
 }
 
-async fn update_event(
-    pool: &PgPool,
-    id: &EventId,
-    partial_event: PartialEventNew,
-) -> Result<EventNew> {
+async fn update_event(pool: &PgPool, id: &EventId, partial_event: PartialEvent) -> Result<Event> {
     let mut tx = pool.begin().await?;
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("UPDATE events SET ");
@@ -452,7 +448,7 @@ where
     }
 }
 
-async fn save_new_event(pool: &PgPool, partial_event: PartialEventNew) -> Result<EventNew> {
+async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
     let closed = partial_event.closed;
     let event_type = partial_event
         .event_type
@@ -517,7 +513,7 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEventNew) -> Result
 
     let mut tx = pool.begin().await?;
 
-    let mut new_event: EventNew = query!(
+    let mut new_event: Event = query!(
         r#"
 INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
@@ -545,7 +541,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
         external_operator
     )
     .map(|row| {
-        EventNew::new(
+        Event::new(
             row.id.into(),
             row.created,
             row.closed,
@@ -647,7 +643,7 @@ pub async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
 pub async fn get_bookings_to_verify_payment(
     pool: &PgPool,
     payment_ids: HashSet<&String>,
-) -> Result<Vec<VerifyPaymentBookingRecordNew>> {
+) -> Result<Vec<VerifyPaymentBookingRecord>> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
@@ -683,7 +679,7 @@ ORDER BY
     let result = query_builder
         .build()
         .map(|row| {
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 row.get("id"),
                 row.get("event_name"),
                 row.get("full_name"),
@@ -729,7 +725,7 @@ WHERE
 pub async fn get_event_counters(
     pool: &PgPool,
     lifecycle_status: LifecycleStatus,
-) -> Result<Vec<EventCounterNew>> {
+) -> Result<Vec<EventCounter>> {
     let mut conn = pool.acquire().await?;
 
     Ok(fetch_event_counters(&mut conn, lifecycle_status).await?)
@@ -738,7 +734,7 @@ pub async fn get_event_counters(
 async fn fetch_event_counters(
     conn: &mut PgConnection,
     lifecycle_status: LifecycleStatus,
-) -> Result<Vec<EventCounterNew>> {
+) -> Result<Vec<EventCounter>> {
     let event_counters = query!(
         r#"
 SELECT
@@ -759,7 +755,7 @@ WHERE
         // unwrap is needed because view columns are always "nullable"
         // try_into is needed to convert the i64 into a i16
         // both unwraps can never fail
-        EventCounterNew::new(
+        EventCounter::new(
             row.id.into(),
             row.max_subscribers.unwrap(),
             row.max_waiting_list.unwrap(),
@@ -774,8 +770,8 @@ WHERE
 }
 
 pub enum BookingResult {
-    Booked(EventNew, Vec<EventCounterNew>, String),
-    WaitingList(EventNew, Vec<EventCounterNew>, String),
+    Booked(Event, Vec<EventCounter>, String),
+    WaitingList(Event, Vec<EventCounter>, String),
     DuplicateBooking,
     BookedOut,
 }
@@ -794,7 +790,7 @@ impl EventSubscriberId {
     }
 }
 
-pub async fn book_event(pool: &PgPool, booking: &EventBookingNew) -> Result<BookingResult> {
+pub async fn book_event(pool: &PgPool, booking: &EventBooking) -> Result<BookingResult> {
     let mut tx = pool.begin().await?;
 
     let result = match calc_enroll_status(&mut tx, &booking.event_id).await? {
@@ -811,7 +807,7 @@ pub async fn pre_book_event(
     pool: &PgPool,
     event_id: EventId,
     subscriber_id: i32,
-) -> Result<(BookingResult, Option<EventBookingNew>)> {
+) -> Result<(BookingResult, Option<EventBooking>)> {
     let mut tx = pool.begin().await?;
 
     let result = match calc_enroll_status(&mut tx, &event_id).await? {
@@ -843,7 +839,7 @@ WHERE
                 event_id.get_ref()
             )
             .map(|row| {
-                EventBookingNew::new(
+                EventBooking::new(
                     event_id.into_inner(),
                     row.first_name,
                     row.last_name,
@@ -888,7 +884,7 @@ WHERE
         // unwrap is needed because view columns are always "nullable"
         // try_into is needed to convert the i64 into a i16
         // both unwraps can never fail
-        EventCounterNew::new(
+        EventCounter::new(
             row.id.unwrap(),
             row.max_subscribers.unwrap(),
             row.max_waiting_list.unwrap(),
@@ -916,7 +912,7 @@ WHERE
 
 async fn process_booking(
     conn: &mut PgConnection,
-    booking: &EventBookingNew,
+    booking: &EventBooking,
     enrolled: bool,
     pre_booking: bool,
 ) -> Result<BookingResult> {
@@ -1009,7 +1005,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
 
 async fn insert_event_subscriber(
     conn: &mut PgConnection,
-    booking: &EventBookingNew,
+    booking: &EventBooking,
 ) -> Result<EventSubscriberId> {
     if let Some(id) = get_event_subscriber_id(conn, &booking).await? {
         return Ok(EventSubscriberId::Existing(id));
@@ -1037,7 +1033,7 @@ RETURNING id"#,
 
 async fn get_event_subscriber_id(
     conn: &mut PgConnection,
-    booking: &EventBookingNew,
+    booking: &EventBooking,
 ) -> Result<Option<i32>> {
     let mut query_builder: QueryBuilder<Postgres> =
         QueryBuilder::new("SELECT e.id FROM event_subscribers e WHERE ");

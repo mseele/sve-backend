@@ -33,10 +33,6 @@ base64 = "0.13"
 base64-serde = "0.6"
 chrono = { version = "0.4", features = ["serde", "unstable-locales"] }
 chrono-tz = { version = "0.6" }
-googapis = { version = "0.6", features = ["google-firestore-v1"] }
-gouth = { version = "0.2" }
-tonic = { version = "0.6", features = ["tls"] }
-google-sheets4 = "3.1"
 google-calendar3 = "3.1"
 yup-oauth2 = "6.6"
 hyper = "0.14"

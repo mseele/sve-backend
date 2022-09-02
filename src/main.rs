@@ -7,8 +7,6 @@ mod db;
 mod email;
 mod logic;
 mod models;
-mod sheets;
-mod store;
 mod hashids {
     use harsh::{Error, Harsh};
 

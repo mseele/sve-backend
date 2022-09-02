@@ -1,6 +1,6 @@
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{
-    ContactMessage, EventBookingNew, EventId, MassEmails, NewsSubscription, PartialEventNew,
+    ContactMessage, EventBooking, EventId, MassEmails, NewsSubscription, PartialEvent,
 };
 use actix_web::http::header::ContentType;
 use actix_web::web::{Data, Json};
@@ -155,7 +155,7 @@ async fn counter(
 
 async fn booking(
     pool: Data<PgPool>,
-    Json(booking): Json<EventBookingNew>,
+    Json(booking): Json<EventBooking>,
 ) -> Result<impl Responder, ResponseError> {
     let response = events::booking(&pool, booking).await;
     Ok(Json(response))
@@ -171,7 +171,7 @@ async fn prebooking(
 
 async fn update(
     pool: Data<PgPool>,
-    Json(partial_event): Json<PartialEventNew>,
+    Json(partial_event): Json<PartialEvent>,
 ) -> Result<impl Responder, ResponseError> {
     let event = events::update(&pool, partial_event).await?;
     Ok(Json(event))

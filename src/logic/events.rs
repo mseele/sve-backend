@@ -2,11 +2,9 @@ use super::csv::PaymentRecord;
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
-    BookingResponse, EventType, LifecycleStatus, NewsSubscription, PartialEventNew, ToEuro,
-    VerifyPaymentBookingRecordNew, VerifyPaymentResult,
+    BookingResponse, Event, EventBooking, EventCounter, EventId, EventType, LifecycleStatus,
+    NewsSubscription, PartialEvent, ToEuro, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
-use crate::models::{EventBookingNew, EventId};
-use crate::models::{EventCounterNew, EventNew};
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Duration, Locale, NaiveDate, Utc};
@@ -21,15 +19,15 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
 
-pub async fn get_events(pool: &PgPool, beta: Option<bool>) -> Result<Vec<EventNew>> {
+pub async fn get_events(pool: &PgPool, beta: Option<bool>) -> Result<Vec<Event>> {
     Ok(db::get_events(pool, true, into_opt_lifecycle_status(beta)).await?)
 }
 
-pub async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounterNew>> {
+pub async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {
     Ok(db::get_event_counters(pool, into_lifecycle_status(beta)).await?)
 }
 
-pub async fn booking(pool: &PgPool, booking: EventBookingNew) -> BookingResponse {
+pub async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
     match book_event(pool, booking).await {
         Ok(response) => response,
         Err(e) => {
@@ -49,7 +47,7 @@ pub async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
     }
 }
 
-pub async fn update(pool: &PgPool, partial_event: PartialEventNew) -> Result<EventNew> {
+pub async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
     Ok(db::write_event(pool, partial_event).await?)
 }
 
@@ -100,7 +98,7 @@ fn into_opt_lifecycle_status(beta: Option<bool>) -> Option<LifecycleStatus> {
     }
 }
 
-async fn book_event(pool: &PgPool, booking: EventBookingNew) -> Result<BookingResponse> {
+async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingResponse> {
     let booking_result = db::book_event(pool, &booking).await?;
     let booking_response = match booking_result {
         BookingResult::Booked(event, counter, booking_number) => {
@@ -187,9 +185,9 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
 
 async fn process_booking(
     pool: &PgPool,
-    booking: &EventBookingNew,
-    event: EventNew,
-    counter: Vec<EventCounterNew>,
+    booking: &EventBooking,
+    event: Event,
+    counter: Vec<EventCounter>,
     booked: bool,
     booking_number: String,
 ) -> Result<BookingResponse> {
@@ -205,11 +203,7 @@ async fn process_booking(
     Ok(BookingResponse::success(message, counter))
 }
 
-async fn subscribe_to_updates(
-    pool: &PgPool,
-    booking: &EventBookingNew,
-    event: &EventNew,
-) -> Result<()> {
+async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Event) -> Result<()> {
     // only subscribe to updates if updates field is true
     if booking.updates.unwrap_or(false) == false {
         return Ok(());
@@ -222,8 +216,8 @@ async fn subscribe_to_updates(
 }
 
 async fn send_mail(
-    booking: &EventBookingNew,
-    event: &EventNew,
+    booking: &EventBooking,
+    event: &Event,
     booked: bool,
     booking_number: String,
 ) -> Result<()> {
@@ -270,8 +264,8 @@ async fn send_mail(
 
 fn create_body(
     template: &str,
-    booking: &EventBookingNew,
-    event: &EventNew,
+    booking: &EventBooking,
+    event: &Event,
     booking_number: Option<&String>,
 ) -> String {
     let mut body = template
@@ -304,7 +298,7 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
     body
 }
 
-fn format_dates(event: &EventNew) -> String {
+fn format_dates(event: &Event) -> String {
     event
         .dates
         .iter()
@@ -316,7 +310,7 @@ fn format_dates(event: &EventNew) -> String {
         .join("\n")
 }
 
-fn replace_payday(body: String, event: &EventNew) -> String {
+fn replace_payday(body: String, event: &Event) -> String {
     if let Some(first_date) = event.dates.first() {
         let mut payday_replace_str = "${payday}";
         let mut days = 14;
@@ -367,7 +361,7 @@ fn read_payment_records(
 
 fn compare_payment_records_with_bookings(
     payment_records: &Vec<PaymentRecord>,
-    bookings: &mut Vec<VerifyPaymentBookingRecordNew>,
+    bookings: &mut Vec<VerifyPaymentBookingRecord>,
 ) -> Result<(HashMap<i32, String>, Vec<VerifyPaymentResult>)> {
     let mut verified_payment_bookings = Vec::new();
     let mut verified_ibans = HashMap::new();
@@ -517,7 +511,7 @@ mod tests {
 
     #[test]
     fn test_create_body() {
-        let booking_member = EventBookingNew::new(
+        let booking_member = EventBooking::new(
             0,
             String::from("Max"),
             String::from("Mustermann"),
@@ -529,7 +523,7 @@ mod tests {
             None,
             None,
         );
-        let booking_non_member = EventBookingNew::new(
+        let booking_non_member = EventBooking::new(
             0,
             String::from("Max"),
             String::from("Mustermann"),
@@ -541,7 +535,7 @@ mod tests {
             None,
             None,
         );
-        let event = EventNew::new(
+        let event = Event::new(
             0,
             Utc::now(),
             None,
@@ -690,7 +684,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
 ";
         let mut bookings = vec![
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 1,
                 "Test-Kurs".into(),
                 "Max Mustermann".into(),
@@ -700,7 +694,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 None,
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 2,
                 "Test-Kurs".into(),
                 "Erika Mustermann".into(),
@@ -710,7 +704,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 None,
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 3,
                 "Test-Kurs".into(),
                 "Lieschen Müller".into(),
@@ -720,7 +714,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 Some(Utc::now()),
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 4,
                 "Test-Kurs".into(),
                 "Otto Normalverbraucher".into(),
@@ -761,7 +755,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
 ";
 
         let mut bookings = vec![
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 1,
                 "Test-Kurs".into(),
                 "Max Mustermann".into(),
@@ -771,7 +765,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                 true,
                 None,
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 2,
                 "Test-Kurs".into(),
                 "Erika Mustermann".into(),
@@ -781,7 +775,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                 true,
                 None,
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 3,
                 "Test-Kurs".into(),
                 "Lieschen Müller".into(),
@@ -791,7 +785,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                 true,
                 Some(Utc::now()),
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 4,
                 "Test-Kurs".into(),
                 "Otto Normalverbraucher".into(),
@@ -845,7 +839,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
 ";
         let mut bookings = vec![
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 1,
                 "Test-Kurs".into(),
                 "Max Mustermann".into(),
@@ -855,7 +849,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 None,
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 2,
                 "Test-Kurs".into(),
                 "Erika Mustermann".into(),
@@ -865,7 +859,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 None,
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 3,
                 "Test-Kurs".into(),
                 "Lieschen Müller".into(),
@@ -875,7 +869,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 Some(Utc::now()),
             ),
-            VerifyPaymentBookingRecordNew::new(
+            VerifyPaymentBookingRecord::new(
                 4,
                 "Test-Kurs".into(),
                 "Otto Normalverbraucher".into(),
@@ -915,7 +909,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
     fn compare_csv_with_bookings(
         csv: &str,
         csv_start_date: Option<NaiveDate>,
-        bookings: &mut Vec<VerifyPaymentBookingRecordNew>,
+        bookings: &mut Vec<VerifyPaymentBookingRecord>,
     ) -> (HashMap<i32, String>, Vec<VerifyPaymentResult>) {
         let payment_records = read_payment_records(&csv, csv_start_date).unwrap();
         compare_payment_records_with_bookings(&payment_records, bookings).unwrap()
@@ -927,8 +921,8 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
             .to_string()
     }
 
-    fn new_event(dates: Vec<DateTime<Utc>>) -> EventNew {
-        EventNew::new(
+    fn new_event(dates: Vec<DateTime<Utc>>) -> Event {
+        Event::new(
             0,
             Utc::now(),
             None,
