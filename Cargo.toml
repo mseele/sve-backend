@@ -43,6 +43,7 @@ hyper = "0.14"
 hyper-rustls = "0.23"
 lettre = { version = "0.10.0-rc.6", features = ["tokio1-native-tls"] }
 regex = "1.5"
+lazy_static = "1.4.0"
 csv = "1.1"
 encoding = "0.2"
 bigdecimal = { version = "0.3", features = ["serde"] }

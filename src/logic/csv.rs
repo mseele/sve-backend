@@ -1,7 +1,11 @@
 use crate::models::FromEuro;
 use anyhow::{anyhow, bail, Result};
+use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::Deserialize;
+use std::{collections::HashSet, ops::Neg};
 
 pub fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
     let readers: Vec<Box<dyn CSVReader>> = vec![
@@ -21,7 +25,8 @@ pub struct PaymentRecord {
     pub payee: String,
     pub payee_iban: String,
     pub purpose: String,
-    pub volumne: f64,
+    pub volumne: BigDecimal,
+    pub payment_ids: HashSet<String>,
 }
 
 impl PaymentRecord {
@@ -30,14 +35,24 @@ impl PaymentRecord {
         payee: String,
         payee_iban: String,
         purpose: String,
-        volumne: f64,
+        volumne: BigDecimal,
     ) -> Self {
+        // extract the payment id's
+        lazy_static! {
+            static ref PAYMENT_ID_PATTERN: Regex = Regex::new(r"\d{2}-\d{4}").unwrap();
+        }
+        let payment_ids = PAYMENT_ID_PATTERN
+            .find_iter(&purpose)
+            .map(|mat| mat.as_str().into())
+            .collect();
+
         Self {
             date,
             payee,
             payee_iban,
             purpose,
             volumne,
+            payment_ids,
         }
     }
 }
@@ -82,7 +97,7 @@ struct VobaRichPaymentRecord {
     #[serde(rename = "Währung")]
     _currency: String,
     #[serde(rename = "Umsatz", deserialize_with = "deserialize_float_with_comma")]
-    volumne: f64,
+    volumne: BigDecimal,
     #[serde(rename = "Soll/Haben")]
     debit_credit: String,
 }
@@ -95,16 +110,16 @@ impl From<VobaRichPaymentRecord> for PaymentRecord {
             record.payee,
             record.payee_iban,
             record.purpose,
-            volumne,
+            volumne.to_owned(),
         )
     }
 }
 
 impl VobaRichPaymentRecord {
-    fn volumne(&self) -> f64 {
+    fn volumne(&self) -> BigDecimal {
         match self.debit_credit.as_str() {
-            "H" => self.volumne,
-            _ => -self.volumne,
+            "H" => self.volumne.clone(),
+            _ => self.volumne.clone().neg(),
         }
     }
 
@@ -175,7 +190,7 @@ struct VobaClassicPaymentRecord {
     #[serde(rename = "Verwendungszweck")]
     purpose: String,
     #[serde(rename = "Betrag", deserialize_with = "deserialize_float_with_comma")]
-    volumne: f64,
+    volumne: BigDecimal,
     #[serde(rename = "Waehrung")]
     _currency: String,
     #[serde(rename = "Saldo nach Buchung")]
@@ -223,7 +238,7 @@ impl CSVReader for VobaClassicCSVReader {
 
 // special serde deserializer
 
-fn deserialize_float_with_comma<'de, D>(deserializer: D) -> Result<f64, D::Error>
+fn deserialize_float_with_comma<'de, D>(deserializer: D) -> Result<BigDecimal, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -242,7 +257,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
+    use bigdecimal::FromPrimitive;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -264,7 +282,7 @@ Textschlüssel:;;von:;;bis:;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;
 Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben
 09.03.2022;09.03.2022;16 Euro-Überweisung;801;Test GmbH;0;DE92500105174132432988;58629112;GENODES1VBH;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;;EUR;24,15;S
-09.03.2022;09.03.2022;51 Überweisungsgutschr.;931;Max Mustermann;0;DE62500105176261449571;10517962;SOLADES1FDS;22-1423;;EUR;27,00;H
+09.03.2022;09.03.2022;51 Überweisungsgutschr.;931;Max Mustermann;0;DE62500105176261449571;10517962;SOLADES1FDS;22-1423 22-1154;;EUR;27,00;H
 10.03.2022;10.03.2022;54 Überweisungsgutschr.;932;Erika Mustermann;0;DE91500105176171781279;10517962;SOLADES1FDS;Erika 22-1425 Mustermann;;EUR;33,50;H
 10.03.2022;10.03.2022;78 Euro-Überweisung;941;Lieschen Müller;0;DE21500105179625862911;10517962;GENODES1VBH;Lieschen Müller 22-1456;;EUR;27,00;S
 10.03.2022;10.03.2022;90 Euro-Überweisung;951;Otto Normalverbraucher;0;DE21500105179625862911;10517962;GENODES1VBH;Otto Normalverbraucher, Test-Kurs,22-1467;;EUR;45,90;H
@@ -276,41 +294,46 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         assert_eq!(
             VobaRichCSVReader::default().read(csv).unwrap(),
             vec![
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 9),
-                    String::from("Test GmbH"),
-                    String::from("DE92500105174132432988"),
-                    String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
-                    -24.15
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 9),
-                    String::from("Max Mustermann"),
-                    String::from("DE62500105176261449571"),
-                    String::from("22-1423"),
-                    27.00
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 10),
-                    String::from("Erika Mustermann"),
-                    String::from("DE91500105176171781279"),
-                    String::from("Erika 22-1425 Mustermann"),
-                    33.50
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 10),
-                    String::from("Lieschen Müller"),
-                    String::from("DE21500105179625862911"),
-                    String::from("Lieschen Müller 22-1456"),
-                    -27.00
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 10),
-                    String::from("Otto Normalverbraucher"),
-                    String::from("DE21500105179625862911"),
-                    String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),
-                    45.90
-                )
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    payee: String::from("Test GmbH"),
+                    payee_iban: String::from("DE92500105174132432988"),
+                    purpose: String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
+                    volumne: BigDecimal::from_str("-24.15").unwrap(),
+                    payment_ids: HashSet::new(),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    payee: String::from("Max Mustermann"),
+                    payee_iban: String::from("DE62500105176261449571"),
+                    purpose: String::from("22-1423 22-1154"),
+                    volumne: BigDecimal::from_i8(27).unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1423"), String::from("22-1154")]),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    payee: String::from("Erika Mustermann"),
+                    payee_iban: String::from("DE91500105176171781279"),
+                    purpose: String::from("Erika 22-1425 Mustermann"),
+                    volumne: BigDecimal::from_str("33.50").unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1425")]),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    payee: String::from("Lieschen Müller"),
+                    payee_iban: String::from("DE21500105179625862911"),
+                    purpose: String::from("Lieschen Müller 22-1456"),
+                    volumne: BigDecimal::from_i8(-27).unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1456")]),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    payee: String::from("Otto Normalverbraucher"),
+                    payee_iban: String::from("DE21500105179625862911"),
+                    purpose: String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),
+                    volumne: BigDecimal::from_str("45.90").unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1467")]),
+                },
             ]
         );
     }
@@ -351,41 +374,46 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
         assert_eq!(
             VobaClassicCSVReader::default().read(csv).unwrap(),
             vec![
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 9),
-                    String::from("Test GmbH"),
-                    String::from("DE92500105174132432988"),
-                    String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
-                    -24.15
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 9),
-                    String::from("Max Mustermann"),
-                    String::from("DE62500105176261449571"),
-                    String::from("22-1423"),
-                    27.00
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 10),
-                    String::from("Erika Mustermann"),
-                    String::from("DE91500105176171781279"),
-                    String::from("Erika 22-1425 Mustermann"),
-                    33.50
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 10),
-                    String::from("Lieschen Müller"),
-                    String::from("DE21500105179625862911"),
-                    String::from("Lieschen Müller 22-1456"),
-                    -27.00
-                ),
-                PaymentRecord::new(
-                    NaiveDate::from_ymd(2022, 3, 10),
-                    String::from("Otto Normalverbraucher"),
-                    String::from("DE21500105179625862911"),
-                    String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),
-                    45.90
-                )
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    payee: String::from("Test GmbH"),
+                    payee_iban: String::from("DE92500105174132432988"),
+                    purpose: String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
+                    volumne: BigDecimal::from_str("-24.15").unwrap(),
+                    payment_ids: HashSet::new(),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    payee: String::from("Max Mustermann"),
+                    payee_iban: String::from("DE62500105176261449571"),
+                    purpose: String::from("22-1423"),
+                    volumne: BigDecimal::from_i8(27).unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1423")]),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    payee: String::from("Erika Mustermann"),
+                    payee_iban: String::from("DE91500105176171781279"),
+                    purpose: String::from("Erika 22-1425 Mustermann"),
+                    volumne: BigDecimal::from_str("33.50").unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1425")]),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    payee: String::from("Lieschen Müller"),
+                    payee_iban: String::from("DE21500105179625862911"),
+                    purpose: String::from("Lieschen Müller 22-1456"),
+                    volumne: BigDecimal::from_i8(-27).unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1456")]),
+                },
+                PaymentRecord {
+                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    payee: String::from("Otto Normalverbraucher"),
+                    payee_iban: String::from("DE21500105179625862911"),
+                    purpose: String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),
+                    volumne: BigDecimal::from_str("45.90").unwrap(),
+                    payment_ids: HashSet::from([String::from("22-1467")]),
+                }
             ]
         );
     }

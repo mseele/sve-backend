@@ -2494,6 +2494,7 @@ dependencies = [
  "hyper",
  "hyper-rustls",
  "itertools",
+ "lazy_static",
  "lettre",
  "log 0.4.17",
  "mime 0.3.16",

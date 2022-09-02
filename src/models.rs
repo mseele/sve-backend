@@ -1,31 +1,22 @@
 use anyhow::{anyhow, bail, Context, Result};
 use base64::STANDARD;
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use google_sheets4::api::ValueRange;
-use harsh::Harsh;
 use lettre::message::{Mailbox, MessageBuilder};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display};
-use std::num::ParseFloatError;
 use std::ops::Deref;
 use std::str::from_utf8;
 use std::str::FromStr;
 
+use crate::hashids;
+
 base64_serde_type!(Base64Standard, STANDARD);
 
-fn harsh() -> Harsh {
-    return Harsh::builder()
-        .salt("#mehralseinverein")
-        .length(10)
-        .alphabet("abcdefghijklmnopqrstuvwxyz")
-        .build()
-        .unwrap();
-}
-
-/// Special i32 that is encoded / decoded to a short 
+/// Special i32 that is encoded / decoded to a short
 /// unique id on json serialization / deserialization.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -64,9 +55,10 @@ impl Deref for EventId {
 impl Serialize for EventId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: base64_serde::Serializer,
+        S: Serializer,
     {
-        serializer.serialize_str(&harsh().encode(&[self.0 as u64]))
+        let id = u64::try_from(self.0).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&hashids::encode(&[id]))
     }
 }
 
@@ -75,11 +67,10 @@ impl<'de> Deserialize<'de> for EventId {
     where
         D: Deserializer<'de>,
     {
-        return Ok(EventId(
-            harsh()
-                .decode(String::deserialize(deserializer)?)
-                .map_err(serde::de::Error::custom)?[0] as i32,
-        ));
+        let value = String::deserialize(deserializer)?;
+        let ids = hashids::decode(value).map_err(serde::de::Error::custom)?;
+        let id = i32::try_from(ids[0]).map_err(serde::de::Error::custom)?;
+        return Ok(EventId(id));
     }
 }
 
@@ -171,6 +162,13 @@ impl EventNew {
             alt_booking_button_text,
             alt_email_address,
             external_operator,
+        }
+    }
+
+    pub fn cost<'a>(&'a self, is_member: bool) -> &BigDecimal {
+        match is_member {
+            true => &self.cost_member,
+            false => &self.cost_non_member,
         }
     }
 }
@@ -537,6 +535,10 @@ impl EventBookingNew {
     pub fn is_member(&self) -> bool {
         self.member.unwrap_or(false)
     }
+
+    pub fn cost<'a>(&'a self, event: &'a EventNew) -> &BigDecimal {
+        event.cost(self.is_member())
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -633,7 +635,7 @@ impl From<Event> for EventCounter {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct EventCounterNew {
     pub id: EventId,
@@ -674,11 +676,11 @@ impl EventCounterNew {
 pub struct BookingResponse {
     success: bool,
     message: String,
-    counter: Vec<EventCounter>,
+    counter: Vec<EventCounterNew>,
 }
 
 impl BookingResponse {
-    pub fn success(message: &str, counter: Vec<EventCounter>) -> Self {
+    pub fn success(message: &str, counter: Vec<EventCounterNew>) -> Self {
         Self {
             success: true,
             message: message.into(),
@@ -900,10 +902,46 @@ impl From<MessageType> for EmailType {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct VerifyPaymentBookingRecordNew {
+    pub booking_id: i32,
+    event_name: String,
+    pub full_name: String,
+    pub cost: BigDecimal,
+    pub payment_id: String,
+    pub canceled: Option<DateTime<Utc>>,
+    pub enrolled: bool,
+    pub payed: Option<DateTime<Utc>>,
+}
+
+impl VerifyPaymentBookingRecordNew {
+    pub fn new(
+        booking_id: i32,
+        event_name: String,
+        full_name: String,
+        cost: BigDecimal,
+        payment_id: String,
+        canceled: Option<DateTime<Utc>>,
+        enrolled: bool,
+        payed: Option<DateTime<Utc>>,
+    ) -> Self {
+        VerifyPaymentBookingRecordNew {
+            booking_id,
+            event_name,
+            full_name,
+            cost,
+            payment_id,
+            canceled,
+            enrolled,
+            payed,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct VerifyPaymentBookingRecord {
     sheet_title: String,
     update_cell: String,
-    pub cost: f64,
+    pub cost: BigDecimal,
     pub booking_number: String,
     pub payed_already: bool,
 }
@@ -912,7 +950,7 @@ impl VerifyPaymentBookingRecord {
     pub fn new(
         sheet_title: String,
         update_cell: String,
-        cost: f64,
+        cost: BigDecimal,
         booking_number: String,
         payed_already: bool,
     ) -> Self {
@@ -955,11 +993,11 @@ pub trait ToEuro {
 }
 
 pub trait FromEuro {
-    fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError>;
-    fn from_euro_with_symbol(self) -> Result<f64, ParseFloatError>;
+    fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError>;
+    fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError>;
 }
 
-impl ToEuro for f64 {
+impl ToEuro for BigDecimal {
     fn to_euro_without_symbol(&self) -> String {
         let formatted = format!("{:.2}", self);
         formatted.replace(".", ",")
@@ -967,10 +1005,11 @@ impl ToEuro for f64 {
 }
 
 impl FromEuro for String {
-    fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError> {
-        self.replace(".", "").replace(",", ".").parse::<f64>()
+    fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
+        BigDecimal::from_str(&self.replace(".", "").replace(",", "."))
     }
-    fn from_euro_with_symbol(self) -> Result<f64, ParseFloatError> {
+
+    fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
         self.trim_end_matches("€")
             .trim_end_matches(char::is_whitespace)
             .from_euro_without_symbol()
@@ -978,10 +1017,10 @@ impl FromEuro for String {
 }
 
 impl FromEuro for &str {
-    fn from_euro_without_symbol(self) -> Result<f64, ParseFloatError> {
+    fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
         self.to_string().from_euro_without_symbol()
     }
-    fn from_euro_with_symbol(self) -> Result<f64, ParseFloatError> {
+    fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
         self.trim_end_matches("€")
             .trim_end_matches(char::is_whitespace)
             .from_euro_without_symbol()
@@ -991,12 +1030,13 @@ impl FromEuro for &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bigdecimal::FromPrimitive;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn test_cost() {
-        let member = EventBooking::new(
-            String::from("id"),
+        let member = EventBookingNew::new(
+            0,
             String::from("first_name"),
             String::from("last_name"),
             String::from("street"),
@@ -1007,8 +1047,8 @@ mod tests {
             None,
             None,
         );
-        let no_member = EventBooking::new(
-            String::from("id"),
+        let no_member = EventBookingNew::new(
+            0,
             String::from("first_name"),
             String::from("last_name"),
             String::from("street"),
@@ -1020,33 +1060,32 @@ mod tests {
             None,
         );
 
-        let event = new_event(59.0, 69_f64);
+        let event = new_event("59.0", "69");
         let cost = member.cost(&event);
-        assert_eq!(cost, 59_f64);
+        assert_eq!(cost, &BigDecimal::from_i8(59).unwrap());
         assert_eq!(cost.to_euro(), "59,00 €");
         let cost = no_member.cost(&event);
-        assert_eq!(cost, 69_f64);
+        assert_eq!(cost, &BigDecimal::from_i8(69).unwrap());
         assert_eq!(cost.to_euro(), "69,00 €");
 
-        let event = new_event(5.99, 9.99);
+        let event = new_event("5.99", "9.99");
         let cost = member.cost(&event);
-        assert_eq!(cost, 5.99);
+        assert_eq!(cost, &BigDecimal::from_str("5.99").unwrap());
         assert_eq!(cost.to_euro(), "5,99 €");
         let cost = no_member.cost(&event);
-        assert_eq!(cost, 9.99);
+        assert_eq!(cost, &BigDecimal::from_str("9.99").unwrap());
         assert_eq!(cost.to_euro(), "9,99 €");
     }
 
-    fn new_event(cost_member: f64, cost_non_member: f64) -> Event {
-        Event::new(
-            String::from("id"),
-            String::from("sheet_id"),
+    fn new_event(cost_member: &str, cost_non_member: &str) -> EventNew {
+        EventNew::new(
             0,
+            Utc::now(),
+            None,
             EventType::Fitness,
+            LifecycleStatus::Draft,
             String::from("name"),
             0,
-            true,
-            false,
             String::from("short_description"),
             String::from("description"),
             String::from("image"),
@@ -1056,10 +1095,8 @@ mod tests {
             0,
             0,
             0,
-            cost_member,
-            cost_non_member,
-            0,
-            0,
+            BigDecimal::from_str(cost_member).unwrap(),
+            BigDecimal::from_str(cost_non_member).unwrap(),
             String::from("location"),
             String::from("booking_template"),
             String::from("waiting_template"),

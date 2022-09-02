@@ -1,5 +1,7 @@
 use crate::logic::{calendar, contact, events, news, tasks};
-use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, NewsSubscription};
+use crate::models::{
+    ContactMessage, EventBookingNew, EventId, MassEmails, NewsSubscription, PartialEventNew,
+};
 use actix_web::http::header::ContentType;
 use actix_web::web::{Data, Json};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
@@ -109,13 +111,18 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
 #[derive(Debug, Deserialize)]
 pub struct EventsRequest {
+    #[deprecated = "should be removed after psql migration"]
     all: Option<bool>,
     beta: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
+pub struct EventCountersRequest {
+    beta: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct VerifyPaymentInput {
-    sheet_id: String,
     csv: String,
     start_date: Option<NaiveDate>,
 }
@@ -125,19 +132,30 @@ pub struct PrebookingInput {
     hash: String,
 }
 
-async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
-    let events = events::get_events(info.all, info.beta).await?;
+#[derive(Debug, Deserialize)]
+pub struct DeleteEventInput {
+    id: EventId,
+}
+
+async fn events(
+    pool: Data<PgPool>,
+    info: web::Query<EventsRequest>,
+) -> Result<impl Responder, ResponseError> {
+    let events = events::get_events(&pool, info.beta).await?;
     Ok(Json(events))
 }
 
-async fn counter() -> Result<impl Responder, ResponseError> {
-    let event_counters = events::get_event_counters().await?;
+async fn counter(
+    pool: Data<PgPool>,
+    info: web::Query<EventCountersRequest>,
+) -> Result<impl Responder, ResponseError> {
+    let event_counters = events::get_event_counters(&pool, info.beta).await?;
     Ok(Json(event_counters))
 }
 
 async fn booking(
     pool: Data<PgPool>,
-    Json(booking): Json<EventBooking>,
+    Json(booking): Json<EventBookingNew>,
 ) -> Result<impl Responder, ResponseError> {
     let response = events::booking(&pool, booking).await;
     Ok(Json(response))
@@ -151,20 +169,27 @@ async fn prebooking(
     Ok(Json(response))
 }
 
-async fn update(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
-    let event = events::update(partial_event).await?;
+async fn update(
+    pool: Data<PgPool>,
+    Json(partial_event): Json<PartialEventNew>,
+) -> Result<impl Responder, ResponseError> {
+    let event = events::update(&pool, partial_event).await?;
     Ok(Json(event))
 }
 
-async fn delete(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
-    events::delete(partial_event).await?;
+async fn delete(
+    pool: Data<PgPool>,
+    Json(input): Json<DeleteEventInput>,
+) -> Result<impl Responder, ResponseError> {
+    events::delete(&pool, input.id).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn verify_payments(
+    pool: Data<PgPool>,
     Json(input): Json<VerifyPaymentInput>,
 ) -> Result<impl Responder, ResponseError> {
-    let result = events::verify_payments(input.sheet_id, input.csv, input.start_date).await?;
+    let result = events::verify_payments(&pool, input.csv, input.start_date).await?;
     Ok(Json(result))
 }
 

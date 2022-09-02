@@ -1,6 +1,6 @@
 use crate::models::{
     EventBookingNew, EventCounterNew, EventId, EventNew, EventType, LifecycleStatus,
-    NewsSubscription, NewsTopic, PartialEventNew,
+    NewsSubscription, NewsTopic, PartialEventNew, VerifyPaymentBookingRecordNew,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -9,7 +9,7 @@ use sqlx::{
     postgres::PgPoolOptions, query, query_as, query_builder::Separated, query_scalar, FromRow,
     PgConnection, PgPool, Postgres, QueryBuilder, Row,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const DATABASE_URL: &str = include_str!("../secrets/database_url.env");
 
@@ -644,6 +644,88 @@ pub async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
     Ok(())
 }
 
+pub async fn get_bookings_to_verify_payment(
+    pool: &PgPool,
+    payment_ids: HashSet<&String>,
+) -> Result<Vec<VerifyPaymentBookingRecordNew>> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        r#"
+SELECT
+    b.id,
+    e.name AS event_name,
+    CONCAT (s.first_name, ' ', s.last_name) AS full_name,
+    CASE WHEN s.member IS TRUE
+        THEN e.cost_member
+        ESLE e.cost_non_member
+    END as cost,
+    b.payment_id,
+    b.canceled,
+    b.enrolled,
+    b.payed
+FROM
+    events e,
+    event_bookings b,
+    event_subscribers s
+WHERE
+    e.id = b.event_id
+    AND b.subscriber_id = s.id
+    AND b.payment_id IN("#,
+    );
+    let mut separated = query_builder.separated(", ");
+    for payment_id in payment_ids {
+        separated.push_bind(payment_id);
+    }
+    separated.push_unseparated(
+        r#")
+ORDER BY
+    b.created"#,
+    );
+    let result = query_builder
+        .build()
+        .map(|row| {
+            VerifyPaymentBookingRecordNew::new(
+                row.get("id"),
+                row.get("event_name"),
+                row.get("full_name"),
+                row.get("cost"),
+                row.get("payment_id"),
+                row.get("canceled"),
+                row.get("enrolled"),
+                row.get("payed"),
+            )
+        })
+        .fetch_all(pool)
+        .await?;
+
+    Ok(result)
+}
+
+pub async fn mark_as_payed(pool: &PgPool, verified_payments: &HashMap<i32, String>) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    // TODO: improve by using batch update
+    for (booking_id, iban) in verified_payments {
+        query!(
+            r#"
+UPDATE
+    event_bookings
+SET
+    payed = NOW(),
+    iban = $1
+WHERE
+    id = $2"#,
+            iban,
+            booking_id,
+        )
+        .execute(&mut tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
 pub async fn get_event_counters(
     pool: &PgPool,
     lifecycle_status: LifecycleStatus,
@@ -694,17 +776,101 @@ WHERE
 pub enum BookingResult {
     Booked(EventNew, Vec<EventCounterNew>, String),
     WaitingList(EventNew, Vec<EventCounterNew>, String),
+    DuplicateBooking,
     BookedOut,
 }
 
-pub async fn book_event(
-    pool: &PgPool,
-    booking: &EventBookingNew,
-    pre_booking: bool,
-) -> Result<BookingResult> {
+enum EventSubscriberId {
+    New(i32),
+    Existing(i32),
+}
+
+impl EventSubscriberId {
+    fn get_id(&self) -> &i32 {
+        match self {
+            EventSubscriberId::New(id) => id,
+            EventSubscriberId::Existing(id) => id,
+        }
+    }
+}
+
+pub async fn book_event(pool: &PgPool, booking: &EventBookingNew) -> Result<BookingResult> {
     let mut tx = pool.begin().await?;
 
-    let event_counter: Option<EventCounterNew> = query!(
+    let result = match calc_enroll_status(&mut tx, &booking.event_id).await? {
+        Some(enrolled) => process_booking(&mut tx, booking, enrolled, false).await?,
+        None => BookingResult::BookedOut,
+    };
+
+    tx.commit().await?;
+
+    Ok(result)
+}
+
+pub async fn pre_book_event(
+    pool: &PgPool,
+    event_id: EventId,
+    subscriber_id: i32,
+) -> Result<(BookingResult, Option<EventBookingNew>)> {
+    let mut tx = pool.begin().await?;
+
+    let result = match calc_enroll_status(&mut tx, &event_id).await? {
+        Some(enrolled) => {
+            let result = insert_booking(
+                &mut tx,
+                &event_id,
+                &EventSubscriberId::Existing(subscriber_id),
+                enrolled,
+                true,
+                &None,
+            )
+            .await?;
+
+            let booking = query!(
+                r#"
+SELECT
+    e.first_name,
+    e.last_name,
+    e.street,
+    e.city,
+    e.email,
+    e.phone,
+    e.member
+FROM
+    event_subscribers e
+WHERE
+    e.id = $1"#,
+                event_id.get_ref()
+            )
+            .map(|row| {
+                EventBookingNew::new(
+                    event_id.into_inner(),
+                    row.first_name,
+                    row.last_name,
+                    row.street,
+                    row.city,
+                    row.email,
+                    row.phone,
+                    Some(row.member),
+                    None,
+                    None,
+                )
+            })
+            .fetch_one(&mut tx)
+            .await?;
+
+            (result, Some(booking))
+        }
+        None => (BookingResult::BookedOut, None),
+    };
+
+    tx.commit().await?;
+
+    Ok(result)
+}
+
+async fn calc_enroll_status(conn: &mut PgConnection, event_id: &EventId) -> Result<Option<bool>> {
+    let result = query!(
         r#"
 SELECT
     v.id,
@@ -716,7 +882,7 @@ FROM
     v_event_counters v
 WHERE
     v.id = $1"#,
-        booking.event_id.get_ref(),
+        event_id.get_ref(),
     )
     .map(|row| {
         // unwrap is needed because view columns are always "nullable"
@@ -730,58 +896,104 @@ WHERE
             row.waiting_list.unwrap().try_into().unwrap(),
         )
     })
-    .fetch_optional(&mut tx)
+    .fetch_optional(conn)
     .await?;
 
-    let event_counter = event_counter
-        .ok_or_else(|| anyhow!("Found no event with id '{}' for booking", booking.event_id))?;
+    let event_counter = result.ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
 
-    let result = if event_counter.max_subscribers == -1
+    let enroll_status = if event_counter.max_subscribers == -1
         || event_counter.subscribers < event_counter.max_subscribers
     {
-        insert_booking(&mut tx, booking, true, pre_booking).await?
+        Some(true)
     } else if event_counter.waiting_list < event_counter.max_waiting_list {
-        insert_booking(&mut tx, booking, false, pre_booking).await?
+        Some(false)
     } else {
-        BookingResult::BookedOut
+        None
     };
-    tx.commit().await?;
-    Ok(result)
+
+    Ok(enroll_status)
 }
 
-async fn insert_booking(
+async fn process_booking(
     conn: &mut PgConnection,
     booking: &EventBookingNew,
     enrolled: bool,
     pre_booking: bool,
 ) -> Result<BookingResult> {
     let subscriber_id = insert_event_subscriber(conn, booking).await?;
+    let result = insert_booking(
+        conn,
+        &booking.event_id,
+        &subscriber_id,
+        enrolled,
+        pre_booking,
+        &booking.comments,
+    )
+    .await?;
 
-    let payment_id: Option<i64> = query_scalar!("SELECT nextval('payment_id')")
+    Ok(result)
+}
+
+async fn insert_booking(
+    conn: &mut PgConnection,
+    event_id: &EventId,
+    subscriber_id: &EventSubscriberId,
+    enrolled: bool,
+    pre_booking: bool,
+    comments: &Option<String>,
+) -> Result<BookingResult> {
+    // check for duplicate booking
+    if let EventSubscriberId::Existing(id) = subscriber_id {
+        let count = query!(
+            r#"
+SELECT
+	COUNT(1)
+FROM
+	event_bookings e
+WHERE
+	e.event_id = $1
+	AND e.subscriber_id = $2
+"#,
+            event_id.get_ref(),
+            id
+        )
+        .map(|row| row.count)
         .fetch_one(&mut *conn)
         .await?;
 
+        if let Some(v) = count {
+            if v > 0 {
+                return Ok(BookingResult::DuplicateBooking);
+            }
+        }
+    }
+
+    // generate payment id
+    let payment_id: Option<i64> = query_scalar!("SELECT nextval('payment_id')")
+        .fetch_one(&mut *conn)
+        .await?;
     let year = Utc::now().format("%y");
     let payment_id = format!("{}-{}", year, payment_id.unwrap());
 
+    // insert booking
     query!(
         r#"
 INSERT INTO public.event_bookings
 (event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)
 VALUES($1, $2, $3, $4, $5, $6)"#,
-        booking.event_id.get_ref(),
+        event_id.get_ref(),
         enrolled,
         pre_booking,
-        subscriber_id,
-        booking.comments,
+        subscriber_id.get_id(),
+        *comments,
         payment_id
     )
     .execute(&mut *conn)
     .await?;
 
-    let event = fetch_event(&mut *conn, &booking.event_id)
+    let event = fetch_event(&mut *conn, &event_id)
         .await?
-        .ok_or_else(|| anyhow!("Found no event with id '{}'", booking.event_id))?;
+        .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
     let event_counters = fetch_event_counters(&mut *conn, event.lifecycle_status).await?;
 
     if let true = enrolled {
@@ -798,9 +1010,9 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
 async fn insert_event_subscriber(
     conn: &mut PgConnection,
     booking: &EventBookingNew,
-) -> Result<i32> {
+) -> Result<EventSubscriberId> {
     if let Some(id) = get_event_subscriber_id(conn, &booking).await? {
-        return Ok(id);
+        return Ok(EventSubscriberId::Existing(id));
     }
 
     let id = query!(
@@ -820,7 +1032,7 @@ RETURNING id"#,
     .fetch_one(conn)
     .await?;
 
-    Ok(id)
+    Ok(EventSubscriberId::New(id))
 }
 
 async fn get_event_subscriber_id(

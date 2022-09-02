@@ -294,7 +294,7 @@ fn into_values(
         booking.email.clone(),
         phone_number,
         member,
-        booking.cost(event).to_euro_without_symbol(),
+        // booking.cost(event).to_euro_without_symbol(),
         booking_number.clone(),
         String::from("N"),
         comments,
