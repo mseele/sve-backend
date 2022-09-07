@@ -116,7 +116,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 pub struct EventsRequest {
     beta: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_lifecycle_status_list")]
-    lifecycle_status: Option<Vec<LifecycleStatus>>,
+    status: Option<Vec<LifecycleStatus>>,
 }
 
 pub fn deserialize_lifecycle_status_list<'de, D>(
@@ -178,7 +178,7 @@ async fn events(
     pool: Data<PgPool>,
     mut info: web::Query<EventsRequest>,
 ) -> Result<impl Responder, ResponseError> {
-    let events = events::get_events(&pool, info.beta.take(), info.lifecycle_status.take()).await?;
+    let events = events::get_events(&pool, info.beta.take(), info.status.take()).await?;
     Ok(Json(events))
 }
 
