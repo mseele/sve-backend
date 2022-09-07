@@ -271,6 +271,21 @@ pub enum LifecycleStatus {
     Closed,
 }
 
+impl FromStr for LifecycleStatus {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "draft" => Ok(LifecycleStatus::Draft),
+            "review" => Ok(LifecycleStatus::Review),
+            "published" => Ok(LifecycleStatus::Published),
+            "finished" => Ok(LifecycleStatus::Finished),
+            "closed" => Ok(LifecycleStatus::Closed),
+            other => bail!("Invalid lifecycle status {}", other),
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct EventBooking {

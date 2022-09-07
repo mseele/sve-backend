@@ -1,6 +1,7 @@
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{
-    ContactMessage, EventBooking, EventId, MassEmails, NewsSubscription, PartialEvent,
+    ContactMessage, EventBooking, EventId, LifecycleStatus, MassEmails, NewsSubscription,
+    PartialEvent,
 };
 use actix_web::http::header::ContentType;
 use actix_web::web::{Data, Json};
@@ -9,11 +10,13 @@ use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
 use chrono::NaiveDate;
 use log::error;
+use serde::de;
 use serde::Deserialize;
 use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
-use std::fmt::Display;
+use std::fmt::{self, Display};
+use std::str::FromStr;
 
 pub struct ResponseError {
     err: anyhow::Error,
@@ -111,9 +114,43 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
 #[derive(Debug, Deserialize)]
 pub struct EventsRequest {
-    #[deprecated = "should be removed after psql migration"]
-    all: Option<bool>,
     beta: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_lifecycle_status_list")]
+    lifecycle_status: Option<Vec<LifecycleStatus>>,
+}
+
+pub fn deserialize_lifecycle_status_list<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<LifecycleStatus>>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    struct StringVecVisitor;
+
+    impl<'de> de::Visitor<'de> for StringVecVisitor {
+        type Value = Option<Vec<LifecycleStatus>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter
+                .write_str("a string containing a comma separated list of lifecycle status strings")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            let mut list = Vec::new();
+            for status in v.split(",") {
+                list.push(LifecycleStatus::from_str(status).map_err(E::custom)?);
+            }
+            Ok(match list.len() {
+                0 => None,
+                _ => Some(list),
+            })
+        }
+    }
+
+    deserializer.deserialize_any(StringVecVisitor)
 }
 
 #[derive(Debug, Deserialize)]
@@ -139,9 +176,9 @@ pub struct DeleteEventInput {
 
 async fn events(
     pool: Data<PgPool>,
-    info: web::Query<EventsRequest>,
+    mut info: web::Query<EventsRequest>,
 ) -> Result<impl Responder, ResponseError> {
-    let events = events::get_events(&pool, info.beta).await?;
+    let events = events::get_events(&pool, info.beta.take(), info.lifecycle_status.take()).await?;
     Ok(Json(events))
 }
 

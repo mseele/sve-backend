@@ -19,8 +19,18 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
 
-pub async fn get_events(pool: &PgPool, beta: Option<bool>) -> Result<Vec<Event>> {
-    Ok(db::get_events(pool, true, into_opt_lifecycle_status(beta)).await?)
+pub async fn get_events(
+    pool: &PgPool,
+    beta: Option<bool>,
+    lifecycle_status: Option<Vec<LifecycleStatus>>,
+) -> Result<Vec<Event>> {
+    let lifecycle_status_list;
+    if let Some(beta) = beta {
+        lifecycle_status_list = Some(vec![into_lifecycle_status(beta)]);
+    } else {
+        lifecycle_status_list = lifecycle_status;
+    }
+    Ok(db::get_events(pool, true, lifecycle_status_list).await?)
 }
 
 pub async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {
@@ -88,13 +98,6 @@ fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
         LifecycleStatus::Review
     } else {
         LifecycleStatus::Published
-    }
-}
-
-fn into_opt_lifecycle_status(beta: Option<bool>) -> Option<LifecycleStatus> {
-    match beta {
-        Some(v) => Some(into_lifecycle_status(v)),
-        None => None,
     }
 }
 

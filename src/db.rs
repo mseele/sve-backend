@@ -21,20 +21,18 @@ pub async fn init_pool() -> Result<PgPool> {
 pub async fn get_events(
     pool: &PgPool,
     sort: bool,
-    lifecycle_status: Option<LifecycleStatus>,
+    lifecycle_status: Option<Vec<LifecycleStatus>>,
 ) -> Result<Vec<Event>> {
     let mut conn = pool.acquire().await?;
 
-    let mut iter = match lifecycle_status {
-        Some(lifecycle_status) => {
-            query!(
-                r#"
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        r#"
 SELECT
     e.id,
     e.created,
     e.closed,
-    e.event_type AS "event_type: EventType",
-    e.lifecycle_status AS "lifecycle_status: LifecycleStatus",
+    e.event_type,
+    e.lifecycle_status,
     e.name,
     e.sort_index,
     e.short_description,
@@ -59,136 +57,74 @@ FROM
     events e,
     v_event_counters vev
 WHERE
-    e.id = vev.id
-    AND e.lifecycle_status = $1
+    e.id = vev.id"#,
+    );
+    if let Some(lifecycle_status) = &lifecycle_status {
+        query_builder.push(
+            r#"
+ AND e.lifecycle_status IN("#,
+        );
+        let mut separated = query_builder.separated(", ");
+        for value in lifecycle_status.iter() {
+            separated.push_bind(value);
+        }
+        query_builder.push(
+            r#")
+"#,
+        );
+    }
+
+    query_builder.push(
+        r#"
 ORDER BY
     e.sort_index,
     e.created"#,
-                lifecycle_status as LifecycleStatus
-            )
-            .map(|row| {
-                (
-                    Event::new(
-                        row.id,
-                        row.created,
-                        row.closed,
-                        row.event_type,
-                        row.lifecycle_status,
-                        row.name,
-                        row.sort_index,
-                        row.short_description,
-                        row.description,
-                        row.image,
-                        row.light,
-                        Vec::new(),
-                        row.custom_date,
-                        row.duration_in_minutes,
-                        row.max_subscribers,
-                        row.max_waiting_list,
-                        row.cost_member,
-                        row.cost_non_member,
-                        row.location,
-                        row.booking_template,
-                        row.waiting_template,
-                        row.alt_booking_button_text,
-                        row.alt_email_address,
-                        row.external_operator,
-                    ),
-                    // try_into is needed to convert the i64 into a i16
-                    EventCounter::new(
-                        row.id,
-                        row.max_subscribers,
-                        row.max_waiting_list,
-                        row.subscribers.unwrap().try_into().unwrap(),
-                        row.waiting_list.unwrap().try_into().unwrap(),
-                    ),
-                )
-            })
-            .fetch_all(&mut *conn)
-            .await?
-        }
-        None => {
-            query!(
-                r#"
-SELECT
-    e.id,
-    e.created,
-    e.closed,
-    e.event_type AS "event_type: EventType",
-    e.lifecycle_status AS "lifecycle_status: LifecycleStatus",
-    e.name,
-    e.sort_index,
-    e.short_description,
-    e.description,
-    e.image,
-    e.light,
-    e.custom_date,
-    e.duration_in_minutes,
-    e.max_subscribers,
-    e.max_waiting_list,
-    e.cost_member,
-    e.cost_non_member,
-    e.location,
-    e.booking_template,
-    e.waiting_template,
-    e.alt_booking_button_text,
-    e.alt_email_address,
-    e.external_operator,
-    vev.subscribers,
-    vev.waiting_list
-FROM
-    events e,
-    v_event_counters vev
-WHERE
-    e.id = vev.id
-ORDER BY
-    e.sort_index,
-    e.created"#
-            )
-            .map(|row| {
-                (
-                    Event::new(
-                        row.id,
-                        row.created,
-                        row.closed,
-                        row.event_type,
-                        row.lifecycle_status,
-                        row.name,
-                        row.sort_index,
-                        row.short_description,
-                        row.description,
-                        row.image,
-                        row.light,
-                        Vec::new(),
-                        row.custom_date,
-                        row.duration_in_minutes,
-                        row.max_subscribers,
-                        row.max_waiting_list,
-                        row.cost_member,
-                        row.cost_non_member,
-                        row.location,
-                        row.booking_template,
-                        row.waiting_template,
-                        row.alt_booking_button_text,
-                        row.alt_email_address,
-                        row.external_operator,
-                    ),
-                    // try_into is needed to convert the i64 into a i16
-                    EventCounter::new(
-                        row.id,
-                        row.max_subscribers,
-                        row.max_waiting_list,
-                        row.subscribers.unwrap().try_into().unwrap(),
-                        row.waiting_list.unwrap().try_into().unwrap(),
-                    ),
-                )
-            })
-            .fetch_all(&mut *conn)
-            .await?
-        }
-    }
-    .into_iter();
+    );
 
+    let mut result = Vec::new();
+    for row in query_builder.build().fetch_all(&mut *conn).await? {
+        let subscribers: i64 = row.try_get("subscribers")?;
+        let waiting_list: i64 = row.try_get("waiting_list")?;
+
+        result.push((
+            Event::new(
+                row.try_get("id")?,
+                row.try_get("created")?,
+                row.try_get("closed")?,
+                row.try_get("event_type")?,
+                row.try_get("lifecycle_status")?,
+                row.try_get("name")?,
+                row.try_get("sort_index")?,
+                row.try_get("short_description")?,
+                row.try_get("description")?,
+                row.try_get("image")?,
+                row.try_get("light")?,
+                Vec::new(),
+                row.try_get("custom_date")?,
+                row.try_get("duration_in_minutes")?,
+                row.try_get("max_subscribers")?,
+                row.try_get("max_waiting_list")?,
+                row.try_get("cost_member")?,
+                row.try_get("cost_non_member")?,
+                row.try_get("location")?,
+                row.try_get("booking_template")?,
+                row.try_get("waiting_template")?,
+                row.try_get("alt_booking_button_text")?,
+                row.try_get("alt_email_address")?,
+                row.try_get("external_operator")?,
+            ),
+            // try_into is needed to convert the i64 into a i16
+            EventCounter::new(
+                row.try_get("id")?,
+                row.try_get("max_subscribers")?,
+                row.try_get("max_waiting_list")?,
+                subscribers.try_into()?,
+                waiting_list.try_into()?,
+            ),
+        ));
+    }
+
+    let mut iter = result.into_iter();
     let mut events: Vec<Event>;
     if sort {
         iter = iter.sorted_by(|(a, ca), (b, cb)| {
