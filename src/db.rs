@@ -343,6 +343,16 @@ async fn update_event(pool: &PgPool, id: &EventId, partial_event: PartialEvent) 
         partial_event.external_operator,
     );
 
+    // add closed date if lifecycle status should be updated to closed
+    // and no closed date is defined
+    if matches!(
+        partial_event.lifecycle_status,
+        Some(LifecycleStatus::Closed)
+    ) && matches!(partial_event.closed, None)
+    {
+        update_is_needed |= push_bind(&mut separated, "CLOSED", Some(Utc::now()));
+    }
+
     if update_is_needed {
         query_builder.push("WHERE id = ");
         query_builder.push_bind(id.get_ref());
