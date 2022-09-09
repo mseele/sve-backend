@@ -299,7 +299,6 @@ impl FromStr for LifecycleStatus {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct EventBooking {
     pub event_id: EventId,
     pub first_name: String,
@@ -350,7 +349,6 @@ impl EventBooking {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct EventCounter {
     pub id: EventId,
     pub max_subscribers: i16,
@@ -386,7 +384,6 @@ impl EventCounter {
 }
 
 #[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct BookingResponse {
     success: bool,
     message: String,
@@ -412,7 +409,6 @@ impl BookingResponse {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct NewsSubscription {
     pub email: String,
     #[serde(rename = "types")]
@@ -476,7 +472,6 @@ impl From<NewsTopic> for EmailType {
 }
 
 #[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct Appointment {
     pub id: Option<String>,
     pub sort_index: u32,
@@ -516,7 +511,6 @@ impl Appointment {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct EmailAccount {
     #[serde(rename = "type")]
     pub email_type: EmailType,
@@ -560,7 +554,6 @@ pub enum EmailType {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct ContactMessage {
     #[serde(rename = "type")]
     pub message_type: MessageType,
@@ -572,13 +565,11 @@ pub struct ContactMessage {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct MassEmails {
     pub emails: Vec<MassEmail>,
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct MassEmail {
     #[serde(rename = "type")]
     pub message_type: MessageType,
@@ -589,7 +580,6 @@ pub struct MassEmail {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
 pub struct EmailAttachment {
     pub name: String,
     pub mime_type: String,
