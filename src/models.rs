@@ -657,7 +657,7 @@ pub trait ToEuro {
     fn to_euro_without_symbol(&self) -> String;
 
     fn to_euro(&self) -> String {
-        format!("{} €", &self.to_euro_without_symbol())
+        format!("{} €", self.to_euro_without_symbol())
     }
 }
 
