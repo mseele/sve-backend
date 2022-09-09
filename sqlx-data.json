@@ -491,191 +491,6 @@
     },
     "query": "SELECT nextval('payment_id')"
   },
-  "90341c31cbecf54f11ed7f42db57658cd13cb8338a074b679b029091a15af739": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        },
-        {
-          "name": "created",
-          "ordinal": 1,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "closed",
-          "ordinal": 2,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "event_type: EventType",
-          "ordinal": 3,
-          "type_info": {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "Fitness",
-                  "Events"
-                ]
-              },
-              "name": "event_type"
-            }
-          }
-        },
-        {
-          "name": "lifecycle_status: LifecycleStatus",
-          "ordinal": 4,
-          "type_info": {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "Draft",
-                  "Review",
-                  "Published",
-                  "Finished",
-                  "Closed"
-                ]
-              },
-              "name": "lifecycle_status"
-            }
-          }
-        },
-        {
-          "name": "name",
-          "ordinal": 5,
-          "type_info": "Text"
-        },
-        {
-          "name": "sort_index",
-          "ordinal": 6,
-          "type_info": "Int2"
-        },
-        {
-          "name": "short_description",
-          "ordinal": 7,
-          "type_info": "Text"
-        },
-        {
-          "name": "description",
-          "ordinal": 8,
-          "type_info": "Text"
-        },
-        {
-          "name": "image",
-          "ordinal": 9,
-          "type_info": "Text"
-        },
-        {
-          "name": "light",
-          "ordinal": 10,
-          "type_info": "Bool"
-        },
-        {
-          "name": "custom_date",
-          "ordinal": 11,
-          "type_info": "Text"
-        },
-        {
-          "name": "duration_in_minutes",
-          "ordinal": 12,
-          "type_info": "Int2"
-        },
-        {
-          "name": "max_subscribers",
-          "ordinal": 13,
-          "type_info": "Int2"
-        },
-        {
-          "name": "max_waiting_list",
-          "ordinal": 14,
-          "type_info": "Int2"
-        },
-        {
-          "name": "cost_member",
-          "ordinal": 15,
-          "type_info": "Numeric"
-        },
-        {
-          "name": "cost_non_member",
-          "ordinal": 16,
-          "type_info": "Numeric"
-        },
-        {
-          "name": "location",
-          "ordinal": 17,
-          "type_info": "Text"
-        },
-        {
-          "name": "booking_template",
-          "ordinal": 18,
-          "type_info": "Text"
-        },
-        {
-          "name": "waiting_template",
-          "ordinal": 19,
-          "type_info": "Text"
-        },
-        {
-          "name": "alt_booking_button_text",
-          "ordinal": 20,
-          "type_info": "Text"
-        },
-        {
-          "name": "alt_email_address",
-          "ordinal": 21,
-          "type_info": "Text"
-        },
-        {
-          "name": "external_operator",
-          "ordinal": 22,
-          "type_info": "Bool"
-        },
-        {
-          "name": "subscribers",
-          "ordinal": 23,
-          "type_info": "Int8"
-        },
-        {
-          "name": "waiting_list",
-          "ordinal": 24,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "\nSELECT\n    e.id,\n    e.created,\n    e.closed,\n    e.event_type AS \"event_type: EventType\",\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\",\n    e.name,\n    e.sort_index,\n    e.short_description,\n    e.description,\n    e.image,\n    e.light,\n    e.custom_date,\n    e.duration_in_minutes,\n    e.max_subscribers,\n    e.max_waiting_list,\n    e.cost_member,\n    e.cost_non_member,\n    e.location,\n    e.booking_template,\n    e.waiting_template,\n    e.alt_booking_button_text,\n    e.alt_email_address,\n    e.external_operator,\n    vev.subscribers,\n    vev.waiting_list\nFROM\n    events e,\n    v_event_counters vev\nWHERE\n    e.id = vev.id\nORDER BY\n    e.sort_index,\n    e.created"
-  },
   "91092a9a0e93550a4397d9475bc61710916273a523de3a51b25e0d6dba6a86a4": {
     "describe": {
       "columns": [],
@@ -731,6 +546,39 @@
       }
     },
     "query": "\nSELECT\n    v.id,\n    v.max_subscribers,\n    v.max_waiting_list,\n    v.subscribers,\n    v.waiting_list\nFROM\n    v_event_counters v\nWHERE\n    v.id = $1"
+  },
+  "ab4ca29fa73d9a333db6c4c819032f4dc83ad12e83f00ffb6d972610093db409": {
+    "describe": {
+      "columns": [
+        {
+          "name": "lifecycle_status: LifecycleStatus",
+          "ordinal": 0,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Draft",
+                  "Review",
+                  "Published",
+                  "Finished",
+                  "Closed"
+                ]
+              },
+              "name": "lifecycle_status"
+            }
+          }
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\"\nFROM\n    events e\nWHERE\n    e.id = $1"
   },
   "b26263300179296293a5dec160a7533168bd06ad3f0bf108b27375054a964ceb": {
     "describe": {
@@ -1015,205 +863,5 @@
       }
     },
     "query": "\nINSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)\nVALUES($1, $2, $3, $4, $5, $6, $7)\nRETURNING id"
-  },
-  "e1cfcd71a7ec9c9c51db9b945ecc42145b35f6dadd17764f8c4c2c586a414125": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        },
-        {
-          "name": "created",
-          "ordinal": 1,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "closed",
-          "ordinal": 2,
-          "type_info": "Timestamptz"
-        },
-        {
-          "name": "event_type: EventType",
-          "ordinal": 3,
-          "type_info": {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "Fitness",
-                  "Events"
-                ]
-              },
-              "name": "event_type"
-            }
-          }
-        },
-        {
-          "name": "lifecycle_status: LifecycleStatus",
-          "ordinal": 4,
-          "type_info": {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "Draft",
-                  "Review",
-                  "Published",
-                  "Finished",
-                  "Closed"
-                ]
-              },
-              "name": "lifecycle_status"
-            }
-          }
-        },
-        {
-          "name": "name",
-          "ordinal": 5,
-          "type_info": "Text"
-        },
-        {
-          "name": "sort_index",
-          "ordinal": 6,
-          "type_info": "Int2"
-        },
-        {
-          "name": "short_description",
-          "ordinal": 7,
-          "type_info": "Text"
-        },
-        {
-          "name": "description",
-          "ordinal": 8,
-          "type_info": "Text"
-        },
-        {
-          "name": "image",
-          "ordinal": 9,
-          "type_info": "Text"
-        },
-        {
-          "name": "light",
-          "ordinal": 10,
-          "type_info": "Bool"
-        },
-        {
-          "name": "custom_date",
-          "ordinal": 11,
-          "type_info": "Text"
-        },
-        {
-          "name": "duration_in_minutes",
-          "ordinal": 12,
-          "type_info": "Int2"
-        },
-        {
-          "name": "max_subscribers",
-          "ordinal": 13,
-          "type_info": "Int2"
-        },
-        {
-          "name": "max_waiting_list",
-          "ordinal": 14,
-          "type_info": "Int2"
-        },
-        {
-          "name": "cost_member",
-          "ordinal": 15,
-          "type_info": "Numeric"
-        },
-        {
-          "name": "cost_non_member",
-          "ordinal": 16,
-          "type_info": "Numeric"
-        },
-        {
-          "name": "location",
-          "ordinal": 17,
-          "type_info": "Text"
-        },
-        {
-          "name": "booking_template",
-          "ordinal": 18,
-          "type_info": "Text"
-        },
-        {
-          "name": "waiting_template",
-          "ordinal": 19,
-          "type_info": "Text"
-        },
-        {
-          "name": "alt_booking_button_text",
-          "ordinal": 20,
-          "type_info": "Text"
-        },
-        {
-          "name": "alt_email_address",
-          "ordinal": 21,
-          "type_info": "Text"
-        },
-        {
-          "name": "external_operator",
-          "ordinal": 22,
-          "type_info": "Bool"
-        },
-        {
-          "name": "subscribers",
-          "ordinal": 23,
-          "type_info": "Int8"
-        },
-        {
-          "name": "waiting_list",
-          "ordinal": 24,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        false,
-        true,
-        true
-      ],
-      "parameters": {
-        "Left": [
-          {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "Draft",
-                  "Review",
-                  "Published",
-                  "Finished",
-                  "Closed"
-                ]
-              },
-              "name": "lifecycle_status"
-            }
-          }
-        ]
-      }
-    },
-    "query": "\nSELECT\n    e.id,\n    e.created,\n    e.closed,\n    e.event_type AS \"event_type: EventType\",\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\",\n    e.name,\n    e.sort_index,\n    e.short_description,\n    e.description,\n    e.image,\n    e.light,\n    e.custom_date,\n    e.duration_in_minutes,\n    e.max_subscribers,\n    e.max_waiting_list,\n    e.cost_member,\n    e.cost_non_member,\n    e.location,\n    e.booking_template,\n    e.waiting_template,\n    e.alt_booking_button_text,\n    e.alt_email_address,\n    e.external_operator,\n    vev.subscribers,\n    vev.waiting_list\nFROM\n    events e,\n    v_event_counters vev\nWHERE\n    e.id = vev.id\n    AND e.lifecycle_status = $1\nORDER BY\n    e.sort_index,\n    e.created"
   }
 }

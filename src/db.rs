@@ -719,6 +719,7 @@ pub enum BookingResult {
     Booked(Event, Vec<EventCounter>, String),
     WaitingList(Event, Vec<EventCounter>, String),
     DuplicateBooking,
+    NotBookable,
     BookedOut,
 }
 
@@ -739,6 +740,10 @@ impl EventSubscriberId {
 pub async fn book_event(pool: &PgPool, booking: &EventBooking) -> Result<BookingResult> {
     let mut tx = pool.begin().await?;
 
+    if !is_event_bookable(&mut tx, &booking.event_id).await? {
+        return Ok(BookingResult::NotBookable)
+    }
+
     let result = match calc_enroll_status(&mut tx, &booking.event_id).await? {
         Some(enrolled) => process_booking(&mut tx, booking, enrolled, false).await?,
         None => BookingResult::BookedOut,
@@ -755,6 +760,10 @@ pub async fn pre_book_event(
     subscriber_id: i32,
 ) -> Result<(BookingResult, Option<EventBooking>)> {
     let mut tx = pool.begin().await?;
+
+    if !is_event_bookable(&mut tx, &event_id).await? {
+        return Ok((BookingResult::NotBookable, None))
+    }
 
     let result = match calc_enroll_status(&mut tx, &event_id).await? {
         Some(enrolled) => {
@@ -809,6 +818,26 @@ WHERE
     tx.commit().await?;
 
     Ok(result)
+}
+
+async fn is_event_bookable(conn: &mut PgConnection, event_id: &EventId) -> Result<bool> {
+    let lifecycle = query!(
+        r#"
+SELECT
+    e.lifecycle_status AS "lifecycle_status: LifecycleStatus"
+FROM
+    events e
+WHERE
+    e.id = $1"#,
+        event_id.get_ref()
+    )
+    .map(|row| {
+        row.lifecycle_status
+    })
+    .fetch_one(conn)
+    .await?;
+
+    Ok(lifecycle.is_bookable())
 }
 
 async fn calc_enroll_status(conn: &mut PgConnection, event_id: &EventId) -> Result<Option<bool>> {

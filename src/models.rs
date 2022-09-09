@@ -271,6 +271,18 @@ pub enum LifecycleStatus {
     Closed,
 }
 
+impl LifecycleStatus {
+    pub fn is_bookable(self) -> bool {
+        match self {
+            LifecycleStatus::Draft => false,
+            LifecycleStatus::Review => true,
+            LifecycleStatus::Published => true,
+            LifecycleStatus::Finished => true,
+            LifecycleStatus::Closed => false,
+        }
+    }
+}
+
 impl FromStr for LifecycleStatus {
     type Err = anyhow::Error;
 

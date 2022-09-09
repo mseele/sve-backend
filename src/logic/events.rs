@@ -117,6 +117,13 @@ async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingRespo
             );
             BookingResponse::failure("Wir haben schon eine Buchung mit diesen Anmeldedaten erkannt. Bitte verwende für weitere Buchungen andere Anmeldedaten.")
         }
+        BookingResult::NotBookable => {
+            error!(
+                "Event ({}) booking failed because the event is in a unbookable state.",
+                booking.event_id
+            );
+            BookingResponse::failure("Das Event kann aktuell leider nicht gebucht werden.")
+        }
         BookingResult::BookedOut => {
             error!(
                 "Booking failed because Event ({}) was overbooked.",
@@ -177,6 +184,13 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
                 booking
             );
             BookingResponse::failure("Der Buchungslink wurde schon benutzt und ist daher ungültig.")
+        }
+        BookingResult::NotBookable => {
+            warn!(
+                "Prebooking is not possible because the event is in a unbookable state for booking {:?}",
+                booking
+            );
+            BookingResponse::failure("Das Event kann aktuell leider nicht gebucht werden.")
         }
         BookingResult::BookedOut => {
             BookingResponse::failure("Das Event ist leider schon ausgebucht.")
