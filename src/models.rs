@@ -75,7 +75,7 @@ impl<'de> Deserialize<'de> for EventId {
 
 impl From<i32> for EventId {
     fn from(value: i32) -> Self {
-        EventId(value)
+        Self(value)
     }
 }
 
@@ -220,8 +220,8 @@ impl From<EventType> for &str {
 impl From<EventType> for NewsTopic {
     fn from(event_type: EventType) -> Self {
         match event_type {
-            EventType::Fitness => NewsTopic::Fitness,
-            EventType::Events => NewsTopic::Events,
+            EventType::Fitness => Self::Fitness,
+            EventType::Events => Self::Events,
         }
     }
 }
@@ -229,8 +229,8 @@ impl From<EventType> for NewsTopic {
 impl From<EventType> for EmailType {
     fn from(event_type: EventType) -> Self {
         match event_type {
-            EventType::Fitness => EmailType::Fitness,
-            EventType::Events => EmailType::Events,
+            EventType::Fitness => Self::Fitness,
+            EventType::Events => Self::Events,
         }
     }
 }
@@ -240,8 +240,8 @@ impl FromStr for EventType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Fitness" => Ok(EventType::Fitness),
-            "Events" => Ok(EventType::Events),
+            "Fitness" => Ok(Self::Fitness),
+            "Events" => Ok(Self::Events),
             other => bail!("Invalid type {}", other),
         }
     }
@@ -288,11 +288,11 @@ impl FromStr for LifecycleStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "draft" => Ok(LifecycleStatus::Draft),
-            "review" => Ok(LifecycleStatus::Review),
-            "published" => Ok(LifecycleStatus::Published),
-            "finished" => Ok(LifecycleStatus::Finished),
-            "closed" => Ok(LifecycleStatus::Closed),
+            "draft" => Ok(Self::Draft),
+            "review" => Ok(Self::Review),
+            "published" => Ok(Self::Published),
+            "finished" => Ok(Self::Finished),
+            "closed" => Ok(Self::Closed),
             other => bail!("Invalid lifecycle status {}", other),
         }
     }
@@ -408,6 +408,16 @@ impl BookingResponse {
     }
 }
 
+#[derive(Deserialize, Debug)]
+pub struct EventEmail {
+    pub event_id: EventId,
+    pub bookings: bool,
+    pub waiting_list: bool,
+    pub subject: String,
+    pub body: String,
+    pub attachments: Option<Vec<EmailAttachment>>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NewsSubscription {
     pub email: String,
@@ -453,9 +463,9 @@ impl FromStr for NewsTopic {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "General" => Ok(NewsTopic::General),
-            "Events" => Ok(NewsTopic::Events),
-            "Fitness" => Ok(NewsTopic::Fitness),
+            "General" => Ok(Self::General),
+            "Events" => Ok(Self::Events),
+            "Fitness" => Ok(Self::Fitness),
             other => bail!("Invalid topic {}", other),
         }
     }
@@ -464,9 +474,9 @@ impl FromStr for NewsTopic {
 impl From<NewsTopic> for EmailType {
     fn from(topic: NewsTopic) -> Self {
         match topic {
-            NewsTopic::General => EmailType::Info,
-            NewsTopic::Events => EmailType::Events,
-            NewsTopic::Fitness => EmailType::Fitness,
+            NewsTopic::General => Self::Info,
+            NewsTopic::Events => Self::Events,
+            NewsTopic::Fitness => Self::Fitness,
         }
     }
 }
@@ -597,10 +607,10 @@ pub enum MessageType {
 impl From<MessageType> for EmailType {
     fn from(message_type: MessageType) -> Self {
         match message_type {
-            MessageType::General => EmailType::Info,
-            MessageType::Events => EmailType::Events,
-            MessageType::Fitness => EmailType::Fitness,
-            MessageType::Kunstrasen => EmailType::Kunstrasen,
+            MessageType::General => Self::Info,
+            MessageType::Events => Self::Events,
+            MessageType::Fitness => Self::Fitness,
+            MessageType::Kunstrasen => Self::Kunstrasen,
         }
     }
 }
@@ -628,7 +638,7 @@ impl VerifyPaymentBookingRecord {
         enrolled: bool,
         payed: Option<DateTime<Utc>>,
     ) -> Self {
-        VerifyPaymentBookingRecord {
+        Self {
             booking_id,
             event_name,
             full_name,
@@ -649,7 +659,7 @@ pub struct VerifyPaymentResult {
 
 impl VerifyPaymentResult {
     pub fn new(title: String, values: Vec<String>) -> Self {
-        VerifyPaymentResult { title, values }
+        Self { title, values }
     }
 }
 
