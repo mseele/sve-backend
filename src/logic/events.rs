@@ -104,11 +104,11 @@ fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
 async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingResponse> {
     let booking_result = db::book_event(pool, &booking).await?;
     let booking_response = match booking_result {
-        BookingResult::Booked(event, counter, booking_number) => {
-            process_booking(pool, &booking, event, counter, true, booking_number).await?
+        BookingResult::Booked(event, counter, payment_id) => {
+            process_booking(pool, &booking, event, counter, true, payment_id).await?
         }
-        BookingResult::WaitingList(event, counter, booking_number) => {
-            process_booking(pool, &booking, event, counter, false, booking_number).await?
+        BookingResult::WaitingList(event, counter, payment_id) => {
+            process_booking(pool, &booking, event, counter, false, payment_id).await?
         }
         BookingResult::DuplicateBooking => {
             error!(
@@ -154,7 +154,7 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
 
     let (booking_result, booking) = db::pre_book_event(pool, event_id, subscriber_id).await?;
     let booking_response = match booking_result {
-        BookingResult::Booked(event, counter, booking_number) => {
+        BookingResult::Booked(event, counter, payment_id) => {
             process_booking(
                 pool,
                 &booking
@@ -162,11 +162,11 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
                 event,
                 counter,
                 true,
-                booking_number,
+                payment_id,
             )
             .await?
         }
-        BookingResult::WaitingList(event, counter, booking_number) => {
+        BookingResult::WaitingList(event, counter, payment_id) => {
             process_booking(
                 pool,
                 &booking
@@ -174,7 +174,7 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
                 event,
                 counter,
                 false,
-                booking_number,
+                payment_id,
             )
             .await?
         }
@@ -206,10 +206,10 @@ async fn process_booking(
     event: Event,
     counter: Vec<EventCounter>,
     booked: bool,
-    booking_number: String,
+    payment_id: String,
 ) -> Result<BookingResponse> {
     subscribe_to_updates(pool, booking, &event).await?;
-    send_mail(booking, &event, booked, booking_number).await?;
+    send_mail(booking, &event, booked, payment_id).await?;
     info!("Booking of Event {} was successfull", booking.event_id);
     let message;
     if booked {
@@ -236,7 +236,7 @@ async fn send_mail(
     booking: &EventBooking,
     event: &Event,
     booked: bool,
-    booking_number: String,
+    payment_id: String,
 ) -> Result<()> {
     let email_account = match &event.alt_email_address {
         Some(email_address) => email::get_account_by_address(email_address),
@@ -251,15 +251,15 @@ async fn send_mail(
     );
     let subject;
     let template;
-    let booking_num;
+    let opt_payment_id;
     if booked {
         subject = format!("{} Bestätigung Buchung", subject_prefix);
         template = &event.booking_template;
-        booking_num = Some(&booking_number);
+        opt_payment_id = Some(payment_id);
     } else {
         subject = format!("{} Bestätigung Warteliste", subject_prefix);
         template = &event.waiting_template;
-        booking_num = None;
+        opt_payment_id = None;
     }
 
     let message = email_account
@@ -271,7 +271,7 @@ async fn send_mail(
             template,
             booking,
             event,
-            booking_num,
+            opt_payment_id,
         )))?;
 
     email::send_message(&email_account, message).await?;
@@ -283,7 +283,7 @@ fn create_body(
     template: &str,
     booking: &EventBooking,
     event: &Event,
-    booking_number: Option<&String>,
+    payment_id: Option<String>,
 ) -> String {
     let mut body = template
         .replace("${firstname}", booking.first_name.trim())
@@ -292,8 +292,8 @@ fn create_body(
         .replace("${location}", &event.location)
         .replace("${price}", &booking.cost(event).to_euro())
         .replace("${dates}", &format_dates(&event));
-    if let Some(booking_number) = booking_number {
-        body = body.replace("${booking_number}", booking_number);
+    if let Some(payment_id) = payment_id {
+        body = body.replace("${payment_id}", &payment_id);
     }
     body = replace_payday(body, &event);
     if booking.updates.unwrap_or(false) {
@@ -589,14 +589,14 @@ mod tests {
 
         assert_eq!(
             create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${booking_number}
+                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${payment_id}
 ${dates}",
                 &booking_member,
                 &event,
                 None
             ),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{booking_number}}
+                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{payment_id}}
 - Mo., 07. März 2022, 19:00 Uhr
 - Di., 08. März 2022, 19:00 Uhr
 - Mi., 09. März 2022, 19:00 Uhr
@@ -609,7 +609,7 @@ ${dates}",
         );
         assert_eq!(
             create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${booking_number}
+                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${payment_id}
 ${dates}",
                 &booking_non_member,
                 &event,
