@@ -2,8 +2,9 @@ use super::csv::PaymentRecord;
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
-    BookingResponse, Event, EventBooking, EventCounter, EventId, EventType, LifecycleStatus,
-    NewsSubscription, PartialEvent, ToEuro, VerifyPaymentBookingRecord, VerifyPaymentResult,
+    BookingResponse, Email, Event, EventBooking, EventCounter, EventEmail, EventId, EventType,
+    LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
+    VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
@@ -91,6 +92,61 @@ pub async fn verify_payments(
     }
 
     Ok(result)
+}
+
+pub async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
+    if !data.bookings && !data.waiting_list {
+        bail!("Either bookings or waiting list option need to be selected to send an event email.")
+    }
+    let enrolled = if data.bookings && !data.waiting_list {
+        Some(true)
+    } else if data.waiting_list && !data.bookings {
+        Some(false)
+    } else {
+        None
+    };
+
+    let event = db::get_event(pool, &data.event_id)
+        .await?
+        .ok_or_else(|| anyhow!("Found no event with id '{}'", data.event_id))?;
+
+    let bookings = db::get_bookings(pool, &data.event_id, enrolled).await?;
+    if bookings.is_empty() {
+        return Ok(())
+    }
+
+    let email_account = email::get_account_by_type(event.event_type.into())?;
+    let message_type: MessageType = event.event_type.into();
+    let mut messages = Vec::new();
+
+    for (booking, payment_id) in bookings {
+        let body = create_body(&data.body, &booking, &event, Some(payment_id));
+
+        let attachments = match &data.attachments {
+            Some(attachments) => Some(
+                attachments
+                    .into_iter()
+                    .map(|attachment| attachment.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            None => None,
+        };
+
+        messages.push(
+            Email::new(
+                message_type,
+                booking.email,
+                data.subject.clone(),
+                body,
+                attachments,
+            )
+            .into_message(&email_account)?,
+        );
+    }
+
+    email::send_messages(&email_account, messages).await?;
+
+    Ok(())
 }
 
 fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
@@ -613,7 +669,7 @@ ${dates}",
 ${dates}",
                 &booking_non_member,
                 &event,
-                Some(&String::from("22-1012"))
+                Some(String::from("22-1012"))
             ),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012

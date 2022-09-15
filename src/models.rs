@@ -2,7 +2,8 @@ use anyhow::{bail, Context, Result};
 use base64::STANDARD;
 use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
-use lettre::message::{Mailbox, MessageBuilder};
+use lettre::message::header::ContentType;
+use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -227,6 +228,15 @@ impl From<EventType> for NewsTopic {
 }
 
 impl From<EventType> for EmailType {
+    fn from(event_type: EventType) -> Self {
+        match event_type {
+            EventType::Fitness => Self::Fitness,
+            EventType::Events => Self::Events,
+        }
+    }
+}
+
+impl From<EventType> for MessageType {
     fn from(event_type: EventType) -> Self {
         match event_type {
             EventType::Fitness => Self::Fitness,
@@ -575,12 +585,7 @@ pub struct ContactMessage {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct MassEmails {
-    pub emails: Vec<MassEmail>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct MassEmail {
+pub struct Email {
     #[serde(rename = "type")]
     pub message_type: MessageType,
     pub to: String,
@@ -589,7 +594,48 @@ pub struct MassEmail {
     pub attachments: Option<Vec<EmailAttachment>>,
 }
 
-#[derive(Deserialize, Debug)]
+impl Email {
+    pub fn new(
+        message_type: MessageType,
+        to: String,
+        subject: String,
+        content: String,
+        attachments: Option<Vec<EmailAttachment>>,
+    ) -> Self {
+        Self {
+            message_type,
+            to,
+            subject,
+            content,
+            attachments,
+        }
+    }
+
+    pub fn into_message(self, email_account: &EmailAccount) -> Result<Message> {
+        let message_builder = email_account
+            .new_message()?
+            .to(self.to.parse()?)
+            .subject(self.subject);
+        let message = match self.attachments {
+            Some(attachments) => {
+                let mut multi_part = MultiPart::mixed().singlepart(SinglePart::plain(self.content));
+                for attachment in attachments {
+                    let filename = attachment.name;
+                    let content = base64::decode(&attachment.data)?;
+                    let content_type = ContentType::parse(&attachment.mime_type)?;
+                    multi_part = multi_part
+                        .singlepart(Attachment::new(filename).body(content, content_type));
+                }
+                message_builder.multipart(multi_part)
+            }
+            None => message_builder.singlepart(SinglePart::plain(self.content)),
+        }?;
+
+        Ok(message)
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct EmailAttachment {
     pub name: String,
     pub mime_type: String,

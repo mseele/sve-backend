@@ -1,6 +1,6 @@
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{
-    ContactMessage, EventBooking, EventId, LifecycleStatus, MassEmails, NewsSubscription,
+    ContactMessage, Email, EventBooking, EventEmail, EventId, LifecycleStatus, NewsSubscription,
     PartialEvent,
 };
 use actix_web::http::header::ContentType;
@@ -113,7 +113,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 // events
 
 #[derive(Debug, Deserialize)]
-pub struct EventsRequest {
+struct EventsRequest {
     beta: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_lifecycle_status_list")]
     status: Option<Vec<LifecycleStatus>>,
@@ -299,13 +299,26 @@ async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError
 
 // contact
 
+#[derive(Deserialize, Debug)]
+struct EmailsBody {
+    emails: Option<Vec<Email>>,
+    event: Option<EventEmail>,
+}
+
 async fn message(Json(message): Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
     contact::message(message).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn emails(Json(emails): Json<MassEmails>) -> Result<impl Responder, ResponseError> {
-    contact::emails(emails.emails).await?;
+async fn emails(
+    pool: Data<PgPool>,
+    Json(body): Json<EmailsBody>,
+) -> Result<impl Responder, ResponseError> {
+    if let Some(emails) = body.emails {
+        contact::emails(emails).await?;
+    } else if let Some(event) = body.event {
+        events::send_event_email(&pool, event).await?;
+    }
     Ok(HttpResponse::Ok().finish())
 }
 

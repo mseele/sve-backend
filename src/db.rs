@@ -143,9 +143,9 @@ ORDER BY
     Ok(events)
 }
 
-pub async fn get_event(pool: &PgPool, id: EventId) -> Result<Option<Event>> {
+pub async fn get_event(pool: &PgPool, id: &EventId) -> Result<Option<Event>> {
     let mut conn = pool.acquire().await?;
-    Ok(fetch_event(&mut conn, &id).await?)
+    Ok(fetch_event(&mut conn, id).await?)
 }
 
 async fn fetch_event(conn: &mut PgConnection, id: &EventId) -> Result<Option<Event>> {
@@ -677,6 +677,72 @@ pub async fn get_event_counters(
     Ok(fetch_event_counters(&mut conn, lifecycle_status).await?)
 }
 
+pub async fn get_bookings(
+    pool: &PgPool,
+    event_id: &EventId,
+    enrolled: Option<bool>,
+) -> Result<Vec<(EventBooking, String)>> {
+    let mut conn = pool.acquire().await?;
+
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        r#"
+SELECT
+    v.event_id,
+    v.first_name,
+    v.last_name,
+    v.street,
+    v.city,
+    v.email,
+    v.phone,
+    v.member,
+    v.payment_id
+FROM
+    v_event_bookings v
+WHERE
+    v.event_id = "#,
+    );
+    query_builder.push_bind(event_id.get_ref()).push(
+        r#"
+    AND v.canceled IS NULL"#,
+    );
+
+    if let Some(enrolled) = enrolled {
+        query_builder
+            .push(
+                r#"
+    AND v.enrolled = "#,
+            )
+            .push_bind(enrolled);
+    }
+
+    query_builder.push(
+        r#"
+ORDER BY
+    v.created"#,
+    );
+
+    let mut result = Vec::new();
+    for row in query_builder.build().fetch_all(&mut *conn).await? {
+        result.push((
+            EventBooking::new(
+                row.try_get("event_id")?,
+                row.try_get("first_name")?,
+                row.try_get("last_name")?,
+                row.try_get("street")?,
+                row.try_get("city")?,
+                row.try_get("email")?,
+                row.try_get("phone")?,
+                row.try_get("member")?,
+                None,
+                None,
+            ),
+            row.try_get("payment_id")?,
+        ));
+    }
+
+    Ok(result)
+}
+
 async fn fetch_event_counters(
     conn: &mut PgConnection,
     lifecycle_status: LifecycleStatus,
@@ -741,7 +807,7 @@ pub async fn book_event(pool: &PgPool, booking: &EventBooking) -> Result<Booking
     let mut tx = pool.begin().await?;
 
     if !is_event_bookable(&mut tx, &booking.event_id).await? {
-        return Ok(BookingResult::NotBookable)
+        return Ok(BookingResult::NotBookable);
     }
 
     let result = match calc_enroll_status(&mut tx, &booking.event_id).await? {
@@ -762,7 +828,7 @@ pub async fn pre_book_event(
     let mut tx = pool.begin().await?;
 
     if !is_event_bookable(&mut tx, &event_id).await? {
-        return Ok((BookingResult::NotBookable, None))
+        return Ok((BookingResult::NotBookable, None));
     }
 
     let result = match calc_enroll_status(&mut tx, &event_id).await? {
@@ -831,9 +897,7 @@ WHERE
     e.id = $1"#,
         event_id.get_ref()
     )
-    .map(|row| {
-        row.lifecycle_status
-    })
+    .map(|row| row.lifecycle_status)
     .fetch_one(conn)
     .await?;
 

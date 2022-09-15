@@ -1,12 +1,9 @@
 use crate::{
     email,
-    models::{ContactMessage, EmailAccount, EmailType, MassEmail},
+    models::{ContactMessage, Email, EmailType},
 };
 use anyhow::Result;
-use lettre::{
-    message::{header::ContentType, Attachment, MultiPart, SinglePart},
-    Message,
-};
+use lettre::message::SinglePart;
 use log::info;
 use std::collections::HashMap;
 
@@ -49,8 +46,8 @@ pub async fn message(contact_message: ContactMessage) -> Result<()> {
     Ok(())
 }
 
-pub async fn emails(emails: Vec<MassEmail>) -> Result<()> {
-    let mut grouped_emails: HashMap<EmailType, Vec<MassEmail>> = HashMap::new();
+pub async fn emails(emails: Vec<Email>) -> Result<()> {
+    let mut grouped_emails: HashMap<EmailType, Vec<Email>> = HashMap::new();
     for email in emails {
         let email_type = email.message_type.into();
         grouped_emails
@@ -62,33 +59,10 @@ pub async fn emails(emails: Vec<MassEmail>) -> Result<()> {
         let from = email::get_account_by_type(email_type)?;
         let messages = emails
             .into_iter()
-            .map(|email| map(&from, email))
+            .map(|email| email.into_message(&from))
             .collect::<anyhow::Result<Vec<_>>>()?;
         email::send_messages(&from, messages).await?;
     }
 
     Ok(())
-}
-
-fn map(email_account: &EmailAccount, email: MassEmail) -> Result<Message> {
-    let message_builder = email_account
-        .new_message()?
-        .to(email.to.parse()?)
-        .subject(email.subject);
-    let message = match email.attachments {
-        Some(attachments) => {
-            let mut multi_part = MultiPart::mixed().singlepart(SinglePart::plain(email.content));
-            for attachment in attachments {
-                let filename = attachment.name;
-                let content = base64::decode(&attachment.data)?;
-                let content_type = ContentType::parse(&attachment.mime_type)?;
-                multi_part =
-                    multi_part.singlepart(Attachment::new(filename).body(content, content_type));
-            }
-            message_builder.multipart(multi_part)
-        }
-        None => message_builder.singlepart(SinglePart::plain(email.content)),
-    }?;
-
-    Ok(message)
 }
