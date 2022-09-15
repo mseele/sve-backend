@@ -1,4 +1,4 @@
-use crate::models::{NewsTopic, NewsSubscription};
+use crate::models::{NewsSubscription, NewsTopic};
 use crate::{db, email};
 use anyhow::Result;
 use lettre::message::header::{self, ContentType};
@@ -6,22 +6,24 @@ use lettre::message::SinglePart;
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 
-pub const UNSUBSCRIBE_MESSAGE: &str = "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
+pub(crate)const UNSUBSCRIBE_MESSAGE: &str = "Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
 https://www.sv-eutingen.de/newsletter";
 
-pub async fn subscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<()> {
+pub(crate) async fn subscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<()> {
     subscribe_to_news(pool, subscription, true).await?;
 
     Ok(())
 }
 
-pub async fn unsubscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<()> {
+pub(crate) async fn unsubscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<()> {
     db::unsubscribe(pool, &subscription).await?;
 
     Ok(())
 }
 
-pub async fn get_subscriptions(pool: &PgPool) -> Result<HashMap<NewsTopic, HashSet<String>>> {
+pub(crate) async fn get_subscriptions(
+    pool: &PgPool,
+) -> Result<HashMap<NewsTopic, HashSet<String>>> {
     let subscriptions = db::get_subscriptions(pool).await?;
 
     let mut result: HashMap<NewsTopic, HashSet<String>> = HashMap::new();

@@ -7,7 +7,7 @@ use lettre::message::SinglePart;
 use log::info;
 use std::collections::HashMap;
 
-pub async fn message(contact_message: ContactMessage) -> Result<()> {
+pub(crate) async fn message(contact_message: ContactMessage) -> Result<()> {
     let email_account = email::get_account_by_type(contact_message.message_type.into())?;
 
     let email = contact_message.email.trim();
@@ -46,7 +46,7 @@ pub async fn message(contact_message: ContactMessage) -> Result<()> {
     Ok(())
 }
 
-pub async fn emails(emails: Vec<Email>) -> Result<()> {
+pub(crate) async fn emails(emails: Vec<Email>) -> Result<()> {
     let mut grouped_emails: HashMap<EmailType, Vec<Email>> = HashMap::new();
     for email in emails {
         let email_type = email.message_type.into();

@@ -20,14 +20,14 @@ base64_serde_type!(Base64Standard, STANDARD);
 /// unique id on json serialization / deserialization.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct EventId(i32);
+pub(crate) struct EventId(i32);
 
 impl EventId {
-    pub fn get_ref(&self) -> &i32 {
+    pub(crate) fn get_ref(&self) -> &i32 {
         &self.0
     }
 
-    pub fn into_inner(self) -> i32 {
+    pub(crate) fn into_inner(self) -> i32 {
         self.0
     }
 }
@@ -81,37 +81,37 @@ impl From<i32> for EventId {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Event {
-    pub id: EventId,
-    pub created: DateTime<Utc>,
-    pub closed: Option<DateTime<Utc>>,
+pub(crate) struct Event {
+    pub(crate) id: EventId,
+    pub(crate) created: DateTime<Utc>,
+    pub(crate) closed: Option<DateTime<Utc>>,
     #[serde(rename = "type")]
-    pub event_type: EventType,
+    pub(crate) event_type: EventType,
     #[serde(rename = "status")]
-    pub lifecycle_status: LifecycleStatus,
-    pub name: String,
-    pub sort_index: i16,
-    pub short_description: String,
-    pub description: String,
-    pub image: String,
-    pub light: bool,
-    pub dates: Vec<DateTime<Utc>>,
-    pub custom_date: Option<String>,
-    pub duration_in_minutes: i16,
-    pub max_subscribers: i16,
-    pub max_waiting_list: i16,
-    pub cost_member: BigDecimal,
-    pub cost_non_member: BigDecimal,
-    pub location: String,
-    pub booking_template: String,
-    pub waiting_template: String,
-    pub alt_booking_button_text: Option<String>,
-    pub alt_email_address: Option<String>,
-    pub external_operator: bool,
+    pub(crate) lifecycle_status: LifecycleStatus,
+    pub(crate) name: String,
+    pub(crate) sort_index: i16,
+    pub(crate) short_description: String,
+    pub(crate) description: String,
+    pub(crate) image: String,
+    pub(crate) light: bool,
+    pub(crate) dates: Vec<DateTime<Utc>>,
+    pub(crate) custom_date: Option<String>,
+    pub(crate) duration_in_minutes: i16,
+    pub(crate) max_subscribers: i16,
+    pub(crate) max_waiting_list: i16,
+    pub(crate) cost_member: BigDecimal,
+    pub(crate) cost_non_member: BigDecimal,
+    pub(crate) location: String,
+    pub(crate) booking_template: String,
+    pub(crate) waiting_template: String,
+    pub(crate) alt_booking_button_text: Option<String>,
+    pub(crate) alt_email_address: Option<String>,
+    pub(crate) external_operator: bool,
 }
 
 impl Event {
-    pub fn new(
+    pub(crate) fn new(
         id: i32,
         created: DateTime<Utc>,
         closed: Option<DateTime<Utc>>,
@@ -165,7 +165,7 @@ impl Event {
         }
     }
 
-    pub fn cost<'a>(&'a self, is_member: bool) -> &BigDecimal {
+    pub(crate) fn cost<'a>(&'a self, is_member: bool) -> &BigDecimal {
         match is_member {
             true => &self.cost_member,
             false => &self.cost_non_member,
@@ -174,37 +174,37 @@ impl Event {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
-pub struct PartialEvent {
-    pub id: Option<EventId>,
-    pub closed: Option<DateTime<Utc>>,
+pub(crate) struct PartialEvent {
+    pub(crate) id: Option<EventId>,
+    pub(crate) closed: Option<DateTime<Utc>>,
     #[serde(rename = "type")]
-    pub event_type: Option<EventType>,
+    pub(crate) event_type: Option<EventType>,
     #[serde(rename = "status")]
-    pub lifecycle_status: Option<LifecycleStatus>,
-    pub name: Option<String>,
-    pub sort_index: Option<i16>,
-    pub short_description: Option<String>,
-    pub description: Option<String>,
-    pub image: Option<String>,
-    pub light: Option<bool>,
-    pub dates: Option<Vec<DateTime<Utc>>>,
-    pub custom_date: Option<String>,
-    pub duration_in_minutes: Option<i16>,
-    pub max_subscribers: Option<i16>,
-    pub max_waiting_list: Option<i16>,
-    pub cost_member: Option<BigDecimal>,
-    pub cost_non_member: Option<BigDecimal>,
-    pub location: Option<String>,
-    pub booking_template: Option<String>,
-    pub waiting_template: Option<String>,
-    pub alt_booking_button_text: Option<String>,
-    pub alt_email_address: Option<String>,
-    pub external_operator: Option<bool>,
+    pub(crate) lifecycle_status: Option<LifecycleStatus>,
+    pub(crate) name: Option<String>,
+    pub(crate) sort_index: Option<i16>,
+    pub(crate) short_description: Option<String>,
+    pub(crate) description: Option<String>,
+    pub(crate) image: Option<String>,
+    pub(crate) light: Option<bool>,
+    pub(crate) dates: Option<Vec<DateTime<Utc>>>,
+    pub(crate) custom_date: Option<String>,
+    pub(crate) duration_in_minutes: Option<i16>,
+    pub(crate) max_subscribers: Option<i16>,
+    pub(crate) max_waiting_list: Option<i16>,
+    pub(crate) cost_member: Option<BigDecimal>,
+    pub(crate) cost_non_member: Option<BigDecimal>,
+    pub(crate) location: Option<String>,
+    pub(crate) booking_template: Option<String>,
+    pub(crate) waiting_template: Option<String>,
+    pub(crate) alt_booking_button_text: Option<String>,
+    pub(crate) alt_email_address: Option<String>,
+    pub(crate) external_operator: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
 #[sqlx(type_name = "event_type")]
-pub enum EventType {
+pub(crate) enum EventType {
     Fitness,
     Events,
 }
@@ -259,7 +259,7 @@ impl FromStr for EventType {
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
 #[sqlx(type_name = "lifecycle_status")]
-pub enum LifecycleStatus {
+pub(crate) enum LifecycleStatus {
     /// Not visible and not bookable.
     /// Used to prepare a new event - deletion is possible
     Draft,
@@ -282,7 +282,7 @@ pub enum LifecycleStatus {
 }
 
 impl LifecycleStatus {
-    pub fn is_bookable(self) -> bool {
+    pub(crate) fn is_bookable(self) -> bool {
         match self {
             LifecycleStatus::Draft => false,
             LifecycleStatus::Review => true,
@@ -309,21 +309,21 @@ impl FromStr for LifecycleStatus {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct EventBooking {
-    pub event_id: EventId,
-    pub first_name: String,
-    pub last_name: String,
-    pub street: String,
-    pub city: String,
-    pub email: String,
-    pub phone: Option<String>,
-    pub member: Option<bool>,
-    pub updates: Option<bool>,
-    pub comments: Option<String>,
+pub(crate) struct EventBooking {
+    pub(crate) event_id: EventId,
+    pub(crate) first_name: String,
+    pub(crate) last_name: String,
+    pub(crate) street: String,
+    pub(crate) city: String,
+    pub(crate) email: String,
+    pub(crate) phone: Option<String>,
+    pub(crate) member: Option<bool>,
+    pub(crate) updates: Option<bool>,
+    pub(crate) comments: Option<String>,
 }
 
 impl EventBooking {
-    pub fn new(
+    pub(crate) fn new(
         event_id: i32,
         first_name: String,
         last_name: String,
@@ -349,26 +349,26 @@ impl EventBooking {
         }
     }
 
-    pub fn is_member(&self) -> bool {
+    pub(crate) fn is_member(&self) -> bool {
         self.member.unwrap_or(false)
     }
 
-    pub fn cost<'a>(&'a self, event: &'a Event) -> &BigDecimal {
+    pub(crate) fn cost<'a>(&'a self, event: &'a Event) -> &BigDecimal {
         event.cost(self.is_member())
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct EventCounter {
-    pub id: EventId,
-    pub max_subscribers: i16,
-    pub max_waiting_list: i16,
-    pub subscribers: i16,
-    pub waiting_list: i16,
+pub(crate) struct EventCounter {
+    pub(crate) id: EventId,
+    pub(crate) max_subscribers: i16,
+    pub(crate) max_waiting_list: i16,
+    pub(crate) subscribers: i16,
+    pub(crate) waiting_list: i16,
 }
 
 impl EventCounter {
-    pub fn new(
+    pub(crate) fn new(
         id: i32,
         max_subscribers: i16,
         max_waiting_list: i16,
@@ -384,7 +384,7 @@ impl EventCounter {
         }
     }
 
-    pub fn is_booked_up(&self) -> bool {
+    pub(crate) fn is_booked_up(&self) -> bool {
         if self.max_subscribers == -1 {
             return false;
         }
@@ -394,14 +394,14 @@ impl EventCounter {
 }
 
 #[derive(Serialize, Debug)]
-pub struct BookingResponse {
+pub(crate) struct BookingResponse {
     success: bool,
     message: String,
     counter: Vec<EventCounter>,
 }
 
 impl BookingResponse {
-    pub fn success(message: &str, counter: Vec<EventCounter>) -> Self {
+    pub(crate) fn success(message: &str, counter: Vec<EventCounter>) -> Self {
         Self {
             success: true,
             message: message.into(),
@@ -409,7 +409,7 @@ impl BookingResponse {
         }
     }
 
-    pub fn failure(message: &str) -> Self {
+    pub(crate) fn failure(message: &str) -> Self {
         Self {
             success: false,
             message: message.into(),
@@ -419,37 +419,37 @@ impl BookingResponse {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct EventEmail {
-    pub event_id: EventId,
-    pub bookings: bool,
-    pub waiting_list: bool,
-    pub subject: String,
-    pub body: String,
-    pub attachments: Option<Vec<EmailAttachment>>,
+pub(crate) struct EventEmail {
+    pub(crate) event_id: EventId,
+    pub(crate) bookings: bool,
+    pub(crate) waiting_list: bool,
+    pub(crate) subject: String,
+    pub(crate) body: String,
+    pub(crate) attachments: Option<Vec<EmailAttachment>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct NewsSubscription {
-    pub email: String,
+pub(crate) struct NewsSubscription {
+    pub(crate) email: String,
     #[serde(rename = "types")]
-    pub topics: Vec<NewsTopic>,
+    pub(crate) topics: Vec<NewsTopic>,
 }
 
 impl NewsSubscription {
-    pub fn new(email: String, topics: Vec<NewsTopic>) -> NewsSubscription {
+    pub(crate) fn new(email: String, topics: Vec<NewsTopic>) -> NewsSubscription {
         NewsSubscription { email, topics }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Copy, Hash)]
-pub enum NewsTopic {
+pub(crate) enum NewsTopic {
     General,
     Events,
     Fitness,
 }
 
 impl NewsTopic {
-    pub fn display_name(self: &Self) -> &str {
+    pub(crate) fn display_name(self: &Self) -> &str {
         match self {
             NewsTopic::General => "Allgemein",
             NewsTopic::Events => "Events",
@@ -492,20 +492,20 @@ impl From<NewsTopic> for EmailType {
 }
 
 #[derive(Serialize, Debug)]
-pub struct Appointment {
-    pub id: Option<String>,
-    pub sort_index: u32,
-    pub title: Option<String>,
-    pub link: Option<String>,
-    pub description: Option<String>,
-    pub start_date: Option<NaiveDate>,
-    pub end_date: Option<NaiveDate>,
-    pub start_date_time: Option<NaiveDateTime>,
-    pub end_date_time: Option<NaiveDateTime>,
+pub(crate) struct Appointment {
+    pub(crate) id: Option<String>,
+    pub(crate) sort_index: u32,
+    pub(crate) title: Option<String>,
+    pub(crate) link: Option<String>,
+    pub(crate) description: Option<String>,
+    pub(crate) start_date: Option<NaiveDate>,
+    pub(crate) end_date: Option<NaiveDate>,
+    pub(crate) start_date_time: Option<NaiveDateTime>,
+    pub(crate) end_date_time: Option<NaiveDateTime>,
 }
 
 impl Appointment {
-    pub fn new(
+    pub(crate) fn new(
         id: Option<String>,
         sort_index: u32,
         title: Option<String>,
@@ -531,25 +531,25 @@ impl Appointment {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct EmailAccount {
+pub(crate) struct EmailAccount {
     #[serde(rename = "type")]
-    pub email_type: EmailType,
-    pub name: String,
-    pub address: String,
+    pub(crate) email_type: EmailType,
+    pub(crate) name: String,
+    pub(crate) address: String,
     #[serde(with = "Base64Standard")]
     password: Vec<u8>,
 }
 
 impl EmailAccount {
-    pub fn mailbox(&self) -> Result<Mailbox> {
+    pub(crate) fn mailbox(&self) -> Result<Mailbox> {
         Ok(self.address.parse()?)
     }
 
-    pub fn new_message(&self) -> Result<MessageBuilder> {
+    pub(crate) fn new_message(&self) -> Result<MessageBuilder> {
         Ok(Message::builder().from(self.mailbox()?).date_now())
     }
 
-    pub fn mailer(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
+    pub(crate) fn mailer(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
         let transport = AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.gmail.com")?
             .credentials(Credentials::new(
                 self.address.clone(),
@@ -565,7 +565,7 @@ impl EmailAccount {
 }
 
 #[derive(Deserialize, PartialEq, Eq, Hash, Debug)]
-pub enum EmailType {
+pub(crate) enum EmailType {
     Fitness,
     Events,
     Info,
@@ -574,28 +574,28 @@ pub enum EmailType {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ContactMessage {
+pub(crate) struct ContactMessage {
     #[serde(rename = "type")]
-    pub message_type: MessageType,
-    pub to: String,
-    pub name: String,
-    pub email: String,
-    pub phone: Option<String>,
-    pub message: String,
+    pub(crate) message_type: MessageType,
+    pub(crate) to: String,
+    pub(crate) name: String,
+    pub(crate) email: String,
+    pub(crate) phone: Option<String>,
+    pub(crate) message: String,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Email {
+pub(crate) struct Email {
     #[serde(rename = "type")]
-    pub message_type: MessageType,
-    pub to: String,
-    pub subject: String,
-    pub content: String,
-    pub attachments: Option<Vec<EmailAttachment>>,
+    pub(crate) message_type: MessageType,
+    pub(crate) to: String,
+    pub(crate) subject: String,
+    pub(crate) content: String,
+    pub(crate) attachments: Option<Vec<EmailAttachment>>,
 }
 
 impl Email {
-    pub fn new(
+    pub(crate) fn new(
         message_type: MessageType,
         to: String,
         subject: String,
@@ -611,7 +611,7 @@ impl Email {
         }
     }
 
-    pub fn into_message(self, email_account: &EmailAccount) -> Result<Message> {
+    pub(crate) fn into_message(self, email_account: &EmailAccount) -> Result<Message> {
         let message_builder = email_account
             .new_message()?
             .to(self.to.parse()?)
@@ -636,14 +636,14 @@ impl Email {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct EmailAttachment {
-    pub name: String,
-    pub mime_type: String,
-    pub data: String,
+pub(crate) struct EmailAttachment {
+    pub(crate) name: String,
+    pub(crate) mime_type: String,
+    pub(crate) data: String,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Clone, Copy)]
-pub enum MessageType {
+pub(crate) enum MessageType {
     General,
     Events,
     Fitness,
@@ -662,19 +662,19 @@ impl From<MessageType> for EmailType {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct VerifyPaymentBookingRecord {
-    pub booking_id: i32,
+pub(crate) struct VerifyPaymentBookingRecord {
+    pub(crate) booking_id: i32,
     event_name: String,
-    pub full_name: String,
-    pub cost: BigDecimal,
-    pub payment_id: String,
-    pub canceled: Option<DateTime<Utc>>,
-    pub enrolled: bool,
-    pub payed: Option<DateTime<Utc>>,
+    pub(crate) full_name: String,
+    pub(crate) cost: BigDecimal,
+    pub(crate) payment_id: String,
+    pub(crate) canceled: Option<DateTime<Utc>>,
+    pub(crate) enrolled: bool,
+    pub(crate) payed: Option<DateTime<Utc>>,
 }
 
 impl VerifyPaymentBookingRecord {
-    pub fn new(
+    pub(crate) fn new(
         booking_id: i32,
         event_name: String,
         full_name: String,
@@ -698,18 +698,18 @@ impl VerifyPaymentBookingRecord {
 }
 
 #[derive(Debug, Serialize, PartialEq)]
-pub struct VerifyPaymentResult {
+pub(crate) struct VerifyPaymentResult {
     title: String,
     values: Vec<String>,
 }
 
 impl VerifyPaymentResult {
-    pub fn new(title: String, values: Vec<String>) -> Self {
+    pub(crate) fn new(title: String, values: Vec<String>) -> Self {
         Self { title, values }
     }
 }
 
-pub trait ToEuro {
+pub(crate) trait ToEuro {
     fn to_euro_without_symbol(&self) -> String;
 
     fn to_euro(&self) -> String {
@@ -717,7 +717,7 @@ pub trait ToEuro {
     }
 }
 
-pub trait FromEuro {
+pub(crate) trait FromEuro {
     fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError>;
     fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError>;
 }

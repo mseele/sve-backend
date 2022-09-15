@@ -13,12 +13,12 @@ use std::collections::{HashMap, HashSet};
 
 const DATABASE_URL: &str = include_str!("../secrets/database_url.env");
 
-pub async fn init_pool() -> Result<PgPool> {
+pub(crate) async fn init_pool() -> Result<PgPool> {
     let pool = PgPoolOptions::new().connect(DATABASE_URL).await?;
     Ok(pool)
 }
 
-pub async fn get_events(
+pub(crate) async fn get_events(
     pool: &PgPool,
     sort: bool,
     lifecycle_status: Option<Vec<LifecycleStatus>>,
@@ -143,7 +143,7 @@ ORDER BY
     Ok(events)
 }
 
-pub async fn get_event(pool: &PgPool, id: &EventId) -> Result<Option<Event>> {
+pub(crate) async fn get_event(pool: &PgPool, id: &EventId) -> Result<Option<Event>> {
     let mut conn = pool.acquire().await?;
     Ok(fetch_event(&mut conn, id).await?)
 }
@@ -264,7 +264,7 @@ ORDER BY
     Ok(events)
 }
 
-pub async fn write_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
+pub(crate) async fn write_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
     match partial_event.id {
         Some(id) => update_event(pool, &id, partial_event).await,
         None => save_new_event(pool, partial_event).await,
@@ -553,7 +553,7 @@ async fn insert_event_dates(
     Ok(dates)
 }
 
-pub async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
+pub(crate) async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     let lifecycle_status: Option<LifecycleStatus> = query!(
@@ -586,7 +586,7 @@ pub async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_bookings_to_verify_payment(
+pub(crate) async fn get_bookings_to_verify_payment(
     pool: &PgPool,
     payment_ids: HashSet<&String>,
 ) -> Result<Vec<VerifyPaymentBookingRecord>> {
@@ -642,7 +642,10 @@ ORDER BY
     Ok(result)
 }
 
-pub async fn mark_as_payed(pool: &PgPool, verified_payments: &HashMap<i32, String>) -> Result<()> {
+pub(crate) async fn mark_as_payed(
+    pool: &PgPool,
+    verified_payments: &HashMap<i32, String>,
+) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     // TODO: improve by using batch update
@@ -668,7 +671,7 @@ WHERE
     Ok(())
 }
 
-pub async fn get_event_counters(
+pub(crate) async fn get_event_counters(
     pool: &PgPool,
     lifecycle_status: LifecycleStatus,
 ) -> Result<Vec<EventCounter>> {
@@ -677,7 +680,7 @@ pub async fn get_event_counters(
     Ok(fetch_event_counters(&mut conn, lifecycle_status).await?)
 }
 
-pub async fn get_bookings(
+pub(crate) async fn get_bookings(
     pool: &PgPool,
     event_id: &EventId,
     enrolled: Option<bool>,
@@ -781,7 +784,7 @@ WHERE
     Ok(event_counters)
 }
 
-pub enum BookingResult {
+pub(crate) enum BookingResult {
     Booked(Event, Vec<EventCounter>, String),
     WaitingList(Event, Vec<EventCounter>, String),
     DuplicateBooking,
@@ -803,7 +806,7 @@ impl EventSubscriberId {
     }
 }
 
-pub async fn book_event(pool: &PgPool, booking: &EventBooking) -> Result<BookingResult> {
+pub(crate) async fn book_event(pool: &PgPool, booking: &EventBooking) -> Result<BookingResult> {
     let mut tx = pool.begin().await?;
 
     if !is_event_bookable(&mut tx, &booking.event_id).await? {
@@ -820,7 +823,7 @@ pub async fn book_event(pool: &PgPool, booking: &EventBooking) -> Result<Booking
     Ok(result)
 }
 
-pub async fn pre_book_event(
+pub(crate) async fn pre_book_event(
     pool: &PgPool,
     event_id: EventId,
     subscriber_id: i32,
@@ -1124,7 +1127,7 @@ async fn get_event_subscriber_id(
     Ok(id)
 }
 
-pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
+pub(crate) async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
     let subscriptions =
         query!(r#"SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"#)
             .map(|row| {
@@ -1146,7 +1149,10 @@ pub async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
     Ok(subscriptions)
 }
 
-pub async fn subscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<NewsSubscription> {
+pub(crate) async fn subscribe(
+    pool: &PgPool,
+    subscription: NewsSubscription,
+) -> Result<NewsSubscription> {
     let mut tx = pool.begin().await?;
     let current_subscription = get_current_subscription(&mut tx, &subscription.email).await?;
 
@@ -1179,7 +1185,7 @@ pub async fn subscribe(pool: &PgPool, subscription: NewsSubscription) -> Result<
     Ok(subscription)
 }
 
-pub async fn unsubscribe(pool: &PgPool, subscription: &NewsSubscription) -> Result<()> {
+pub(crate) async fn unsubscribe(pool: &PgPool, subscription: &NewsSubscription) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     let current_subscription = get_current_subscription(&mut tx, &subscription.email).await?;

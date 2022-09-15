@@ -18,7 +18,7 @@ use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
-pub struct ResponseError {
+pub(crate) struct ResponseError {
     err: anyhow::Error,
 }
 
@@ -73,7 +73,7 @@ impl error::ResponseError for ResponseError {
     }
 }
 
-pub fn config(cfg: &mut web::ServiceConfig) {
+pub(crate) fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/events")
             .route("", web::get().to(events))
@@ -119,7 +119,7 @@ struct EventsRequest {
     status: Option<Vec<LifecycleStatus>>,
 }
 
-pub fn deserialize_lifecycle_status_list<'de, D>(
+pub(crate) fn deserialize_lifecycle_status_list<'de, D>(
     deserializer: D,
 ) -> Result<Option<Vec<LifecycleStatus>>, D::Error>
 where
@@ -154,23 +154,23 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-pub struct EventCountersRequest {
+pub(crate) struct EventCountersRequest {
     beta: bool,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct VerifyPaymentInput {
+pub(crate) struct VerifyPaymentInput {
     csv: String,
     start_date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PrebookingInput {
+pub(crate) struct PrebookingInput {
     hash: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DeleteEventInput {
+pub(crate) struct DeleteEventInput {
     id: EventId,
 }
 

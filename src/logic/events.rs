@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
 
-pub async fn get_events(
+pub(crate) async fn get_events(
     pool: &PgPool,
     beta: Option<bool>,
     lifecycle_status: Option<Vec<LifecycleStatus>>,
@@ -34,11 +34,11 @@ pub async fn get_events(
     Ok(db::get_events(pool, true, lifecycle_status_list).await?)
 }
 
-pub async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {
+pub(crate) async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {
     Ok(db::get_event_counters(pool, into_lifecycle_status(beta)).await?)
 }
 
-pub async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
+pub(crate) async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
     match book_event(pool, booking).await {
         Ok(response) => response,
         Err(e) => {
@@ -48,7 +48,7 @@ pub async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
     }
 }
 
-pub async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
+pub(crate) async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
     match pre_book_event(pool, hash).await {
         Ok(response) => response,
         Err(e) => {
@@ -58,15 +58,15 @@ pub async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
     }
 }
 
-pub async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
+pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
     Ok(db::write_event(pool, partial_event).await?)
 }
 
-pub async fn delete(pool: &PgPool, event_id: EventId) -> Result<()> {
+pub(crate) async fn delete(pool: &PgPool, event_id: EventId) -> Result<()> {
     Ok(db::delete_event(pool, event_id).await?)
 }
 
-pub async fn verify_payments(
+pub(crate) async fn verify_payments(
     pool: &PgPool,
     csv: String,
     csv_start_date: Option<NaiveDate>,
@@ -94,7 +94,7 @@ pub async fn verify_payments(
     Ok(result)
 }
 
-pub async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
+pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
     if !data.bookings && !data.waiting_list {
         bail!("Either bookings or waiting list option need to be selected to send an event email.")
     }
@@ -112,7 +112,7 @@ pub async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
 
     let bookings = db::get_bookings(pool, &data.event_id, enrolled).await?;
     if bookings.is_empty() {
-        return Ok(())
+        return Ok(());
     }
 
     let email_account = email::get_account_by_type(event.event_type.into())?;

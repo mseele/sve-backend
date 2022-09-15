@@ -7,7 +7,7 @@ use regex::Regex;
 use serde::Deserialize;
 use std::{collections::HashSet, ops::Neg};
 
-pub fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
+pub(crate) fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
     let readers: Vec<Box<dyn CSVReader>> = vec![
         Box::new(VobaClassicCSVReader::default()),
         Box::new(VobaRichCSVReader::default()),
@@ -20,13 +20,13 @@ pub fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PaymentRecord {
-    pub date: NaiveDate,
-    pub payee: String,
-    pub payee_iban: String,
-    pub purpose: String,
-    pub volumne: BigDecimal,
-    pub payment_ids: HashSet<String>,
+pub(crate) struct PaymentRecord {
+    pub(crate) date: NaiveDate,
+    pub(crate) payee: String,
+    pub(crate) payee_iban: String,
+    pub(crate) purpose: String,
+    pub(crate) volumne: BigDecimal,
+    pub(crate) payment_ids: HashSet<String>,
 }
 
 impl PaymentRecord {

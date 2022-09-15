@@ -19,11 +19,11 @@ mod hashids {
             .unwrap();
     }
 
-    pub fn encode(values: &[u64]) -> String {
+    pub(crate) fn encode(values: &[u64]) -> String {
         harsh().encode(values)
     }
 
-    pub fn decode<T: AsRef<str>>(input: T) -> Result<Vec<u64>, Error> {
+    pub(crate) fn decode<T: AsRef<str>>(input: T) -> Result<Vec<u64>, Error> {
         harsh().decode(input)
     }
 }
@@ -32,7 +32,7 @@ use actix_cors::Cors;
 use actix_web::{dev::Service, web, App, HttpServer};
 use log::error;
 
-pub const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
+pub(crate) const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
