@@ -122,6 +122,7 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
     for (booking, payment_id) in bookings {
         let body = create_body(&data.body, &booking, &event, Some(payment_id));
 
+        // TODO: use Rc instead of clone
         let attachments = match &data.attachments {
             Some(attachments) => Some(
                 attachments
