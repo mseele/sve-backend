@@ -120,7 +120,13 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
     let mut messages = Vec::new();
 
     for (booking, payment_id) in bookings {
-        let body = create_body(&data.body, &booking, &event, Some(payment_id));
+        let body = create_body(
+            &data.body,
+            &booking,
+            &event,
+            Some(payment_id),
+            data.prebooking_event_id,
+        )?;
 
         // TODO: use Rc instead of clone
         let attachments = match &data.attachments {
@@ -329,7 +335,8 @@ async fn send_mail(
             booking,
             event,
             opt_payment_id,
-        )))?;
+            None,
+        )?))?;
 
     email::send_message(&email_account, message).await?;
 
@@ -341,7 +348,8 @@ fn create_body(
     booking: &EventBooking,
     event: &Event,
     payment_id: Option<String>,
-) -> String {
+    prebooking_event_id: Option<EventId>,
+) -> Result<String> {
     let mut body = template
         .replace("${firstname}", booking.first_name.trim())
         .replace("${lastname}", booking.last_name.trim())
@@ -353,6 +361,14 @@ fn create_body(
         body = body.replace("${payment_id}", &payment_id);
     }
     body = replace_payday(body, &event);
+
+    if let Some(prebooking_event_id) = prebooking_event_id {
+        body = body.replace(
+            "${link}",
+            &create_prebooking_link(event.event_type, prebooking_event_id, booking.subscriber_id)?,
+        );
+    }
+
     if booking.updates.unwrap_or(false) {
         body.push_str(
             format!(
@@ -369,7 +385,7 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
             .as_str(),
         )
     }
-    body
+    Ok(body)
 }
 
 fn format_dates(event: &Event) -> String {
@@ -412,6 +428,27 @@ fn replace_payday(body: String, event: &Event) -> String {
     }
 
     body
+}
+
+fn create_prebooking_link(
+    event_type: EventType,
+    event_id: EventId,
+    subscriber_id: i32,
+) -> Result<String> {
+    let mut url = String::from("https://www.sv-eutingen.de/");
+    url.push_str(match event_type {
+        EventType::Fitness => "fitness",
+        EventType::Events => "events",
+    });
+    url.push_str("/buchung?code=");
+
+    // create the code
+    url.push_str(&hashids::encode(&[
+        event_id.into_inner().try_into()?,
+        subscriber_id.try_into()?,
+    ]));
+
+    return Ok(url);
 }
 
 fn read_payment_records(
@@ -587,6 +624,7 @@ mod tests {
     fn test_create_body() {
         let booking_member = EventBooking::new(
             0,
+            0,
             String::from("Max"),
             String::from("Mustermann"),
             String::from("Haupstraße 1"),
@@ -599,6 +637,7 @@ mod tests {
         );
         let booking_non_member = EventBooking::new(
             0,
+            1,
             String::from("Max"),
             String::from("Mustermann"),
             String::from("Haupstraße 1"),
@@ -609,7 +648,7 @@ mod tests {
             None,
             None,
         );
-        let event = Event::new(
+        let mut event = Event::new(
             0,
             Utc::now(),
             None,
@@ -650,8 +689,10 @@ mod tests {
 ${dates}",
                 &booking_member,
                 &event,
+                None,
                 None
-            ),
+            )
+            .unwrap(),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{payment_id}}
 - Mo., 07. März 2022, 19:00 Uhr
@@ -670,8 +711,10 @@ ${dates}",
 ${dates}",
                 &booking_non_member,
                 &event,
-                Some(String::from("22-1012"))
-            ),
+                Some(String::from("22-1012")),
+                None
+            )
+            .unwrap(),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012
 - Mo., 07. März 2022, 19:00 Uhr
@@ -682,6 +725,35 @@ ${dates}",
 - Sa., 12. März 2022, 19:00 Uhr
 - So., 13. März 2022, 19:00 Uhr",
                 format_payday(Utc::now() + Duration::days(1))
+            )
+        );
+        assert_eq!(
+            create_body(
+                "${link}",
+                &booking_member,
+                &event,
+                None,
+                Some(1.into())
+            )
+            .unwrap(),
+            format!(
+                "https://www.sv-eutingen.de/fitness/buchung?code={}",
+                hashids::encode(&[1, 0])
+            )
+        );
+        event.event_type = EventType::Events;
+        assert_eq!(
+            create_body(
+                "${link}",
+                &booking_non_member,
+                &event,
+                None,
+                Some(2.into())
+            )
+            .unwrap(),
+            format!(
+                "https://www.sv-eutingen.de/events/buchung?code={}",
+                hashids::encode(&[2, 1])
             )
         );
     }

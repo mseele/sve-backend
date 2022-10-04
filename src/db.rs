@@ -691,6 +691,7 @@ pub(crate) async fn get_bookings(
         r#"
 SELECT
     v.event_id,
+    v.subscriber_id,
     v.first_name,
     v.last_name,
     v.street,
@@ -729,6 +730,7 @@ ORDER BY
         result.push((
             EventBooking::new(
                 row.try_get("event_id")?,
+                row.try_get("subscriber_id")?,
                 row.try_get("first_name")?,
                 row.try_get("last_name")?,
                 row.try_get("street")?,
@@ -860,11 +862,12 @@ FROM
     event_subscribers e
 WHERE
     e.id = $1"#,
-                event_id.get_ref()
+                subscriber_id
             )
             .map(|row| {
                 EventBooking::new(
                     event_id.into_inner(),
+                    subscriber_id,
                     row.first_name,
                     row.last_name,
                     row.street,
