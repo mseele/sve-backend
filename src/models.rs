@@ -272,6 +272,11 @@ pub(crate) enum LifecycleStatus {
     /// No longer deletable - can only be archived by closing the event
     Published,
 
+    /// No longer visible but bookable via sv-eutingen.de.
+    /// Edit & Communication (Confirmation email, etc.) is still possible.
+    /// No longer deletable - can only be archived by closing the event
+    Running,
+
     /// No longer visible and no longer bookable.
     /// Communication (Confirmation email, etc.) is still possible.
     /// No longer deletable - can only be archived by closing the event
@@ -287,7 +292,8 @@ impl LifecycleStatus {
             LifecycleStatus::Draft => false,
             LifecycleStatus::Review => true,
             LifecycleStatus::Published => true,
-            LifecycleStatus::Finished => true,
+            LifecycleStatus::Running => true,
+            LifecycleStatus::Finished => false,
             LifecycleStatus::Closed => false,
         }
     }
