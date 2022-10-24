@@ -307,6 +307,7 @@ impl FromStr for LifecycleStatus {
             "draft" => Ok(Self::Draft),
             "review" => Ok(Self::Review),
             "published" => Ok(Self::Published),
+            "running" => Ok(Self::Running),
             "finished" => Ok(Self::Finished),
             "closed" => Ok(Self::Closed),
             other => bail!("Invalid lifecycle status {}", other),
