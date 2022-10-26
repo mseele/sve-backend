@@ -327,16 +327,15 @@ async fn send_booking_mail(
         Some(email_address) => email::get_account_by_address(email_address),
         None => email::get_account_by_type(event.event_type.into()),
     }?;
-    let subject_prefix = event.subject_prefix();
     let subject;
     let template;
     let opt_payment_id;
     if booked {
-        subject = format!("{} Bestätigung Buchung", subject_prefix);
+        subject = format!("{} Bestätigung Buchung", event.subject_prefix());
         template = &event.booking_template;
         opt_payment_id = Some(payment_id);
     } else {
-        subject = format!("{} Bestätigung Warteliste", subject_prefix);
+        subject = format!("{} Bestätigung Warteliste", event.subject_prefix());
         template = &event.waiting_template;
         opt_payment_id = None;
     }
