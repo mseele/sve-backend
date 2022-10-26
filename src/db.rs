@@ -138,7 +138,7 @@ ORDER BY
     }
     events = iter.map(|(event, _)| event).collect();
 
-    fetch_dates(&mut conn, &mut events).await?;
+    insert_event_dates(&mut conn, &mut events).await?;
 
     Ok(events)
 }
@@ -213,13 +213,13 @@ WHERE
     .await?;
 
     if let Some(value) = event {
-        event = fetch_dates(&mut *conn, &mut vec![value]).await?.pop();
+        event = insert_event_dates(&mut *conn, &mut vec![value]).await?.pop();
     }
 
     Ok(event)
 }
 
-async fn fetch_dates<'a>(
+async fn insert_event_dates<'a>(
     conn: &mut PgConnection,
     events: &'a mut Vec<Event>,
 ) -> Result<&'a mut Vec<Event>> {
@@ -361,8 +361,9 @@ async fn update_event(pool: &PgPool, id: &EventId, partial_event: PartialEvent) 
     }
 
     if let Some(dates) = partial_event.dates {
+        
         delete_event_dates(&mut tx, id).await?;
-        insert_event_dates(&mut tx, id, dates).await?;
+        save_event_dates(&mut tx, id, dates).await?;
     }
 
     let event = fetch_event(&mut tx, id)
@@ -518,7 +519,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     .await?;
 
     delete_event_dates(&mut tx, &new_event.id).await?;
-    new_event.dates = insert_event_dates(&mut tx, &new_event.id, dates).await?;
+    new_event.dates = save_event_dates(&mut tx, &new_event.id, dates).await?;
 
     tx.commit().await?;
 
@@ -536,7 +537,7 @@ async fn delete_event_dates(conn: &mut PgConnection, event_id: &EventId) -> Resu
     Ok(())
 }
 
-async fn insert_event_dates(
+async fn save_event_dates(
     conn: &mut PgConnection,
     event_id: &EventId,
     dates: Vec<DateTime<Utc>>,
