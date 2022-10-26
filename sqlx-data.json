@@ -87,6 +87,7 @@
                   "Draft",
                   "Review",
                   "Published",
+                  "Running",
                   "Finished",
                   "Closed"
                 ]
@@ -177,6 +178,7 @@
                   "Draft",
                   "Review",
                   "Published",
+                  "Running",
                   "Finished",
                   "Closed"
                 ]
@@ -245,6 +247,7 @@
                   "Draft",
                   "Review",
                   "Published",
+                  "Running",
                   "Finished",
                   "Closed"
                 ]
@@ -390,6 +393,7 @@
                   "Draft",
                   "Review",
                   "Published",
+                  "Running",
                   "Finished",
                   "Closed"
                 ]
@@ -560,6 +564,7 @@
                   "Draft",
                   "Review",
                   "Published",
+                  "Running",
                   "Finished",
                   "Closed"
                 ]
@@ -706,6 +711,7 @@
                   "Draft",
                   "Review",
                   "Published",
+                  "Running",
                   "Finished",
                   "Closed"
                 ]
