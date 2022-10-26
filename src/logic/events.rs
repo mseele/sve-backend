@@ -2,8 +2,8 @@ use super::csv::PaymentRecord;
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
-    BookingResponse, Email, Event, EventBooking, EventCounter, EventEmail, EventId, EventType,
-    LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
+    BookingResponse, Email, EmailAttachment, Event, EventBooking, EventCounter, EventEmail,
+    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
     VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
@@ -110,7 +110,30 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", data.event_id))?;
 
-    let bookings = db::get_bookings(pool, &data.event_id, enrolled).await?;
+    process_event_email(
+        pool,
+        event,
+        enrolled,
+        data.subject,
+        data.body,
+        data.attachments,
+        data.prebooking_event_id,
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn process_event_email(
+    pool: &PgPool,
+    event: Event,
+    enrolled: Option<bool>,
+    subject: String,
+    body: String,
+    attachments: Option<Vec<EmailAttachment>>,
+    prebooking_event_id: Option<EventId>,
+) -> Result<()> {
+    let bookings = db::get_bookings(pool, &event.id, enrolled).await?;
     if bookings.is_empty() {
         return Ok(());
     }
@@ -121,15 +144,14 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
 
     for (booking, payment_id) in bookings {
         let body = create_body(
-            &data.body,
+            &body,
             &booking,
             &event,
             Some(payment_id),
-            data.prebooking_event_id,
+            prebooking_event_id,
         )?;
 
-        // TODO: use Rc instead of clone
-        let attachments = match &data.attachments {
+        let attachments = match &attachments {
             Some(attachments) => Some(
                 attachments
                     .into_iter()
@@ -143,7 +165,7 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
             Email::new(
                 message_type,
                 booking.email,
-                data.subject.clone(),
+                subject.clone(),
                 body,
                 attachments,
             )
