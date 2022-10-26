@@ -305,13 +305,7 @@ async fn send_mail(
         Some(email_address) => email::get_account_by_address(email_address),
         None => email::get_account_by_type(event.event_type.into()),
     }?;
-    let subject_prefix = format!(
-        "[{}@SVE]",
-        match event.event_type {
-            EventType::Fitness => "Fitness",
-            EventType::Events => "Events",
-        }
-    );
+    let subject_prefix = event.subject_prefix();
     let subject;
     let template;
     let opt_payment_id;

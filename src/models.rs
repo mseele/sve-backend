@@ -171,6 +171,16 @@ impl Event {
             false => &self.cost_non_member,
         }
     }
+
+    pub(crate) fn subject_prefix(&self) -> String {
+        format!(
+            "[{}@SVE]",
+            match self.event_type {
+                EventType::Fitness => "Fitness",
+                EventType::Events => "Events",
+            }
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
