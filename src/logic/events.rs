@@ -766,14 +766,7 @@ ${dates}",
             )
         );
         assert_eq!(
-            create_body(
-                "${link}",
-                &booking_member,
-                &event,
-                None,
-                Some(1.into())
-            )
-            .unwrap(),
+            create_body("${link}", &booking_member, &event, None, Some(1.into())).unwrap(),
             format!(
                 "https://www.sv-eutingen.de/fitness/buchung?code={}",
                 hashids::encode(&[1, 0])
@@ -781,14 +774,7 @@ ${dates}",
         );
         event.event_type = EventType::Events;
         assert_eq!(
-            create_body(
-                "${link}",
-                &booking_non_member,
-                &event,
-                None,
-                Some(2.into())
-            )
-            .unwrap(),
+            create_body("${link}", &booking_non_member, &event, None, Some(2.into())).unwrap(),
             format!(
                 "https://www.sv-eutingen.de/events/buchung?code={}",
                 hashids::encode(&[2, 1])

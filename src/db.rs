@@ -213,7 +213,9 @@ WHERE
     .await?;
 
     if let Some(value) = event {
-        event = insert_event_dates(&mut *conn, &mut vec![value]).await?.pop();
+        event = insert_event_dates(&mut *conn, &mut vec![value])
+            .await?
+            .pop();
     }
 
     Ok(event)
