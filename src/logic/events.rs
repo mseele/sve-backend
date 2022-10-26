@@ -294,7 +294,7 @@ async fn process_booking(
     payment_id: String,
 ) -> Result<BookingResponse> {
     subscribe_to_updates(pool, booking, &event).await?;
-    send_mail(booking, &event, booked, payment_id).await?;
+    send_booking_mail(booking, &event, booked, payment_id).await?;
     info!("Booking of Event {} was successfull", booking.event_id);
     let message;
     if booked {
@@ -317,7 +317,7 @@ async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Eve
     Ok(())
 }
 
-async fn send_mail(
+async fn send_booking_mail(
     booking: &EventBooking,
     event: &Event,
     booked: bool,
