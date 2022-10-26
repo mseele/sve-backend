@@ -518,7 +518,6 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     .fetch_one(&mut tx)
     .await?;
 
-    delete_event_dates(&mut tx, &new_event.id).await?;
     new_event.dates = save_event_dates(&mut tx, &new_event.id, dates).await?;
 
     tx.commit().await?;
