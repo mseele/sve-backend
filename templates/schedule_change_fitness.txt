@@ -1,0 +1,11 @@
+Hallo ${firstname},
+
+bei deinem gebuchten Kurs "${name}" gibt es eine Terminänderung.
+
+Die neuen Kurstermine sind:
+${dates}
+
+Wir wünschen Dir weiterhin viel Spaß beim Kurs.
+
+Herzliche Grüße
+Team Fitness@SVE

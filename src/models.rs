@@ -80,7 +80,7 @@ impl From<i32> for EventId {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct Event {
     pub(crate) id: EventId,
     pub(crate) created: DateTime<Utc>,

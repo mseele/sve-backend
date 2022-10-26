@@ -551,6 +551,26 @@
     },
     "query": "\nSELECT\n    v.id,\n    v.max_subscribers,\n    v.max_waiting_list,\n    v.subscribers,\n    v.waiting_list\nFROM\n    v_event_counters v\nWHERE\n    v.id = $1"
   },
+  "a63500c1b6d38506b36953d5a795204879d007b90d8e36d920a781ac68daffa8": {
+    "describe": {
+      "columns": [
+        {
+          "name": "date",
+          "ordinal": 0,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n    e.date\nFROM\n    event_dates e\nWHERE\n    e.event_id = $1"
+  },
   "ab4ca29fa73d9a333db6c4c819032f4dc83ad12e83f00ffb6d972610093db409": {
     "describe": {
       "columns": [

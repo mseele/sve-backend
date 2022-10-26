@@ -59,7 +59,30 @@ pub(crate) async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
 }
 
 pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
-    Ok(db::write_event(pool, partial_event).await?)
+    let (event, event_schedule_change) = db::write_event(pool, partial_event).await?;
+    if event_schedule_change
+        && matches!(
+            event.lifecycle_status,
+            LifecycleStatus::Review | LifecycleStatus::Published | LifecycleStatus::Running
+        )
+    {
+        let subject = format!("{} Terminänderung {}", event.subject_prefix(), event.name);
+        let body = match event.event_type {
+            EventType::Fitness => include_str!("../../templates/schedule_change_fitness.txt"),
+            EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
+        };
+        process_event_email(
+            pool,
+            event.clone(),
+            Some(true),
+            subject,
+            body.into(),
+            None,
+            None,
+        )
+        .await?;
+    }
+    Ok(event)
 }
 
 pub(crate) async fn delete(pool: &PgPool, event_id: EventId) -> Result<()> {

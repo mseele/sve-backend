@@ -264,14 +264,21 @@ ORDER BY
     Ok(events)
 }
 
-pub(crate) async fn write_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
+pub(crate) async fn write_event(
+    pool: &PgPool,
+    partial_event: PartialEvent,
+) -> Result<(Event, bool)> {
     match partial_event.id {
         Some(id) => update_event(pool, &id, partial_event).await,
-        None => save_new_event(pool, partial_event).await,
+        None => Ok((save_new_event(pool, partial_event).await?, false)),
     }
 }
 
-async fn update_event(pool: &PgPool, id: &EventId, partial_event: PartialEvent) -> Result<Event> {
+async fn update_event(
+    pool: &PgPool,
+    id: &EventId,
+    partial_event: PartialEvent,
+) -> Result<(Event, bool)> {
     let mut tx = pool.begin().await?;
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("UPDATE events SET ");
@@ -360,10 +367,15 @@ async fn update_event(pool: &PgPool, id: &EventId, partial_event: PartialEvent) 
         query_builder.build().execute(&mut tx).await?;
     }
 
-    if let Some(dates) = partial_event.dates {
-        
-        delete_event_dates(&mut tx, id).await?;
-        save_event_dates(&mut tx, id, dates).await?;
+    let mut event_schedule_change = false;
+
+    if let Some(new_dates) = partial_event.dates {
+        let current_dates = get_event_dates(&mut tx, id).await?;
+        if current_dates != new_dates {
+            delete_event_dates(&mut tx, id).await?;
+            save_event_dates(&mut tx, id, new_dates).await?;
+            event_schedule_change = true;
+        }
     }
 
     let event = fetch_event(&mut tx, id)
@@ -372,7 +384,7 @@ async fn update_event(pool: &PgPool, id: &EventId, partial_event: PartialEvent) 
 
     tx.commit().await?;
 
-    Ok(event)
+    Ok((event, event_schedule_change))
 }
 
 fn push_bind<'gb, 'args, T>(
@@ -523,6 +535,27 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     tx.commit().await?;
 
     Ok(new_event)
+}
+
+async fn get_event_dates(
+    conn: &mut PgConnection,
+    event_id: &EventId,
+) -> Result<Vec<DateTime<Utc>>> {
+    let result = query!(
+        r#"
+SELECT
+    e.date
+FROM
+    event_dates e
+WHERE
+    e.event_id = $1"#,
+        event_id.get_ref()
+    )
+    .map(|row| row.date)
+    .fetch_all(conn)
+    .await?;
+
+    Ok(result)
 }
 
 async fn delete_event_dates(conn: &mut PgConnection, event_id: &EventId) -> Result<()> {
