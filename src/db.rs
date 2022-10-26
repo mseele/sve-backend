@@ -598,7 +598,7 @@ SELECT
     CONCAT (s.first_name, ' ', s.last_name) AS full_name,
     CASE WHEN s.member IS TRUE
         THEN e.cost_member
-        ESLE e.cost_non_member
+        ELSE e.cost_non_member
     END as cost,
     b.payment_id,
     b.canceled,
