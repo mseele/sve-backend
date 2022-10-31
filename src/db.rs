@@ -138,7 +138,9 @@ ORDER BY
     }
     events = iter.map(|(event, _)| event).collect();
 
+    if !events.is_empty() {
     insert_event_dates(&mut conn, &mut events).await?;
+    }
 
     Ok(events)
 }
@@ -225,10 +227,6 @@ async fn insert_event_dates<'a>(
     conn: &mut PgConnection,
     events: &'a mut Vec<Event>,
 ) -> Result<&'a mut Vec<Event>> {
-    if events.is_empty() {
-        return Ok(events);
-    }
-
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
