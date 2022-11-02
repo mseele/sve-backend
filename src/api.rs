@@ -4,7 +4,7 @@ use crate::models::{
     PartialEvent,
 };
 use actix_web::http::header::ContentType;
-use actix_web::web::{Data, Json};
+use actix_web::web::{Data, Json, Path};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
@@ -81,7 +81,7 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/booking", web::post().to(booking))
             .route("/prebooking", web::post().to(prebooking))
             .route("/update", web::post().to(update))
-            .route("/delete", web::post().to(delete))
+            .route("/delete/{id}", web::delete().to(delete))
             .route("/verify_payments", web::post().to(verify_payments)),
     );
     cfg.service(
@@ -169,11 +169,6 @@ pub(crate) struct PrebookingInput {
     hash: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct DeleteEventInput {
-    id: EventId,
-}
-
 async fn events(
     pool: Data<PgPool>,
     mut info: web::Query<EventsRequest>,
@@ -216,9 +211,9 @@ async fn update(
 
 async fn delete(
     pool: Data<PgPool>,
-    Json(input): Json<DeleteEventInput>,
+    path: Path<EventId>,
 ) -> Result<impl Responder, ResponseError> {
-    events::delete(&pool, input.id).await?;
+    events::delete(&pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
