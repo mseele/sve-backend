@@ -81,7 +81,7 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/booking", web::post().to(booking))
             .route("/prebooking", web::post().to(prebooking))
             .route("/update", web::post().to(update))
-            .route("/delete/{id}", web::delete().to(delete))
+            .route("/{id}", web::delete().to(delete))
             .route("/verify_payments", web::post().to(verify_payments))
             .route("/booking/{id}", web::patch().to(update_event_booking)),
     );
