@@ -108,6 +108,7 @@ pub(crate) struct Event {
     pub(crate) alt_booking_button_text: Option<String>,
     pub(crate) alt_email_address: Option<String>,
     pub(crate) external_operator: bool,
+    pub(crate) subscribers: Option<Vec<EventSubscription>>,
 }
 
 impl Event {
@@ -162,6 +163,7 @@ impl Event {
             alt_booking_button_text,
             alt_email_address,
             external_operator,
+            subscribers: None,
         }
     }
 
@@ -434,6 +436,45 @@ impl BookingResponse {
             success: false,
             message: message.into(),
             counter: Vec::new(),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub(crate) struct EventSubscription {
+    pub(crate) id: i32,
+    pub(crate) first_name: String,
+    pub(crate) last_name: String,
+    pub(crate) email: String,
+    pub(crate) enrolled: bool,
+    pub(crate) member: bool,
+    pub(crate) payment_id: String,
+    pub(crate) payed: bool,
+    pub(crate) comment: Option<String>,
+}
+
+impl EventSubscription {
+    pub(crate) fn new(
+        id: i32,
+        first_name: String,
+        last_name: String,
+        email: String,
+        enrolled: bool,
+        member: bool,
+        payment_id: String,
+        payed: bool,
+        comment: Option<String>,
+    ) -> Self {
+        Self {
+            id,
+            first_name,
+            last_name,
+            email,
+            enrolled,
+            member,
+            payment_id,
+            payed,
+            comment,
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::models::{
-    Event, EventBooking, EventCounter, EventId, EventType, LifecycleStatus, NewsSubscription,
-    NewsTopic, PartialEvent, VerifyPaymentBookingRecord,
+    Event, EventBooking, EventCounter, EventId, EventSubscription, EventType, LifecycleStatus,
+    NewsSubscription, NewsTopic, PartialEvent, VerifyPaymentBookingRecord,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -22,6 +22,7 @@ pub(crate) async fn get_events(
     pool: &PgPool,
     sort: bool,
     lifecycle_status: Option<Vec<LifecycleStatus>>,
+    subscribers: bool,
 ) -> Result<Vec<Event>> {
     let mut conn = pool.acquire().await?;
 
@@ -140,6 +141,9 @@ ORDER BY
 
     if !events.is_empty() {
     insert_event_dates(&mut conn, &mut events).await?;
+        if subscribers {
+            insert_event_subscribers(&mut conn, &mut events).await?;
+        }
     }
 
     Ok(events)
@@ -262,6 +266,71 @@ ORDER BY
     }
 
     Ok(events)
+}
+
+async fn insert_event_subscribers<'a>(
+    conn: &mut PgConnection,
+    events: &'a mut Vec<Event>,
+) -> Result<()> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        r#"
+SELECT
+    v.event_id,
+    v.id,
+    v.first_name,
+    v.last_name,
+    v.email,
+    v.enrolled,
+    v.member,
+    v.payment_id,
+    v.payed IS NOT NULL AS payed,
+    v.comment
+FROM
+     v_event_bookings v
+WHERE
+    v.event_id IN ("#,
+    );
+    let mut separated = query_builder.separated(", ");
+    for event in events.iter() {
+        separated.push_bind(event.id.get_ref());
+    }
+    separated.push_unseparated(
+        r#")
+    AND v.canceled IS NULL
+ORDER BY
+    v.event_id,
+    v.enrolled,
+    v.created"#,
+    );
+
+    let mut result = HashMap::new();
+    for row in query_builder.build().fetch_all(conn).await? {
+        let id: i32 = row.try_get("event_id")?;
+        result
+            .entry(id)
+            .or_insert_with(|| Vec::new())
+            .push(EventSubscription::new(
+                row.try_get("id")?,
+                row.try_get("first_name")?,
+                row.try_get("last_name")?,
+                row.try_get("email")?,
+                row.try_get("enrolled")?,
+                row.try_get("member")?,
+                row.try_get("payment_id")?,
+                row.try_get("payed")?,
+                row.try_get("comment")?,
+            ));
+    }
+
+    for event in events.iter_mut() {
+        if let Some(subscribers) = result.remove(&event.id.get_ref()) {
+            event.subscribers = Some(subscribers);
+        } else {
+            event.subscribers = Some(Default::default());
+        }
+    }
+
+    Ok(())
 }
 
 pub(crate) async fn write_event(

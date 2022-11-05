@@ -24,6 +24,7 @@ pub(crate) async fn get_events(
     pool: &PgPool,
     beta: Option<bool>,
     lifecycle_status: Option<Vec<LifecycleStatus>>,
+    subscribers: Option<bool>,
 ) -> Result<Vec<Event>> {
     let lifecycle_status_list;
     if let Some(beta) = beta {
@@ -31,7 +32,13 @@ pub(crate) async fn get_events(
     } else {
         lifecycle_status_list = lifecycle_status;
     }
-    Ok(db::get_events(pool, true, lifecycle_status_list).await?)
+    Ok(db::get_events(
+        pool,
+        true,
+        lifecycle_status_list,
+        subscribers.unwrap_or(false),
+    )
+    .await?)
 }
 
 pub(crate) async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {

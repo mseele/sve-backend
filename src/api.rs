@@ -112,13 +112,6 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
 
 // events
 
-#[derive(Debug, Deserialize)]
-struct EventsRequest {
-    beta: Option<bool>,
-    #[serde(default, deserialize_with = "deserialize_lifecycle_status_list")]
-    status: Option<Vec<LifecycleStatus>>,
-}
-
 pub(crate) fn deserialize_lifecycle_status_list<'de, D>(
     deserializer: D,
 ) -> Result<Option<Vec<LifecycleStatus>>, D::Error>
@@ -154,6 +147,14 @@ where
 }
 
 #[derive(Debug, Deserialize)]
+struct EventsQueryParams {
+    beta: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_lifecycle_status_list")]
+    status: Option<Vec<LifecycleStatus>>,
+    subscribers: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct EventCountersRequest {
     beta: bool,
 }
@@ -171,9 +172,15 @@ pub(crate) struct PrebookingInput {
 
 async fn events(
     pool: Data<PgPool>,
-    mut info: web::Query<EventsRequest>,
+    mut query: web::Query<EventsQueryParams>,
 ) -> Result<impl Responder, ResponseError> {
-    let events = events::get_events(&pool, info.beta.take(), info.status.take()).await?;
+    let events = events::get_events(
+        &pool,
+        query.beta.take(),
+        query.status.take(),
+        query.subscribers.take(),
+    )
+    .await?;
     Ok(Json(events))
 }
 
