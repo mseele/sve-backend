@@ -4,7 +4,7 @@ use crate::models::{
     PartialEvent,
 };
 use actix_web::http::header::ContentType;
-use actix_web::web::{Data, Json, Path};
+use actix_web::web::{Data, Json};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
@@ -224,7 +224,7 @@ async fn update(
 
 async fn delete(
     pool: Data<PgPool>,
-    path: Path<EventId>,
+    path: web::Path<EventId>,
 ) -> Result<impl Responder, ResponseError> {
     events::delete(&pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
