@@ -204,6 +204,18 @@
     },
     "query": "\nUPDATE\n    event_bookings\nSET\n    payed = NOW(),\n    iban = $1\nWHERE\n    id = $2"
   },
+  "510b967070cbe4ab7631a9042e0f8d5d09e6a36c8df7e93c22e4d39bf621f083": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "UPDATE event_bookings SET payed = NULL WHERE id = $1"
+  },
   "53d4f2435d29a44e359e5aaef2fbd63896e7e05335a589d3cf9109cc0e2af7c3": {
     "describe": {
       "columns": [
@@ -440,6 +452,18 @@
       }
     },
     "query": "\nINSERT INTO public.event_bookings\n(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)\nVALUES($1, $2, $3, $4, $5, $6)"
+  },
+  "6e9891080ae0a59242f81b2f10fb35ddb5b3dabc83f226504fd6f6b16948aee9": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "UPDATE event_bookings SET payed = NOW() WHERE id = $1"
   },
   "80f5a6e6bf8c85c7b7965deefaf1147d7632dc416c298010616158d5c4526dc9": {
     "describe": {

@@ -124,6 +124,14 @@ pub(crate) async fn verify_payments(
     Ok(result)
 }
 
+pub(crate) async fn update_payment(
+    pool: &PgPool,
+    booking_id: i32,
+    update_payment: bool,
+) -> Result<()> {
+    Ok(db::update_payment(&pool, booking_id, update_payment).await?)
+}
+
 pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
     if !data.bookings && !data.waiting_list {
         bail!("Either bookings or waiting list option need to be selected to send an event email.")

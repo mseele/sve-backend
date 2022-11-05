@@ -140,7 +140,7 @@ ORDER BY
     events = iter.map(|(event, _)| event).collect();
 
     if !events.is_empty() {
-    insert_event_dates(&mut conn, &mut events).await?;
+        insert_event_dates(&mut conn, &mut events).await?;
         if subscribers {
             insert_event_subscribers(&mut conn, &mut events).await?;
         }
@@ -766,6 +766,37 @@ WHERE
         )
         .execute(&mut tx)
         .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
+pub(crate) async fn update_payment(
+    pool: &PgPool,
+    booking_id: i32,
+    update_payment: bool,
+) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    match update_payment {
+        true => {
+            query!(
+                r#"UPDATE event_bookings SET payed = NOW() WHERE id = $1"#,
+                booking_id,
+            )
+            .execute(&mut tx)
+            .await?;
+        }
+        false => {
+            query!(
+                r#"UPDATE event_bookings SET payed = NULL WHERE id = $1"#,
+                booking_id,
+            )
+            .execute(&mut tx)
+            .await?;
+        }
     }
 
     tx.commit().await?;

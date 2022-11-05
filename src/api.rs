@@ -82,7 +82,8 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/prebooking", web::post().to(prebooking))
             .route("/update", web::post().to(update))
             .route("/delete/{id}", web::delete().to(delete))
-            .route("/verify_payments", web::post().to(verify_payments)),
+            .route("/verify_payments", web::post().to(verify_payments))
+            .route("/booking/{id}", web::patch().to(update_event_booking)),
     );
     cfg.service(
         web::scope("/news")
@@ -170,6 +171,11 @@ pub(crate) struct PrebookingInput {
     hash: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct UpdateEventBookingQueryParams {
+    update_payment: Option<bool>,
+}
+
 async fn events(
     pool: Data<PgPool>,
     mut query: web::Query<EventsQueryParams>,
@@ -230,6 +236,18 @@ async fn verify_payments(
 ) -> Result<impl Responder, ResponseError> {
     let result = events::verify_payments(&pool, input.csv, input.start_date).await?;
     Ok(Json(result))
+}
+
+async fn update_event_booking(
+    pool: Data<PgPool>,
+    path: web::Path<i32>,
+    query: web::Query<UpdateEventBookingQueryParams>,
+) -> Result<impl Responder, ResponseError> {
+    let booking_id = path.into_inner();
+    if let Some(update_payment) = query.update_payment {
+        events::update_payment(&pool, booking_id, update_payment).await?;
+    }
+    Ok(HttpResponse::Ok().finish())
 }
 
 // news
