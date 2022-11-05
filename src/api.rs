@@ -156,7 +156,7 @@ struct EventsQueryParams {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct EventCountersRequest {
+pub(crate) struct EventCountersQueryParams {
     beta: bool,
 }
 
@@ -192,9 +192,9 @@ async fn events(
 
 async fn counter(
     pool: Data<PgPool>,
-    info: web::Query<EventCountersRequest>,
+    query: web::Query<EventCountersQueryParams>,
 ) -> Result<impl Responder, ResponseError> {
-    let event_counters = events::get_event_counters(&pool, info.beta).await?;
+    let event_counters = events::get_event_counters(&pool, query.beta).await?;
     Ok(Json(event_counters))
 }
 
