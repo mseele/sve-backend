@@ -5,7 +5,7 @@ bei deinem gebuchten Event "${name}" gibt es eine Terminänderung.
 Die neuen Termine sind:
 ${dates}
 
-Wir wünschen Dir weiterhin viel Spaß beim Kurs.
+Wir wünschen Dir weiterhin viel Spaß beim Event.
 
 Herzliche Grüße
-Team Fitness@SVE
+Team Events@SVE
