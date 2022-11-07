@@ -330,7 +330,6 @@ impl FromStr for LifecycleStatus {
 #[derive(Deserialize, Debug)]
 pub(crate) struct EventBooking {
     pub(crate) event_id: EventId,
-    pub(crate) subscriber_id: i32,
     pub(crate) first_name: String,
     pub(crate) last_name: String,
     pub(crate) street: String,
@@ -345,7 +344,6 @@ pub(crate) struct EventBooking {
 impl EventBooking {
     pub(crate) fn new(
         event_id: i32,
-        subscriber_id: i32,
         first_name: String,
         last_name: String,
         street: String,
@@ -358,7 +356,6 @@ impl EventBooking {
     ) -> Self {
         Self {
             event_id: event_id.into(),
-            subscriber_id,
             first_name,
             last_name,
             street,
@@ -824,7 +821,6 @@ mod tests {
     fn test_cost() {
         let member = EventBooking::new(
             0,
-            0,
             String::from("first_name"),
             String::from("last_name"),
             String::from("street"),
@@ -836,7 +832,6 @@ mod tests {
             None,
         );
         let no_member = EventBooking::new(
-            0,
             0,
             String::from("first_name"),
             String::from("last_name"),

@@ -180,14 +180,19 @@ async fn process_event_email(
     let message_type: MessageType = event.event_type.into();
     let mut messages = Vec::new();
 
-    for (booking, payment_id) in bookings {
-        let body = create_body(
-            &body,
-            &booking,
-            &event,
-            Some(payment_id),
-            prebooking_event_id,
-        )?;
+    for (booking, subscriber_id, payment_id) in bookings {
+        let prebooking_link;
+        if let Some(event_id) = prebooking_event_id {
+            prebooking_link = Some(create_prebooking_link(
+                event.event_type,
+                event_id,
+                subscriber_id,
+            )?);
+        } else {
+            prebooking_link = None;
+        }
+
+        let body = create_body(&body, &booking, &event, Some(payment_id), prebooking_link)?;
 
         let attachments = match &attachments {
             Some(attachments) => Some(
@@ -401,7 +406,7 @@ fn create_body(
     booking: &EventBooking,
     event: &Event,
     payment_id: Option<String>,
-    prebooking_event_id: Option<EventId>,
+    prebooking_link: Option<String>,
 ) -> Result<String> {
     let mut body = template
         .replace("${firstname}", booking.first_name.trim())
@@ -415,11 +420,8 @@ fn create_body(
     }
     body = replace_payday(body, &event);
 
-    if let Some(prebooking_event_id) = prebooking_event_id {
-        body = body.replace(
-            "${link}",
-            &create_prebooking_link(event.event_type, prebooking_event_id, booking.subscriber_id)?,
-        );
+    if let Some(prebooking_link) = prebooking_link {
+        body = body.replace("${link}", &prebooking_link);
     }
 
     if booking.updates.unwrap_or(false) {
@@ -677,7 +679,6 @@ mod tests {
     fn test_create_body() {
         let booking_member = EventBooking::new(
             0,
-            0,
             String::from("Max"),
             String::from("Mustermann"),
             String::from("Haupstraße 1"),
@@ -689,7 +690,6 @@ mod tests {
             None,
         );
         let booking_non_member = EventBooking::new(
-            0,
             1,
             String::from("Max"),
             String::from("Mustermann"),
@@ -701,7 +701,7 @@ mod tests {
             None,
             None,
         );
-        let mut event = Event::new(
+        let event = Event::new(
             0,
             Utc::now(),
             None,
@@ -780,20 +780,17 @@ ${dates}",
                 format_payday(Utc::now() + Duration::days(1))
             )
         );
+
         assert_eq!(
-            create_body("${link}", &booking_member, &event, None, Some(1.into())).unwrap(),
-            format!(
-                "https://www.sv-eutingen.de/fitness/buchung?code={}",
-                hashids::encode(&[1, 0])
+            create_body(
+                "${link}",
+                &booking_member,
+                &event,
+                None,
+                Some("booking_link".into())
             )
-        );
-        event.event_type = EventType::Events;
-        assert_eq!(
-            create_body("${link}", &booking_non_member, &event, None, Some(2.into())).unwrap(),
-            format!(
-                "https://www.sv-eutingen.de/events/buchung?code={}",
-                hashids::encode(&[2, 1])
-            )
+            .unwrap(),
+            "booking_link"
         );
     }
 
@@ -838,6 +835,24 @@ ${dates}",
         let event = new_event(vec![Utc::now() - Duration::days(1)]);
         assert_eq!(replace_payday("${payday}".into(), &event), tomorrow);
         assert_eq!(replace_payday("${payday:7}".into(), &event), tomorrow);
+    }
+
+    #[test]
+    fn test_create_prebooking_link() {
+        assert_eq!(
+            create_prebooking_link(EventType::Fitness, 1.into(), 0.into()).unwrap(),
+            format!(
+                "https://www.sv-eutingen.de/fitness/buchung?code={}",
+                hashids::encode(&[1, 0])
+            )
+        );
+        assert_eq!(
+            create_prebooking_link(EventType::Events, 2.into(), 1.into()).unwrap(),
+            format!(
+                "https://www.sv-eutingen.de/events/buchung?code={}",
+                hashids::encode(&[2, 1])
+            )
+        );
     }
 
     #[test]

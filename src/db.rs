@@ -817,7 +817,7 @@ pub(crate) async fn get_bookings(
     pool: &PgPool,
     event_id: &EventId,
     enrolled: Option<bool>,
-) -> Result<Vec<(EventBooking, String)>> {
+) -> Result<Vec<(EventBooking, i32, String)>> {
     let mut conn = pool.acquire().await?;
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
@@ -863,7 +863,6 @@ ORDER BY
         result.push((
             EventBooking::new(
                 row.try_get("event_id")?,
-                row.try_get("subscriber_id")?,
                 row.try_get("first_name")?,
                 row.try_get("last_name")?,
                 row.try_get("street")?,
@@ -874,6 +873,7 @@ ORDER BY
                 None,
                 None,
             ),
+            row.try_get("subscriber_id")?,
             row.try_get("payment_id")?,
         ));
     }
@@ -1000,7 +1000,6 @@ WHERE
             .map(|row| {
                 EventBooking::new(
                     event_id.into_inner(),
-                    subscriber_id,
                     row.first_name,
                     row.last_name,
                     row.street,
