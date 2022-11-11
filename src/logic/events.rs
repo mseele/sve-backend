@@ -1,4 +1,5 @@
 use super::csv::PaymentRecord;
+use super::template;
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
@@ -8,12 +9,11 @@ use crate::models::{
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{Duration, Locale, NaiveDate, Utc};
+use chrono::NaiveDate;
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
 use lettre::message::SinglePart;
 use log::{error, info, warn};
-use regex::Regex;
 use sqlx::PgPool;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -192,7 +192,14 @@ async fn process_event_email(
             prebooking_link = None;
         }
 
-        let body = create_body(&body, &booking, &event, Some(payment_id), prebooking_link)?;
+        let body = template::render_booking(
+            &body,
+            &booking,
+            &event,
+            Some(payment_id),
+            prebooking_link,
+            None,
+        )?;
 
         let attachments = match &attachments {
             Some(attachments) => Some(
@@ -383,46 +390,7 @@ async fn send_booking_mail(
         opt_payment_id = None;
     }
 
-    let message = email_account
-        .new_message()?
-        .to(booking.email.parse()?)
-        .bcc(email_account.mailbox()?)
-        .subject(subject)
-        .singlepart(SinglePart::plain(create_body(
-            template,
-            booking,
-            event,
-            opt_payment_id,
-            None,
-        )?))?;
-
-    email::send_message(&email_account, message).await?;
-
-    Ok(())
-}
-
-fn create_body(
-    template: &str,
-    booking: &EventBooking,
-    event: &Event,
-    payment_id: Option<String>,
-    prebooking_link: Option<String>,
-) -> Result<String> {
-    let mut body = template
-        .replace("${firstname}", booking.first_name.trim())
-        .replace("${lastname}", booking.last_name.trim())
-        .replace("${name}", event.name.trim())
-        .replace("${location}", &event.location)
-        .replace("${price}", &booking.cost(event).to_euro())
-        .replace("${dates}", &format_dates(&event));
-    if let Some(payment_id) = payment_id {
-        body = body.replace("${payment_id}", &payment_id);
-    }
-    body = replace_payday(body, &event);
-
-    if let Some(prebooking_link) = prebooking_link {
-        body = body.replace("${link}", &prebooking_link);
-    }
+    let mut body = template::render_booking(template, booking, event, opt_payment_id, None, None)?;
 
     if booking.updates.unwrap_or(false) {
         body.push_str(
@@ -440,49 +408,17 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
             .as_str(),
         )
     }
-    Ok(body)
-}
 
-fn format_dates(event: &Event) -> String {
-    event
-        .dates
-        .iter()
-        .map(|d| {
-            d.format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
-                .to_string()
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
+    let message = email_account
+        .new_message()?
+        .to(booking.email.parse()?)
+        .bcc(email_account.mailbox()?)
+        .subject(subject)
+        .singlepart(SinglePart::plain(body))?;
 
-fn replace_payday(body: String, event: &Event) -> String {
-    if let Some(first_date) = event.dates.first() {
-        let mut payday_replace_str = "${payday}";
-        let mut days = 14;
-        let payday_regex = Regex::new(r"\$\{payday:(\d+)\}").expect("regex is valid");
-        if let Some(find_result) = payday_regex.find(&body) {
-            payday_replace_str = &body[find_result.start()..find_result.end()];
-            if let Some(captures) = payday_regex.captures(&body) {
-                days = captures
-                    .get(1)
-                    .map_or("", |m| m.as_str())
-                    .parse::<i32>()
-                    .expect("group is an integer");
-            }
-        }
-        let mut payday = *first_date - Duration::days(days.into());
-        let tomorrow = Utc::now() + Duration::days(1);
-        if payday < tomorrow {
-            payday = tomorrow
-        }
+    email::send_message(&email_account, message).await?;
 
-        return body.replace(
-            payday_replace_str,
-            &payday.format_localized("%d. %B", Locale::de_DE).to_string(),
-        );
-    }
-
-    body
+    Ok(())
 }
 
 fn create_prebooking_link(
@@ -672,170 +608,8 @@ mod tests {
 
     use super::*;
     use bigdecimal::{BigDecimal, FromPrimitive};
-    use chrono::{DateTime, NaiveDate, TimeZone};
+    use chrono::{NaiveDate, Utc};
     use pretty_assertions::assert_eq;
-
-    #[test]
-    fn test_create_body() {
-        let booking_member = EventBooking::new(
-            0,
-            String::from("Max"),
-            String::from("Mustermann"),
-            String::from("Haupstraße 1"),
-            String::from("72184 Eutingen"),
-            String::from("max@mustermann.de"),
-            None,
-            Some(true),
-            None,
-            None,
-        );
-        let booking_non_member = EventBooking::new(
-            1,
-            String::from("Max"),
-            String::from("Mustermann"),
-            String::from("Haupstraße 1"),
-            String::from("72184 Eutingen"),
-            String::from("max@mustermann.de"),
-            None,
-            None,
-            None,
-            None,
-        );
-        let event = Event::new(
-            0,
-            Utc::now(),
-            None,
-            EventType::Fitness,
-            LifecycleStatus::Draft,
-            String::from("FitForFun"),
-            0,
-            String::from("short_description"),
-            String::from("description"),
-            String::from("image"),
-            true,
-            vec![
-                Utc.ymd(2022, 3, 7).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 8).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 9).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 10).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 11).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 12).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 13).and_hms(19, 00, 00),
-            ],
-            None,
-            0,
-            0,
-            0,
-            BigDecimal::from_i8(5).unwrap(),
-            BigDecimal::from_i8(10).unwrap(),
-            String::from("Turn- & Festhalle Eutingen"),
-            String::from("booking_template"),
-            String::from("waiting_template"),
-            None,
-            None,
-            false,
-        );
-
-        assert_eq!(
-            create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${payment_id}
-${dates}",
-                &booking_member,
-                &event,
-                None,
-                None
-            )
-            .unwrap(),
-            format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{payment_id}}
-- Mo., 07. März 2022, 19:00 Uhr
-- Di., 08. März 2022, 19:00 Uhr
-- Mi., 09. März 2022, 19:00 Uhr
-- Do., 10. März 2022, 19:00 Uhr
-- Fr., 11. März 2022, 19:00 Uhr
-- Sa., 12. März 2022, 19:00 Uhr
-- So., 13. März 2022, 19:00 Uhr",
-                format_payday(Utc::now() + Duration::days(1))
-            ),
-        );
-        assert_eq!(
-            create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${payment_id}
-${dates}",
-                &booking_non_member,
-                &event,
-                Some(String::from("22-1012")),
-                None
-            )
-            .unwrap(),
-            format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012
-- Mo., 07. März 2022, 19:00 Uhr
-- Di., 08. März 2022, 19:00 Uhr
-- Mi., 09. März 2022, 19:00 Uhr
-- Do., 10. März 2022, 19:00 Uhr
-- Fr., 11. März 2022, 19:00 Uhr
-- Sa., 12. März 2022, 19:00 Uhr
-- So., 13. März 2022, 19:00 Uhr",
-                format_payday(Utc::now() + Duration::days(1))
-            )
-        );
-
-        assert_eq!(
-            create_body(
-                "${link}",
-                &booking_member,
-                &event,
-                None,
-                Some("booking_link".into())
-            )
-            .unwrap(),
-            "booking_link"
-        );
-    }
-
-    #[test]
-    fn test_replace_payday() {
-        // event starts in 3 weeks
-        let event = new_event(vec![Utc::now() + Duration::weeks(3)]);
-        assert_eq!(
-            replace_payday("${payday}".into(), &event),
-            format_payday(Utc::now() + Duration::weeks(1))
-        );
-        assert_eq!(
-            replace_payday("${payday:7}".into(), &event),
-            format_payday(Utc::now() + Duration::weeks(2))
-        );
-        assert_eq!(
-            replace_payday("${payday:0}".into(), &event),
-            format_payday(Utc::now() + Duration::weeks(3))
-        );
-        let tomorrow = (Utc::now() + Duration::days(1))
-            .format_localized("%d. %B", Locale::de_DE)
-            .to_string();
-        assert_eq!(replace_payday("${payday:21}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:28}".into(), &event), tomorrow);
-
-        // event starts in 3 days
-        let event = new_event(vec![Utc::now() + Duration::days(3)]);
-        assert_eq!(
-            replace_payday("${payday:1}".into(), &event),
-            format_payday(Utc::now() + Duration::days(2))
-        );
-        assert_eq!(replace_payday("${payday:2}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:3}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:14}".into(), &event), tomorrow);
-
-        // event starts today
-        let event = new_event(vec![Utc::now()]);
-        assert_eq!(replace_payday("${payday}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:7}".into(), &event), tomorrow);
-
-        // event started yesterday
-        let event = new_event(vec![Utc::now() - Duration::days(1)]);
-        assert_eq!(replace_payday("${payday}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:7}".into(), &event), tomorrow);
-    }
 
     #[test]
     fn test_create_prebooking_link() {
@@ -1113,40 +887,5 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
     ) -> (HashMap<i32, String>, Vec<VerifyPaymentResult>) {
         let payment_records = read_payment_records(&csv, csv_start_date).unwrap();
         compare_payment_records_with_bookings(&payment_records, bookings).unwrap()
-    }
-
-    fn format_payday(date_time: DateTime<Utc>) -> String {
-        date_time
-            .format_localized("%d. %B", Locale::de_DE)
-            .to_string()
-    }
-
-    fn new_event(dates: Vec<DateTime<Utc>>) -> Event {
-        Event::new(
-            0,
-            Utc::now(),
-            None,
-            EventType::Fitness,
-            LifecycleStatus::Draft,
-            String::from("name"),
-            0,
-            String::from("short_description"),
-            String::from("description"),
-            String::from("image"),
-            true,
-            dates,
-            None,
-            0,
-            0,
-            0,
-            BigDecimal::from_i8(0).unwrap(),
-            BigDecimal::from_i8(0).unwrap(),
-            String::from("location"),
-            String::from("booking_template"),
-            String::from("waiting_template"),
-            None,
-            None,
-            false,
-        )
     }
 }

@@ -1,9 +1,9 @@
-Hallo ${firstname},
+Hallo {{firstname}},
 
-bei deinem gebuchten Kurs "${name}" gibt es eine Terminänderung.
+bei deinem gebuchten Kurs "{{name}}" gibt es eine Terminänderung.
 
 Die neuen Kurstermine sind:
-${dates}
+{{dates}}
 
 Wir wünschen Dir weiterhin viel Spaß beim Kurs.
 

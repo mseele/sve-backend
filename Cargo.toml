@@ -52,6 +52,7 @@ sqlx = { version = "0.6", features = [
 ] }
 itertools = "0.10"
 harsh = "0.2"
+handlebars = "4.3"
 
 [dev-dependencies]
 pretty_assertions = "1.2"
