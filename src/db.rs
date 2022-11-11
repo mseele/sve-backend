@@ -299,7 +299,7 @@ WHERE
     AND v.canceled IS NULL
 ORDER BY
     v.event_id,
-    v.enrolled,
+    v.enrolled DESC,
     v.created"#,
     );
 
