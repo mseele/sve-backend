@@ -1199,7 +1199,7 @@ RETURNING id"#,
         booking.city,
         booking.email,
         booking.phone,
-        booking.member
+        booking.member.or_else(|| Some(false))
     )
     .map(|row| row.id)
     .fetch_one(conn)
