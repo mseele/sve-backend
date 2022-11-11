@@ -83,7 +83,8 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/update", web::post().to(update))
             .route("/{id}", web::delete().to(delete))
             .route("/verify_payments", web::post().to(verify_payments))
-            .route("/booking/{id}", web::patch().to(update_event_booking)),
+            .route("/booking/{id}", web::patch().to(update_event_booking))
+            .route("/booking/{id}", web::delete().to(cancel_event_booking)),
     );
     cfg.service(
         web::scope("/news")
@@ -247,6 +248,15 @@ async fn update_event_booking(
     if let Some(update_payment) = query.update_payment {
         events::update_payment(&pool, booking_id, update_payment).await?;
     }
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn cancel_event_booking(
+    pool: Data<PgPool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, ResponseError> {
+    let booking_id = path.into_inner();
+    events::cancel_booking(&pool, booking_id).await?;
     Ok(HttpResponse::Ok().finish())
 }
 

@@ -21,6 +21,18 @@
     },
     "query": "\nSELECT\n\tCOUNT(1)\nFROM\n\tevent_bookings e\nWHERE\n\te.event_id = $1\n\tAND e.subscriber_id = $2\n"
   },
+  "08bdba04d89a88a8d1fea196318a18ea93f7905d2977860462569a14ec6b340b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "UPDATE event_bookings SET enrolled = true WHERE id = $1"
+  },
   "19bd943180899dc6f06d9c1378a82086f78f972ef53f10b2a22d3039a44c0ab3": {
     "describe": {
       "columns": [
@@ -107,6 +119,18 @@
       }
     },
     "query": "SELECT e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\" FROM events e WHERE e.id = $1"
+  },
+  "305c2392d5448c7fe254c0a5ebf5f3f74665a2f68b7eecddb2026c3e70e45a79": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "UPDATE event_bookings SET canceled = NOW() WHERE id = $1"
   },
   "3393ef408cc9a46f5a6912aca406b6a42853ac80e3abec33da8257f4dbedc3a5": {
     "describe": {
@@ -453,6 +477,68 @@
     },
     "query": "\nINSERT INTO public.event_bookings\n(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)\nVALUES($1, $2, $3, $4, $5, $6)"
   },
+  "6bf11d007b1382915657a0702ec27d9eadabcf6f8753969917a72f16298c8767": {
+    "describe": {
+      "columns": [
+        {
+          "name": "event_id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "first_name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_name",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "street",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "city",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "email",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "phone",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "member",
+          "ordinal": 7,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n    v.event_id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member\nFROM\n    v_event_bookings v\nWHERE\n    v.id = $1"
+  },
   "6e9891080ae0a59242f81b2f10fb35ddb5b3dabc83f226504fd6f6b16948aee9": {
     "describe": {
       "columns": [],
@@ -464,6 +550,74 @@
       }
     },
     "query": "UPDATE event_bookings SET payed = NOW() WHERE id = $1"
+  },
+  "774531f3f7b213473469b13e414d2e3ad1e547ef2a13da58821872a8c8d3e908": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "first_name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "last_name",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "street",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "city",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "email",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "phone",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "member",
+          "ordinal": 7,
+          "type_info": "Bool"
+        },
+        {
+          "name": "payment_id",
+          "ordinal": 8,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n    v.id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member,\n    v.payment_id\nFROM\n    v_event_bookings v\nWHERE\n    v.event_id = $1\n    AND v.canceled IS NULL\n    AND v.enrolled IS FALSE\nORDER BY\nv.created"
   },
   "80f5a6e6bf8c85c7b7965deefaf1147d7632dc416c298010616158d5c4526dc9": {
     "describe": {

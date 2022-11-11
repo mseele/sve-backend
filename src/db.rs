@@ -1262,6 +1262,127 @@ async fn get_event_subscriber_id(
     Ok(id)
 }
 
+pub(crate) async fn cancel_event_booking(
+    pool: &PgPool,
+    booking_id: i32,
+) -> Result<(Event, EventBooking, Option<(EventBooking, String)>)> {
+    let mut tx = pool.begin().await?;
+
+    // cancel booking
+    query!(
+        r#"UPDATE event_bookings SET canceled = NOW() WHERE id = $1"#,
+        booking_id,
+    )
+    .execute(&mut tx)
+    .await?;
+
+    // fetch the canceled booking data
+    let canceled_booking = query!(
+        r#"
+SELECT
+    v.event_id,
+    v.first_name,
+    v.last_name,
+    v.street,
+    v.city,
+    v.email,
+    v.phone,
+    v.member
+FROM
+    v_event_bookings v
+WHERE
+    v.id = $1"#,
+        booking_id
+    )
+    .map(|row| {
+        // unwrap is needed because we fetch from a view
+        EventBooking::new(
+            row.event_id.unwrap().into(),
+            row.first_name.unwrap(),
+            row.last_name.unwrap(),
+            row.street.unwrap(),
+            row.city.unwrap(),
+            row.email.unwrap(),
+            row.phone,
+            row.member,
+            None,
+            None,
+        )
+    })
+    .fetch_one(&mut tx)
+    .await?;
+
+    let event_id = canceled_booking.event_id;
+
+    // fetch the first waiting list entrance
+    let waiting_list_result: Option<(i32, EventBooking, String)> = query!(
+        r#"
+SELECT
+    v.id,
+    v.first_name,
+    v.last_name,
+    v.street,
+    v.city,
+    v.email,
+    v.phone,
+    v.member,
+    v.payment_id
+FROM
+    v_event_bookings v
+WHERE
+    v.event_id = $1
+    AND v.canceled IS NULL
+    AND v.enrolled IS FALSE
+ORDER BY
+v.created"#,
+        event_id.get_ref()
+    )
+    .map(|row| {
+        // unwrap is needed because we fetch from a view
+        (
+            row.id.unwrap(),
+            EventBooking::new(
+                event_id.into_inner(),
+                row.first_name.unwrap(),
+                row.last_name.unwrap(),
+                row.street.unwrap(),
+                row.city.unwrap(),
+                row.email.unwrap(),
+                row.phone,
+                row.member,
+                None,
+                None,
+            ),
+            row.payment_id.unwrap(),
+        )
+    })
+    .fetch_optional(&mut tx)
+    .await?;
+
+    // extract and switch enrolled status for waiting list booking - if available
+    let first_waiting_list_booking;
+    if let Some((booking_id, booking, payment_id)) = waiting_list_result {
+        query!(
+            r#"UPDATE event_bookings SET enrolled = true WHERE id = $1"#,
+            booking_id,
+        )
+        .execute(&mut tx)
+        .await?;
+
+        first_waiting_list_booking = Some((booking, payment_id));
+    } else {
+        first_waiting_list_booking = None;
+    }
+
+    let event = fetch_event(&mut tx, &event_id)
+        .await?
+        .ok_or_else(|| anyhow!("Error fetching event with id '{}'", event_id))?;
+
+    tx.commit().await?;
+
+    Ok((event, canceled_booking, first_waiting_list_booking))
+}
+
 pub(crate) async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
     let subscriptions =
         query!(r#"SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s"#)

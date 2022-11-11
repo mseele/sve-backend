@@ -132,6 +132,56 @@ pub(crate) async fn update_payment(
     Ok(db::update_payment(&pool, booking_id, update_payment).await?)
 }
 
+pub(crate) async fn cancel_booking(pool: &PgPool, booking_id: i32) -> Result<()> {
+    let (event, canceled_booking, waiting_list_booking) =
+        db::cancel_event_booking(&pool, booking_id).await?;
+
+    let email_account = email::get_account_by_type(event.event_type.into())?;
+    let mut messages = Vec::new();
+
+    // create cancellation confirmation email
+    let subject = format!("{} Stornierung Buchung", event.subject_prefix());
+    let body = match event.event_type {
+        EventType::Fitness => include_str!("../../templates/cancel_booking_fitness.txt"),
+        EventType::Events => include_str!("../../templates/cancel_booking_events.txt"),
+    };
+    let body = template::render_booking(&body, &canceled_booking, &event, None, None, None)?;
+    messages.push(
+        email_account
+            .new_message()?
+            .to(canceled_booking.email.parse()?)
+            .bcc(email_account.mailbox()?)
+            .subject(subject)
+            .singlepart(SinglePart::plain(body))?,
+    );
+
+    // create booking confirmation email for the new booking
+    if let Some((new_booking, payment_id)) = waiting_list_booking {
+        let subject = format!("{} Bestätigung Buchung", event.subject_prefix());
+        let body = template::render_booking(
+            &event.booking_template,
+            &new_booking,
+            &event,
+            Some(payment_id),
+            None,
+            Some(false),
+        )?;
+
+        messages.push(
+            email_account
+                .new_message()?
+                .to(new_booking.email.parse()?)
+                .bcc(email_account.mailbox()?)
+                .subject(subject)
+                .singlepart(SinglePart::plain(body))?,
+        );
+    }
+
+    email::send_messages(&email_account, messages).await?;
+
+    Ok(())
+}
+
 pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
     if !data.bookings && !data.waiting_list {
         bail!("Either bookings or waiting list option need to be selected to send an event email.")

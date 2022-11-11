@@ -1,0 +1,8 @@
+Hallo {{firstname}},
+
+wir haben deinen gebuchten Kurs "{{name}}" storniert.
+
+Im kommenden Halbjahr startet unser neues Kursangebot, dass wir wieder über sämtliche Kanäle veröffentlichen. Vielleicht ist dort wieder ein interessantes Angebot für Dich dabei.
+
+Herzliche Grüße
+Team Fitness@SVE
