@@ -649,6 +649,9 @@ fn compare_payment_records_with_bookings(
         non_matching_payment_records,
     ));
 
+    // TODO: add list of open payments (including the possibility to mark as payed
+    // and to send a reminder email for all due payments)
+
     Ok((verified_ibans, compare_result))
 }
 

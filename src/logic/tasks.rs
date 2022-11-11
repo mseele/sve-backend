@@ -15,3 +15,5 @@ pub(crate) async fn renew_calendar_watch() {
         Err(e) => error!("Error renewing calendar watch: {}", e),
     }
 }
+
+// TODO: add event email check (send a reminder email 7 days before the course)
