@@ -715,8 +715,9 @@ fn compare_payment_records_with_bookings(
     Ok((verified_ibans, compare_result))
 }
 
-/// calculate the payday with the first event date
+/// Calculate the payday with the first event date.
 pub(super) fn calculate_payday(
+    booking_date: &DateTime<Utc>,
     first_event_date: &DateTime<Utc>,
     custom_days: Option<i64>,
 ) -> Date<Utc> {
@@ -729,12 +730,12 @@ pub(super) fn calculate_payday(
     }
 
     // calculated payday
-    let mut payday = first_event_date.date() - Duration::days(days.into());
+    let mut payday = first_event_date.date() - Duration::days(days);
 
-    // override with tomorrow, if the payday is today or in the past
-    let tomorrow = Utc::today() + Duration::days(1);
-    if payday < tomorrow {
-        payday = tomorrow
+    // override the payday if it is before the day after the booking date
+    let earliest_paypay = booking_date.date() + Duration::days(1);
+    if payday < earliest_paypay {
+        payday = earliest_paypay
     }
 
     payday
@@ -1029,41 +1030,78 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 
     #[test]
     fn test_calculate_payday() {
+        let booking_date = Utc::now();
+
         // event starts in 3 weeks
         let start_date = Utc::now() + Duration::weeks(3);
         assert_eq!(
-            calculate_payday(&start_date, None),
+            calculate_payday(&booking_date, &start_date, None),
             Utc::today() + Duration::weeks(1)
         );
         assert_eq!(
-            calculate_payday(&start_date, Some(7)),
+            calculate_payday(&booking_date, &start_date, Some(7)),
             Utc::today() + Duration::weeks(2)
         );
         assert_eq!(
-            calculate_payday(&start_date, Some(0)),
+            calculate_payday(&booking_date, &start_date, Some(0)),
             Utc::today() + Duration::weeks(3)
         );
         let tomorrow = Utc::today() + Duration::days(1);
-        assert_eq!(calculate_payday(&start_date, Some(21)), tomorrow);
-        assert_eq!(calculate_payday(&start_date, Some(28)), tomorrow);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(21)),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(28)),
+            tomorrow
+        );
 
         // event starts in 3 days
         let start_date = Utc::now() + Duration::days(3);
         assert_eq!(
-            calculate_payday(&start_date, Some(1)),
+            calculate_payday(&booking_date, &start_date, Some(1)),
             Utc::today() + Duration::days(2)
         );
-        assert_eq!(calculate_payday(&start_date, Some(2)), tomorrow);
-        assert_eq!(calculate_payday(&start_date, Some(3)), tomorrow);
-        assert_eq!(calculate_payday(&start_date, Some(14)), tomorrow);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(2)),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(3)),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(14)),
+            tomorrow
+        );
 
         // event starts today
         let start_date = Utc::now();
-        assert_eq!(calculate_payday(&start_date, None), tomorrow);
-        assert_eq!(calculate_payday(&start_date, Some(7)), tomorrow);
+        assert_eq!(calculate_payday(&booking_date, &start_date, None), tomorrow);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            tomorrow
+        );
 
         // event started yesterday
         let start_date = Utc::now() - Duration::days(1);
+        assert_eq!(calculate_payday(&booking_date, &start_date, None), tomorrow);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            tomorrow
+        );
+
+        // negative paydays (because the bookings are in the past)
+        let booking_date = Utc::now() - Duration::days(31);
+        let start_date = Utc::now();
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, None),
+            Utc::today() - Duration::days(14)
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            Utc::today() - Duration::days(7)
+        );
         assert_eq!(calculate_payday(&start_date, None), tomorrow);
         assert_eq!(calculate_payday(&start_date, Some(7)), tomorrow);
     }

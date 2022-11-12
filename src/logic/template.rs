@@ -123,7 +123,7 @@ impl HelperDef for PaydayHelper<'_> {
                 None => None,
             };
 
-            let payday = events::calculate_payday(first_date, custom_day);
+            let payday = events::calculate_payday(&Utc::now(), first_date, custom_day);
 
             out.write(&payday.format_localized("%d. %B", Locale::de_DE).to_string())?;
         }
