@@ -243,8 +243,9 @@ async fn verify_payments(
     pool: Data<PgPool>,
     Json(input): Json<VerifyPaymentInput>,
 ) -> Result<impl Responder, ResponseError> {
-    let result = events::verify_payments(&pool, input.csv, input.start_date).await?;
-    Ok(Json(result))
+    Ok(Json(
+        events::verify_payments(&pool, input.csv, input.start_date).await?,
+    ))
 }
 
 async fn unpaid_bookings(
