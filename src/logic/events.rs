@@ -98,10 +98,9 @@ pub(crate) async fn delete(pool: &PgPool, event_id: EventId) -> Result<()> {
 
 pub(crate) async fn verify_payments(
     pool: &PgPool,
-    event_type: EventType,
     csv: String,
     csv_start_date: Option<NaiveDate>,
-) -> Result<(Vec<VerifyPaymentResult>, Vec<VerifyPaymentBookingRecord>)> {
+) -> Result<Vec<VerifyPaymentResult>> {
     let bytes = base64::decode(&csv)
         .with_context(|| format!("Error decoding the cvs content: {}", &csv))?;
     let csv = match ISO_8859_1.decode(&bytes, DecoderTrap::Strict) {
@@ -115,14 +114,21 @@ pub(crate) async fn verify_payments(
         .iter()
         .flat_map(|r| &r.payment_ids)
         .collect::<HashSet<_>>();
-    let mut bookings = db::get_bookings_to_verify_payment(pool, event_type, payment_ids).await?;
-    let (verified_payments, result, unpaid_bookings) =
+    let mut bookings = db::get_bookings_to_verify_payment(pool, payment_ids).await?;
+    let (verified_payments, result) =
         compare_payment_records_with_bookings(&payment_records, &mut bookings)?;
     if verified_payments.len() > 0 {
         db::mark_as_payed(&pool, &verified_payments).await?;
     }
 
-    Ok((result, unpaid_bookings))
+    Ok(result)
+}
+
+pub(crate) async fn get_unpaid_bookings(
+    pool: &PgPool,
+    event_type: EventType,
+) -> Result<Vec<VerifyPaymentBookingRecord>> {
+    Ok(db::get_event_bookings_without_payment(&pool, event_type).await?)
 }
 
 pub(crate) async fn update_payment(
@@ -571,11 +577,7 @@ fn read_payment_records(
 fn compare_payment_records_with_bookings(
     payment_records: &Vec<PaymentRecord>,
     bookings: &mut Vec<VerifyPaymentBookingRecord>,
-) -> Result<(
-    HashMap<i32, String>,
-    Vec<VerifyPaymentResult>,
-    Vec<VerifyPaymentBookingRecord>,
-)> {
+) -> Result<(HashMap<i32, String>, Vec<VerifyPaymentResult>)> {
     let mut verified_payment_bookings = Vec::new();
     let mut verified_ibans = HashMap::new();
     let mut payment_bookings_with_errors = BTreeMap::new();
@@ -710,24 +712,7 @@ fn compare_payment_records_with_bookings(
         non_matching_payment_records,
     ));
 
-    // collect all unpaid bookings left
-    let mut unpaid_bookings = bookings
-        .into_iter()
-        .filter_map(|(_, booking)| {
-            // filter out all canceled bookings, waiting list bookings and all payed bookings
-            if booking.canceled.is_some() || !booking.enrolled || booking.payed.is_some() {
-                return None;
-            }
-            Some(booking.clone())
-        })
-        .collect::<Vec<_>>();
-    unpaid_bookings.sort_unstable_by(|a, b| {
-        a.event_name
-            .cmp(&b.event_name)
-            .then(a.payment_id.cmp(&b.payment_id))
-    });
-
-    Ok((verified_ibans, compare_result, unpaid_bookings))
+    Ok((verified_ibans, compare_result))
 }
 
 #[cfg(test)]
@@ -829,92 +814,90 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, None, &mut bookings),
-            (
-                HashMap::from([(1, "DE62500105176261449571".into())]),
-                vec![
-                    VerifyPaymentResult::new(
-                        "1 bezahlte Buchung".into(),
-                        vec!["22-1423".into()]
-                    ),
-                    VerifyPaymentResult::new(
-                        "3 Buchungen mit Problemen".into(),
-                        vec!["22-1425 / Betrag falsch: erwartet 27,00 € != überwiesen 33,50 €".into(),
-                             "22-1456 / Doppelt bezahlt: Buchung ist schon als bezahlt markiert".into(),
-                             "22-1467 / Falsch bezahlt: Buchung ist als storniert markiert".into()]
-                    ),
-                    VerifyPaymentResult::new(
-                        "1 nicht erkannte Buchung".into(),
-                        vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
-                    )
-                ],
-                vec![]
+    compare_csv_with_bookings(csv, None, &mut bookings),
+    (
+        HashMap::from([(1, "DE62500105176261449571".into())]),
+        vec![
+            VerifyPaymentResult::new(
+                "1 bezahlte Buchung".into(),
+                vec!["22-1423".into()]
+            ),
+            VerifyPaymentResult::new(
+                "3 Buchungen mit Problemen".into(),
+                vec!["22-1425 / Betrag falsch: erwartet 27,00 € != überwiesen 33,50 €".into(),
+                     "22-1456 / Doppelt bezahlt: Buchung ist schon als bezahlt markiert".into(),
+                     "22-1467 / Falsch bezahlt: Buchung ist als storniert markiert".into()]
+            ),
+            VerifyPaymentResult::new(
+                "1 nicht erkannte Buchung".into(),
+                vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
             )
-        );
+        ]
+    )
+);
 
         // no matching bookings
-        let csv = r#"Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz
+        let csv = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz
 Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS FREUDENSTADT;09.03.2022;09.03.2022;Test GmbH;DE92500105174132432988;GENODES1VBH;16 Euro-Überweisung;Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH;-24,15;EUR;260,00;;;;;
-"#;
+";
 
-        let booking_1 = VerifyPaymentBookingRecord::new(
-            1,
-            "Test-Kurs".into(),
-            "Max Mustermann".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1423".into(),
-            None,
-            true,
-            None,
-        );
-        let booking_2 = VerifyPaymentBookingRecord::new(
-            2,
-            "Test-Kurs".into(),
-            "Erika Mustermann".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1425".into(),
-            None,
-            true,
-            None,
-        );
-        let booking_3 = VerifyPaymentBookingRecord::new(
-            3,
-            "Test-Kurs".into(),
-            "Lieschen Müller".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1456".into(),
-            None,
-            true,
-            Some(Utc::now()),
-        );
-        let booking_4 = VerifyPaymentBookingRecord::new(
-            4,
-            "Test-Kurs".into(),
-            "Otto Normalverbraucher".into(),
-            BigDecimal::from_str("45.90").unwrap(),
-            "22-1467".into(),
-            None,
-            true,
-            None,
-        );
-        let unpaid_bookings = vec![booking_1.clone(), booking_2.clone(), booking_4.clone()];
-        let mut bookings = vec![booking_1, booking_2, booking_3, booking_4];
+        let mut bookings = vec![
+            VerifyPaymentBookingRecord::new(
+                1,
+                "Test-Kurs".into(),
+                "Max Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1423".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                2,
+                "Test-Kurs".into(),
+                "Erika Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1425".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                3,
+                "Test-Kurs".into(),
+                "Lieschen Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1456".into(),
+                None,
+                true,
+                Some(Utc::now()),
+            ),
+            VerifyPaymentBookingRecord::new(
+                4,
+                "Test-Kurs".into(),
+                "Otto Normalverbraucher".into(),
+                BigDecimal::from_str("45.90").unwrap(),
+                "22-1467".into(),
+                None,
+                true,
+                None,
+            ),
+        ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, None, &mut bookings),
-            (
-                HashMap::new(),
-                vec![
-                    VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
-                    VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
-                    VerifyPaymentResult::new(
-                        "1 nicht erkannte Buchung".into(),
-                        vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
-                    )
-                ],
-                unpaid_bookings
+    compare_csv_with_bookings(csv, None, &mut bookings),
+    (
+        HashMap::new(),
+        vec![
+            VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
+            VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
+            VerifyPaymentResult::new(
+                "1 nicht erkannte Buchung".into(),
+                vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
             )
-        );
+        ]
+    )
+);
 
         // matching bookings with and without errors
         let csv = ";;;;;;;;;;;;;;;;
@@ -942,49 +925,48 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
 ";
-
-        let booking_1 = VerifyPaymentBookingRecord::new(
-            1,
-            "Test-Kurs".into(),
-            "Max Mustermann".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1423".into(),
-            None,
-            true,
-            None,
-        );
-        let booking_2 = VerifyPaymentBookingRecord::new(
-            2,
-            "Test-Kurs".into(),
-            "Erika Mustermann".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1425".into(),
-            None,
-            true,
-            None,
-        );
-        let booking_3 = VerifyPaymentBookingRecord::new(
-            3,
-            "Test-Kurs".into(),
-            "Lieschen Müller".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1456".into(),
-            None,
-            true,
-            Some(Utc::now()),
-        );
-        let booking_4 = VerifyPaymentBookingRecord::new(
-            4,
-            "Test-Kurs".into(),
-            "Otto Normalverbraucher".into(),
-            BigDecimal::from_str("45.90").unwrap(),
-            "22-1467".into(),
-            None,
-            true,
-            None,
-        );
-        let unpaid_bookings = vec![booking_1.clone(), booking_2.clone()];
-        let mut bookings = vec![booking_1, booking_2, booking_3, booking_4];
+        let mut bookings = vec![
+            VerifyPaymentBookingRecord::new(
+                1,
+                "Test-Kurs".into(),
+                "Max Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1423".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                2,
+                "Test-Kurs".into(),
+                "Erika Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1425".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                3,
+                "Test-Kurs".into(),
+                "Lieschen Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1456".into(),
+                None,
+                true,
+                Some(Utc::now()),
+            ),
+            VerifyPaymentBookingRecord::new(
+                4,
+                "Test-Kurs".into(),
+                "Otto Normalverbraucher".into(),
+                BigDecimal::from_str("45.90").unwrap(),
+                "22-1467".into(),
+                None,
+                true,
+                None,
+            ),
+        ];
 
         assert_eq!(
             compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 11), &mut bookings),
@@ -994,53 +976,9 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     VerifyPaymentResult::new("1 bezahlte Buchung".into(), vec!["22-1467".into()]),
                     VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
                     VerifyPaymentResult::new("0 nicht erkannte Buchungen".into(), vec![])
-                ],
-                unpaid_bookings
+                ]
             )
         );
-
-        let booking_1 = VerifyPaymentBookingRecord::new(
-            1,
-            "Test-Kurs".into(),
-            "Max Mustermann".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1423".into(),
-            None,
-            true,
-            None,
-        );
-        let booking_2 = VerifyPaymentBookingRecord::new(
-            2,
-            "Test-Kurs".into(),
-            "Erika Mustermann".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1425".into(),
-            None,
-            true,
-            None,
-        );
-        let booking_3 = VerifyPaymentBookingRecord::new(
-            3,
-            "Test-Kurs".into(),
-            "Lieschen Müller".into(),
-            BigDecimal::from_i8(27).unwrap(),
-            "22-1456".into(),
-            None,
-            true,
-            Some(Utc::now()),
-        );
-        let booking_4 = VerifyPaymentBookingRecord::new(
-            4,
-            "Test-Kurs".into(),
-            "Otto Normalverbraucher".into(),
-            BigDecimal::from_str("45.90").unwrap(),
-            "22-1467".into(),
-            None,
-            true,
-            None,
-        );
-        let unpaid_bookings = vec![booking_1.clone(), booking_2.clone(), booking_4.clone()];
-        let mut bookings = vec![booking_1, booking_2, booking_3, booking_4];
 
         assert_eq!(
             compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 12), &mut bookings),
@@ -1050,8 +988,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
                     VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
                     VerifyPaymentResult::new("0 nicht erkannte Buchungen".into(), vec![])
-                ],
-                unpaid_bookings
+                ]
             )
         );
     }
@@ -1060,11 +997,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         csv: &str,
         csv_start_date: Option<NaiveDate>,
         bookings: &mut Vec<VerifyPaymentBookingRecord>,
-    ) -> (
-        HashMap<i32, String>,
-        Vec<VerifyPaymentResult>,
-        Vec<VerifyPaymentBookingRecord>,
-    ) {
+    ) -> (HashMap<i32, String>, Vec<VerifyPaymentResult>) {
         let payment_records = read_payment_records(&csv, csv_start_date).unwrap();
         compare_payment_records_with_bookings(&payment_records, bookings).unwrap()
     }

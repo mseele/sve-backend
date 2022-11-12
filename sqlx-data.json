@@ -472,6 +472,78 @@
     },
     "query": "\nINSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)\nRETURNING id, created, closed, event_type AS \"event_type: EventType\", lifecycle_status AS \"lifecycle_status: LifecycleStatus\", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator"
   },
+  "5a6e924727e3647bb76c58ccd2990ae106e2d8d5bc33eed86a9cd4c458784160": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        },
+        {
+          "name": "event_name",
+          "ordinal": 1,
+          "type_info": "Text"
+        },
+        {
+          "name": "full_name",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "cost",
+          "ordinal": 3,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "payment_id",
+          "ordinal": 4,
+          "type_info": "Text"
+        },
+        {
+          "name": "canceled",
+          "ordinal": 5,
+          "type_info": "Timestamptz"
+        },
+        {
+          "name": "enrolled",
+          "ordinal": 6,
+          "type_info": "Bool"
+        },
+        {
+          "name": "payed",
+          "ordinal": 7,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        null,
+        null,
+        false,
+        true,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Fitness",
+                  "Events"
+                ]
+              },
+              "name": "event_type"
+            }
+          }
+        ]
+      }
+    },
+    "query": "\nSELECT\n    b.id,\n    e.name AS event_name,\n    CONCAT (s.first_name, ' ', s.last_name) AS full_name,\n    CASE WHEN s.member IS TRUE\n        THEN e.cost_member\n        ELSE e.cost_non_member\n    END as cost,\n    b.payment_id,\n    b.canceled,\n    b.enrolled,\n    b.payed\nFROM\n    events e,\n    event_bookings b,\n    event_subscribers s\nWHERE\n    e.event_type = $1\n    AND e.id = b.event_id\n    AND b.subscriber_id = s.id\n    AND b.enrolled IS TRUE\n    AND b.canceled IS NULL\n    AND b.payed IS NULL\n\tAND e.lifecycle_status IN('Review', 'Published', 'Running')\nORDER BY\n    e.name,\n    b.created"
+  },
   "6a23e3fde55c8286df3a431723f5c5123c3850dc4e0a3371f2b3a9e463ce973e": {
     "describe": {
       "columns": [

@@ -1,7 +1,8 @@
+use crate::db;
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
-    NewsSubscription, PartialEvent, VerifyPaymentBookingRecord, VerifyPaymentResult,
+    NewsSubscription, PartialEvent,
 };
 use actix_web::http::header::ContentType;
 use actix_web::web::{Data, Json};
@@ -11,7 +12,7 @@ use actix_web::{web, HttpResponse, Responder, Result};
 use chrono::NaiveDate;
 use log::error;
 use serde::Deserialize;
-use serde::{de, Serialize};
+use serde::de;
 use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
@@ -83,6 +84,7 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/update", web::post().to(update))
             .route("/{id}", web::delete().to(delete))
             .route("/verify_payments", web::post().to(verify_payments))
+            .route("/unpaid_bookings", web::get().to(unpaid_bookings))
             .route("/booking/{id}", web::patch().to(update_event_booking))
             .route("/booking/{id}", web::delete().to(cancel_event_booking)),
     );
@@ -164,15 +166,13 @@ pub(crate) struct EventCountersQueryParams {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct VerifyPaymentInput {
-    event_type: EventType,
     csv: String,
     start_date: Option<NaiveDate>,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct VerifyPaymentOutput {
-    csv_results: Vec<VerifyPaymentResult>,
-    unpaid_bookings: Vec<VerifyPaymentBookingRecord>,
+#[derive(Debug, Deserialize)]
+pub(crate) struct UnpaidBookingsQueryParams {
+    event_type: EventType,
 }
 
 #[derive(Debug, Deserialize)]
@@ -243,12 +243,16 @@ async fn verify_payments(
     pool: Data<PgPool>,
     Json(input): Json<VerifyPaymentInput>,
 ) -> Result<impl Responder, ResponseError> {
-    let (csv_results, unpaid_bookings) =
-        events::verify_payments(&pool, input.event_type, input.csv, input.start_date).await?;
-    Ok(Json(VerifyPaymentOutput {
-        csv_results,
-        unpaid_bookings,
-    }))
+    let result = events::verify_payments(&pool, input.csv, input.start_date).await?;
+    Ok(Json(result))
+}
+
+async fn unpaid_bookings(
+    pool: Data<PgPool>,
+    query: web::Query<UnpaidBookingsQueryParams>,
+) -> Result<impl Responder, ResponseError> {
+    let result = events::get_unpaid_bookings(&pool, query.event_type).await?;
+    Ok(Json(result))
 }
 
 async fn update_event_booking(

@@ -660,7 +660,6 @@ pub(crate) async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
 
 pub(crate) async fn get_bookings_to_verify_payment(
     pool: &PgPool,
-    event_type: EventType,
     payment_ids: HashSet<&String>,
 ) -> Result<Vec<VerifyPaymentBookingRecord>> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
@@ -682,14 +681,9 @@ FROM
     event_bookings b,
     event_subscribers s
 WHERE
-    e.event_type ="#,
-    );
-    query_builder.push_bind(event_type);
-    query_builder.push(
-        r#"
-    AND e.id = b.event_id
+    e.id = b.event_id
     AND b.subscriber_id = s.id
-    AND (b.payment_id IN("#,
+    AND b.payment_id IN("#,
     );
     let mut separated = query_builder.separated(", ");
     for payment_id in payment_ids {
@@ -697,8 +691,6 @@ WHERE
     }
     separated.push_unseparated(
         r#")
-        OR (b.payed IS NULL
-		    AND e.lifecycle_status IN('Review', 'Published', 'Running')))
 ORDER BY
     b.created"#,
     );
@@ -718,6 +710,59 @@ ORDER BY
         })
         .fetch_all(pool)
         .await?;
+
+    Ok(result)
+}
+
+pub(crate) async fn get_event_bookings_without_payment(
+    pool: &PgPool,
+    event_type: EventType,
+) -> Result<Vec<VerifyPaymentBookingRecord>> {
+    let result = query!(
+        r#"
+SELECT
+    b.id,
+    e.name AS event_name,
+    CONCAT (s.first_name, ' ', s.last_name) AS full_name,
+    CASE WHEN s.member IS TRUE
+        THEN e.cost_member
+        ELSE e.cost_non_member
+    END as cost,
+    b.payment_id,
+    b.canceled,
+    b.enrolled,
+    b.payed
+FROM
+    events e,
+    event_bookings b,
+    event_subscribers s
+WHERE
+    e.event_type = $1
+    AND e.id = b.event_id
+    AND b.subscriber_id = s.id
+    AND b.enrolled IS TRUE
+    AND b.canceled IS NULL
+    AND b.payed IS NULL
+	AND e.lifecycle_status IN('Review', 'Published', 'Running')
+ORDER BY
+    e.name,
+    b.created"#,
+        event_type as EventType
+    )
+    .map(|row| {
+        VerifyPaymentBookingRecord::new(
+            row.id,
+            row.event_name,
+            row.full_name.unwrap(),
+            row.cost.unwrap(),
+            row.payment_id,
+            row.canceled,
+            row.enrolled,
+            row.payed,
+        )
+    })
+    .fetch_all(pool)
+    .await?;
 
     Ok(result)
 }
