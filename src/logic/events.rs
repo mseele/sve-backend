@@ -9,7 +9,7 @@ use crate::models::{
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::NaiveDate;
+use chrono::{Date, DateTime, Duration, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
 use lettre::message::SinglePart;
@@ -715,6 +715,31 @@ fn compare_payment_records_with_bookings(
     Ok((verified_ibans, compare_result))
 }
 
+/// calculate the payday with the first event date
+pub(super) fn calculate_payday(
+    first_event_date: &DateTime<Utc>,
+    custom_days: Option<i64>,
+) -> Date<Utc> {
+    // default value is 14 days
+    let mut days = 14;
+
+    // overwrite with custom days - if available
+    if let Some(custom_days) = custom_days {
+        days = custom_days;
+    }
+
+    // calculated payday
+    let mut payday = first_event_date.date() - Duration::days(days.into());
+
+    // override with tomorrow, if the payday is today or in the past
+    let tomorrow = Utc::today() + Duration::days(1);
+    if payday < tomorrow {
+        payday = tomorrow
+    }
+
+    payday
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -1000,5 +1025,46 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
     ) -> (HashMap<i32, String>, Vec<VerifyPaymentResult>) {
         let payment_records = read_payment_records(&csv, csv_start_date).unwrap();
         compare_payment_records_with_bookings(&payment_records, bookings).unwrap()
+    }
+
+    #[test]
+    fn test_calculate_payday() {
+        // event starts in 3 weeks
+        let start_date = Utc::now() + Duration::weeks(3);
+        assert_eq!(
+            calculate_payday(&start_date, None),
+            Utc::today() + Duration::weeks(1)
+        );
+        assert_eq!(
+            calculate_payday(&start_date, Some(7)),
+            Utc::today() + Duration::weeks(2)
+        );
+        assert_eq!(
+            calculate_payday(&start_date, Some(0)),
+            Utc::today() + Duration::weeks(3)
+        );
+        let tomorrow = Utc::today() + Duration::days(1);
+        assert_eq!(calculate_payday(&start_date, Some(21)), tomorrow);
+        assert_eq!(calculate_payday(&start_date, Some(28)), tomorrow);
+
+        // event starts in 3 days
+        let start_date = Utc::now() + Duration::days(3);
+        assert_eq!(
+            calculate_payday(&start_date, Some(1)),
+            Utc::today() + Duration::days(2)
+        );
+        assert_eq!(calculate_payday(&start_date, Some(2)), tomorrow);
+        assert_eq!(calculate_payday(&start_date, Some(3)), tomorrow);
+        assert_eq!(calculate_payday(&start_date, Some(14)), tomorrow);
+
+        // event starts today
+        let start_date = Utc::now();
+        assert_eq!(calculate_payday(&start_date, None), tomorrow);
+        assert_eq!(calculate_payday(&start_date, Some(7)), tomorrow);
+
+        // event started yesterday
+        let start_date = Utc::now() - Duration::days(1);
+        assert_eq!(calculate_payday(&start_date, None), tomorrow);
+        assert_eq!(calculate_payday(&start_date, Some(7)), tomorrow);
     }
 }

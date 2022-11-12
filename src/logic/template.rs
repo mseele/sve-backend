@@ -1,11 +1,13 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Duration, Locale, Utc};
+use chrono::{DateTime, Locale, Utc};
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderError,
 };
 use serde::Serialize;
 
 use crate::models::{Event, EventBooking, EventSubscription, ToEuro};
+
+use super::events;
 
 #[derive(Serialize)]
 struct BookingTemplateData<'a> {
@@ -111,23 +113,17 @@ impl HelperDef for PaydayHelper<'_> {
         out: &mut dyn Output,
     ) -> HelperResult {
         if let Some(first_date) = self.first_event_date {
-            // default value is 14 days
-            let mut days = 14;
+            let custom_day = match h.param(0) {
+                Some(param) => Some(
+                    param
+                        .value()
+                        .as_i64()
+                        .ok_or(RenderError::new("payday extension is no integer"))?,
+                ),
+                None => None,
+            };
 
-            // overwrite with the first param - if available
-            let param = h.param(0);
-            if let Some(param) = param {
-                days = param
-                    .value()
-                    .as_i64()
-                    .ok_or(RenderError::new("payday extension is no integer"))?;
-            }
-
-            let mut payday = *first_date - Duration::days(days.into());
-            let tomorrow = Utc::now() + Duration::days(1);
-            if payday < tomorrow {
-                payday = tomorrow
-            }
+            let payday = events::calculate_payday(first_date, custom_day);
 
             out.write(&payday.format_localized("%d. %B", Locale::de_DE).to_string())?;
         }
