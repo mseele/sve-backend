@@ -1,0 +1,12 @@
+Hallo {{firstname}},
+
+Du hast einen Platz in unserem SVE-Kurs "{{name}}” gebucht.
+Kommende Woche geht es los und wir möchten Dir letzte Infos geben:
+
+Der Kurs beginnt am {{start_date}} um {{start_time}} und findet hier statt:
+{{location}}.
+
+Wir freuen uns auf Deine Teilnahme und wünschen Dir viel Freude beim Kurs.
+
+Herzliche Grüße
+Team Fitness@SVE

@@ -195,7 +195,7 @@ WHERE
         if subscribers {
             insert_event_subscribers(conn, &mut events).await?;
         }
-}
+    }
 
     Ok(events)
 }
@@ -1351,6 +1351,77 @@ v.created"#,
     tx.commit().await?;
 
     Ok((event, canceled_booking, first_waiting_list_booking))
+}
+
+/// return a list of events who starts next week
+/// and had no reminder email sent until now
+pub(crate) async fn get_reminder_events(pool: &PgPool) -> Result<Vec<Event>> {
+    let mut conn = pool.acquire().await?;
+
+    let event_ids: Vec<i32> = query!(
+        r#"
+SELECT
+	e.id
+FROM
+	events e
+INNER JOIN (
+	SELECT
+		ied.event_id,
+		MIN(ied.date) as date
+	FROM
+		event_dates ied
+	GROUP BY
+		ied.event_id) ed ON
+	e.id = ed.event_id
+WHERE
+	e.reminder_sent IS NULL
+	AND e.lifecycle_status IN('Review', 'Running')
+	AND ed.date >= (CURRENT_DATE + INTERVAL '1' DAY)
+	AND ed.date <= (CURRENT_DATE + INTERVAL '6' DAY)
+	AND EXISTS (
+	SELECT
+		*
+	FROM
+		event_bookings eb
+	WHERE
+		e.id = eb.event_id
+		AND eb.enrolled IS TRUE
+		AND eb.canceled IS NULL)"#
+    )
+    .map(|row| row.id)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    let mut events = Vec::default();
+
+    for event_id in event_ids {
+        events.push(
+            fetch_event(&mut conn, &event_id.into(), true)
+                .await?
+                .ok_or_else(|| anyhow!("Error fetching event with id '{}'", event_id))?,
+        );
+    }
+
+    Ok(events)
+}
+
+/// mark the given event that the reminder email has been sent
+/// (to avoid duplicate sending of reminder emails)
+pub(crate) async fn mark_as_reminder_sent(pool: &PgPool, event_id: &EventId) -> Result<()> {
+    query!(
+        r#"
+UPDATE
+    events
+SET
+    reminder_sent = NOW()
+WHERE
+    id = $1"#,
+        event_id.get_ref(),
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 fn map_event(row: &PgRow) -> Result<Event> {

@@ -1,6 +1,8 @@
 use super::calendar;
+use super::events;
 use crate::email;
 use log::{error, info};
+use sqlx::PgPool;
 
 pub(crate) async fn check_email_connectivity() {
     match email::test_connection().await {
@@ -16,4 +18,11 @@ pub(crate) async fn renew_calendar_watch() {
     }
 }
 
-// TODO: add event email check (send a reminder email 7 days before the course)
+/// send a reminder email for each events that starts next week
+pub(crate) async fn send_event_reminders(pool: &PgPool) {
+    match events::send_event_reminders(pool).await {
+        Ok(count) if count > 0 => info!("{} event reminders has been send successfully.", count),
+        Ok(_) => (),
+        Err(e) => error!("Error while sending event reminders: {}", e),
+    }
+}

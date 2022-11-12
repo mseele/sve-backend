@@ -108,7 +108,8 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
                 "/check_email_connectivity",
                 web::get().to(check_email_connectivity),
             )
-            .route("/renew_calendar_watch", web::get().to(renew_calendar_watch)),
+            .route("/renew_calendar_watch", web::get().to(renew_calendar_watch))
+            .route("/send_event_reminders", web::get().to(send_event_reminders)),
     );
 }
 
@@ -361,5 +362,10 @@ async fn check_email_connectivity() -> Result<impl Responder, ResponseError> {
 
 async fn renew_calendar_watch() -> Result<impl Responder, ResponseError> {
     tasks::renew_calendar_watch().await;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn send_event_reminders(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+    tasks::send_event_reminders(&pool).await;
     Ok(HttpResponse::Ok().finish())
 }

@@ -1,14 +1,14 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Duration, Locale, Utc};
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderError,
 };
 use serde::Serialize;
 
-use crate::models::{Event, EventBooking, ToEuro};
+use crate::models::{Event, EventBooking, EventSubscription, ToEuro};
 
 #[derive(Serialize)]
-struct EventTemplateData<'a> {
+struct BookingTemplateData<'a> {
     firstname: &'a str,
     lastname: &'a str,
     name: &'a str,
@@ -20,7 +20,7 @@ struct EventTemplateData<'a> {
     direct_booking: Option<bool>,
 }
 
-impl<'a> EventTemplateData<'a> {
+impl<'a> BookingTemplateData<'a> {
     fn new(
         booking: &'a EventBooking,
         event: &'a Event,
@@ -52,6 +52,40 @@ fn format_dates(event: &Event) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[derive(Serialize)]
+struct ReminderTemplateData<'a> {
+    firstname: &'a str,
+    name: &'a str,
+    location: &'a str,
+    start_date: String,
+    start_time: String,
+}
+
+impl<'a> ReminderTemplateData<'a> {
+    fn new(event: &'a Event, subscription: &'a EventSubscription) -> Result<Self> {
+        let first_date = event
+            .dates
+            .first()
+            .ok_or_else(|| anyhow!("Attribute 'sort_index' is missing"))?;
+
+        let start_date = first_date
+            .format_localized("%A, %-d. %B %Y", Locale::de_DE)
+            .to_string();
+
+        let start_time = first_date
+            .format_localized("%H:%M Uhr", Locale::de_DE)
+            .to_string();
+
+        Ok(Self {
+            firstname: subscription.first_name.trim(),
+            name: event.name.trim(),
+            location: event.location.trim(),
+            start_date,
+            start_time,
+        })
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -112,16 +146,33 @@ pub(crate) fn render_booking<'a>(
 ) -> Result<String> {
     Ok(render(
         template,
-        EventTemplateData::new(booking, event, payment_id, prebooking_link, direct_booking),
-        PaydayHelper::new(event),
+        BookingTemplateData::new(booking, event, payment_id, prebooking_link, direct_booking),
+        Some(PaydayHelper::new(event)),
     )?)
 }
 
-fn render(template: &str, data: EventTemplateData, payday_helper: PaydayHelper) -> Result<String> {
+pub(crate) fn render_reminder<'a>(
+    template: &str,
+    event: &'a Event,
+    subscription: &'a EventSubscription,
+) -> Result<String> {
+    Ok(render(
+        template,
+        ReminderTemplateData::new(event, subscription)?,
+        None,
+    )?)
+}
+
+fn render<D>(template: &str, data: D, payday_helper: Option<PaydayHelper>) -> Result<String>
+where
+    D: Serialize,
+{
     let mut handlebars = Handlebars::new();
     handlebars.set_strict_mode(true);
     handlebars.register_escape_fn(handlebars::no_escape);
-    handlebars.register_helper("payday", Box::new(payday_helper));
+    if let Some(payday_helper) = payday_helper {
+        handlebars.register_helper("payday", Box::new(payday_helper));
+    }
 
     let result = handlebars.render_template(template, &data)?;
     Ok(result)
@@ -339,6 +390,75 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         assert_eq!(
             render_booking("{{payday 7}}", &booking_member, &event, None, None, None).unwrap(),
             tomorrow
+        );
+    }
+
+    #[test]
+    fn test_render_reminder() {
+        let mut event = Event::new(
+            0,
+            Utc::now(),
+            None,
+            EventType::Fitness,
+            LifecycleStatus::Draft,
+            String::from("FitForFun"),
+            0,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            vec![
+                Utc.ymd(2022, 3, 7).and_hms(19, 00, 00),
+                Utc.ymd(2022, 3, 8).and_hms(19, 00, 00),
+            ],
+            None,
+            0,
+            0,
+            0,
+            BigDecimal::from_i8(5).unwrap(),
+            BigDecimal::from_i8(10).unwrap(),
+            String::from("Turn- & Festhalle Eutingen"),
+            String::from("booking_template"),
+            String::from("waiting_template"),
+            None,
+            None,
+            false,
+        );
+        let event_subscription = EventSubscription::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            true,
+            true,
+            String::from("123"),
+            true,
+            None,
+        );
+
+        assert_eq!(
+            render_reminder(
+                "{{firstname}} {{name}} {{location}} {{start_date}} {{start_time}}",
+                &event,
+                &event_subscription,
+            )
+            .unwrap(),
+            "Max FitForFun Turn- & Festhalle Eutingen Montag, 7. März 2022 19:00 Uhr",
+        );
+
+        event.dates = vec![
+            Utc.ymd(2022, 3, 23).and_hms(19, 00, 00),
+            Utc.ymd(2022, 3, 24).and_hms(19, 00, 00),
+        ];
+
+        assert_eq!(
+            render_reminder(
+                "{{firstname}} {{name}} {{location}} {{start_date}} {{start_time}}",
+                &event,
+                &event_subscription,
+            )
+            .unwrap(),
+            "Max FitForFun Turn- & Festhalle Eutingen Mittwoch, 23. März 2022 19:00 Uhr",
         );
     }
 

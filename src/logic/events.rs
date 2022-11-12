@@ -212,6 +212,62 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
     Ok(())
 }
 
+/// send a reminder email for each events that starts next week
+pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
+    // get all events where a event reminder should be send to the subscribers
+    let events = db::get_reminder_events(pool).await?;
+
+    // process each event
+    for event in &events {
+        // prepare for message generation
+        let email_account = email::get_account_by_type(event.event_type.into())?;
+        let message_type: MessageType = event.event_type.into();
+        let mut messages = Vec::new();
+
+        // get the subject and body (depending on the event type)
+        let (subject, body) = match event.event_type {
+            EventType::Fitness => (
+                format!("{} Info zum Kursstart", event.subject_prefix()),
+                include_str!("../../templates/event_reminder_fitness.txt"),
+            ),
+            EventType::Events => (
+                format!("{} Info zum Eventstart", event.subject_prefix()),
+                include_str!("../../templates/event_reminder_events.txt"),
+            ),
+        };
+
+        // iterate all event subscribers (Option should never be None)
+        if let Some(subscribers) = &event.subscribers {
+            for subscriber in subscribers {
+                // render the body for the email...
+                let body = template::render_reminder(&body, &event, subscriber)?;
+
+                // ...and push the email into the messages list
+                messages.push(
+                    Email::new(
+                        message_type,
+                        subscriber.email.clone(),
+                        subject.clone(),
+                        body,
+                        None,
+                    )
+                    .into_message(&email_account)?,
+                );
+            }
+
+            // send reminder emails to all event subribers
+            email::send_messages(&email_account, messages).await?;
+
+            // mark reminder has been sent to the event
+            // (to avoid duplicate sending of reminder emails)
+            db::mark_as_reminder_sent(pool, &event.id).await?;
+        }
+    }
+
+    // return the count of events for which the reminder has been send
+    Ok(events.len())
+}
+
 async fn process_event_email(
     pool: &PgPool,
     event: Event,
