@@ -1,6 +1,6 @@
 use crate::models::{
     Event, EventBooking, EventCounter, EventId, EventSubscription, EventType, LifecycleStatus,
-    NewsSubscription, NewsTopic, PartialEvent, VerifyPaymentBookingRecord,
+    NewsSubscription, NewsTopic, PartialEvent, UnpaidEventBooking, VerifyPaymentBookingRecord,
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -717,23 +717,39 @@ ORDER BY
 pub(crate) async fn get_event_bookings_without_payment(
     pool: &PgPool,
     event_type: EventType,
-) -> Result<Vec<VerifyPaymentBookingRecord>> {
+) -> Result<
+    Vec<(
+        UnpaidEventBooking,
+        DateTime<Utc>,
+        Option<DateTime<Utc>>,
+        String,
+    )>,
+> {
     let result = query!(
         r#"
 SELECT
-    b.id,
     e.name AS event_name,
+    ed.date as first_event_date,
+    e.booking_template as event_template,
+    b.id,
+    b.created,
     CONCAT (s.first_name, ' ', s.last_name) AS full_name,
     CASE WHEN s.member IS TRUE
         THEN e.cost_member
         ELSE e.cost_non_member
     END as cost,
-    b.payment_id,
-    b.canceled,
-    b.enrolled,
-    b.payed
+    b.payment_id
 FROM
-    events e,
+    events e
+    LEFT JOIN (
+        SELECT
+            ied.event_id,
+            MIN(ied.date) as date
+        FROM
+            event_dates ied
+        GROUP BY
+            ied.event_id) ed ON
+        e.id = ed.event_id,
     event_bookings b,
     event_subscribers s
 WHERE
@@ -750,15 +766,18 @@ ORDER BY
         event_type as EventType
     )
     .map(|row| {
-        VerifyPaymentBookingRecord::new(
-            row.id,
-            row.event_name,
-            row.full_name.unwrap(),
-            row.cost.unwrap(),
-            row.payment_id,
-            row.canceled,
-            row.enrolled,
-            row.payed,
+        (
+            UnpaidEventBooking::new(
+                row.id,
+                row.event_name,
+                row.full_name.unwrap(),
+                row.cost.unwrap(),
+                row.payment_id,
+                None,
+            ),
+            row.created,
+            row.first_event_date,
+            row.event_template,
         )
     })
     .fetch_all(pool)

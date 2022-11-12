@@ -768,6 +768,36 @@ impl VerifyPaymentResult {
     }
 }
 
+#[derive(Serialize, Debug)]
+pub(crate) struct UnpaidEventBooking {
+    pub(crate) booking_id: i32,
+    pub(crate) event_name: String,
+    pub(crate) full_name: String,
+    pub(crate) cost: BigDecimal,
+    pub(crate) payment_id: String,
+    pub(crate) due_in_days: Option<i64>,
+}
+
+impl UnpaidEventBooking {
+    pub(crate) fn new(
+        booking_id: i32,
+        event_name: String,
+        full_name: String,
+        cost: BigDecimal,
+        payment_id: String,
+        due_in_days: Option<i64>,
+    ) -> Self {
+        Self {
+            booking_id,
+            event_name,
+            full_name,
+            cost: cost.round(2),
+            payment_id,
+            due_in_days,
+        }
+    }
+}
+
 pub(crate) trait ToEuro {
     fn to_euro_without_symbol(&self) -> String;
 

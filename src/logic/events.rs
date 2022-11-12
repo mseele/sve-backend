@@ -5,15 +5,17 @@ use crate::email;
 use crate::models::{
     BookingResponse, Email, EmailAttachment, Event, EventBooking, EventCounter, EventEmail,
     EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
-    VerifyPaymentBookingRecord, VerifyPaymentResult,
+    UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Date, DateTime, Duration, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
+use lazy_static::lazy_static;
 use lettre::message::SinglePart;
 use log::{error, info, warn};
+use regex::Regex;
 use sqlx::PgPool;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -127,8 +129,56 @@ pub(crate) async fn verify_payments(
 pub(crate) async fn get_unpaid_bookings(
     pool: &PgPool,
     event_type: EventType,
-) -> Result<Vec<VerifyPaymentBookingRecord>> {
-    Ok(db::get_event_bookings_without_payment(&pool, event_type).await?)
+) -> Result<Vec<UnpaidEventBooking>> {
+    let result = db::get_event_bookings_without_payment(&pool, event_type).await?;
+
+    let mut bookings = Vec::new();
+
+    for (mut booking, booking_insert_date, first_event_date, event_template) in result.into_iter() {
+        if let Some(first_event_date) = first_event_date {
+            let due_in_days =
+                calc_due_in_days(booking_insert_date, first_event_date, event_template)?;
+            booking.due_in_days = Some(due_in_days);
+        }
+        bookings.push(booking);
+    }
+
+    Ok(bookings)
+}
+
+/// calculate the days until the booking should be payed
+fn calc_due_in_days(
+    booking_date: DateTime<Utc>,
+    first_event_date: DateTime<Utc>,
+    event_template: String,
+) -> Result<i64> {
+    // initialize regex
+    lazy_static! {
+        static ref PAYDAY_REGEX: Regex =
+            Regex::new(r"\{\{payday\s+(\d+)\}\}").expect("regex is valid");
+    }
+
+    // calculate custom days - if defined in the event template
+    let custom_days;
+    if let Some(captures) = PAYDAY_REGEX.captures(&event_template) {
+        custom_days = Some(
+            captures
+                .get(1)
+                .map_or("", |m| m.as_str())
+                .parse::<i64>()
+                .expect("custom day is an integer"),
+        );
+    } else {
+        custom_days = None;
+    }
+
+    // get the payday for the event
+    let payday = calculate_payday(&booking_date, &first_event_date, custom_days);
+
+    // calculate due in days
+    let due_in_days = payday - Utc::today();
+
+    Ok(due_in_days.num_days())
 }
 
 pub(crate) async fn update_payment(
@@ -1102,7 +1152,48 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
             calculate_payday(&booking_date, &start_date, Some(7)),
             Utc::today() - Duration::days(7)
         );
-        assert_eq!(calculate_payday(&start_date, None), tomorrow);
-        assert_eq!(calculate_payday(&start_date, Some(7)), tomorrow);
+    }
+
+    #[test]
+    fn test_calc_due_in_days() {
+        // without custom days
+        let booking_date = Utc::now();
+        let start_date = Utc::now() + Duration::days(28);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("")).unwrap(),
+            14
+        );
+
+        let booking_date = Utc::now();
+        let start_date = Utc::now() + Duration::days(14);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("")).unwrap(),
+            1
+        );
+
+        let booking_date = Utc::now() - Duration::days(4);
+        let start_date = Utc::now() + Duration::days(7);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday}}")).unwrap(),
+            -3
+        );
+
+        // with custom days
+        let booking_date = Utc::now();
+        let start_date = Utc::now() + Duration::days(7);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday 7}}")).unwrap(),
+            1
+        );
+        let booking_date = Utc::now() - Duration::days(31);
+        let start_date = Utc::now() + Duration::days(7);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday 1}}")).unwrap(),
+            6
+        );
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday 14}}")).unwrap(),
+            -7
+        );
     }
 }

@@ -1,4 +1,3 @@
-use crate::db;
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
@@ -11,8 +10,8 @@ use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
 use chrono::NaiveDate;
 use log::error;
-use serde::Deserialize;
 use serde::de;
+use serde::Deserialize;
 use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
@@ -252,8 +251,9 @@ async fn unpaid_bookings(
     pool: Data<PgPool>,
     query: web::Query<UnpaidBookingsQueryParams>,
 ) -> Result<impl Responder, ResponseError> {
-    let result = events::get_unpaid_bookings(&pool, query.event_type).await?;
-    Ok(Json(result))
+    Ok(Json(
+        events::get_unpaid_bookings(&pool, query.event_type).await?,
+    ))
 }
 
 async fn update_event_booking(
