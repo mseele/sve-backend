@@ -6,8 +6,10 @@ use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use sqlx::{
-    postgres::PgPoolOptions, query, query_as, query_builder::Separated, query_scalar, FromRow,
-    PgConnection, PgPool, Postgres, QueryBuilder, Row,
+    postgres::{PgPoolOptions, PgRow},
+    query, query_as,
+    query_builder::Separated,
+    query_scalar, FromRow, PgConnection, PgPool, Postgres, QueryBuilder, Row,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -88,32 +90,7 @@ ORDER BY
         let waiting_list: i64 = row.try_get("waiting_list")?;
 
         result.push((
-            Event::new(
-                row.try_get("id")?,
-                row.try_get("created")?,
-                row.try_get("closed")?,
-                row.try_get("event_type")?,
-                row.try_get("lifecycle_status")?,
-                row.try_get("name")?,
-                row.try_get("sort_index")?,
-                row.try_get("short_description")?,
-                row.try_get("description")?,
-                row.try_get("image")?,
-                row.try_get("light")?,
-                Vec::new(),
-                row.try_get("custom_date")?,
-                row.try_get("duration_in_minutes")?,
-                row.try_get("max_subscribers")?,
-                row.try_get("max_waiting_list")?,
-                row.try_get("cost_member")?,
-                row.try_get("cost_non_member")?,
-                row.try_get("location")?,
-                row.try_get("booking_template")?,
-                row.try_get("waiting_template")?,
-                row.try_get("alt_booking_button_text")?,
-                row.try_get("alt_email_address")?,
-                row.try_get("external_operator")?,
-            ),
+            map_event(&row)?,
             // try_into is needed to convert the i64 into a i16
             EventCounter::new(
                 row.try_get("id")?,
@@ -151,11 +128,27 @@ ORDER BY
 
 pub(crate) async fn get_event(pool: &PgPool, id: &EventId) -> Result<Option<Event>> {
     let mut conn = pool.acquire().await?;
-    Ok(fetch_event(&mut conn, id).await?)
+    Ok(fetch_event(&mut conn, id, false).await?)
 }
 
-async fn fetch_event(conn: &mut PgConnection, id: &EventId) -> Result<Option<Event>> {
-    let mut event: Option<Event> = query!(
+/// Fetch a single event by the given event id.
+/// Subscribers will be attached to the event if `subscribers` is true.
+async fn fetch_event(
+    conn: &mut PgConnection,
+    id: &EventId,
+    subscribers: bool,
+) -> Result<Option<Event>> {
+    Ok(fetch_events(conn, vec![&id], subscribers).await?.pop())
+}
+
+/// Fetch a list of events by the given event id's.
+/// Subscribers will be attached to the events if `subscribers` is `true`.
+async fn fetch_events(
+    conn: &mut PgConnection,
+    ids: Vec<&EventId>,
+    subscribers: bool,
+) -> Result<Vec<Event>> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
     e.id,
@@ -184,53 +177,30 @@ SELECT
 FROM
     events e
 WHERE
-    e.id = $1"#,
-        id.get_ref()
-    )
-    .map(|row| {
-        Event::new(
-            row.id,
-            row.created,
-            row.closed,
-            row.event_type,
-            row.lifecycle_status,
-            row.name,
-            row.sort_index,
-            row.short_description,
-            row.description,
-            row.image,
-            row.light,
-            Vec::new(),
-            row.custom_date,
-            row.duration_in_minutes,
-            row.max_subscribers,
-            row.max_waiting_list,
-            row.cost_member,
-            row.cost_non_member,
-            row.location,
-            row.booking_template,
-            row.waiting_template,
-            row.alt_booking_button_text,
-            row.alt_email_address,
-            row.external_operator,
-        )
-    })
-    .fetch_optional(&mut *conn)
-    .await?;
+    e.id IN("#,
+    );
+    let mut separated = query_builder.separated(", ");
+    for value in ids.iter() {
+        separated.push_bind(value.get_ref());
+    }
+    query_builder.push(r#")"#);
 
-    if let Some(value) = event {
-        event = insert_event_dates(&mut *conn, &mut vec![value])
-            .await?
-            .pop();
+    let mut events = Vec::new();
+    for row in query_builder.build().fetch_all(&mut *conn).await? {
+        events.push(map_event(&row)?);
     }
 
-    Ok(event)
+    if !events.is_empty() {
+        insert_event_dates(conn, &mut events).await?;
+        if subscribers {
+            insert_event_subscribers(conn, &mut events).await?;
+        }
 }
 
-async fn insert_event_dates<'a>(
-    conn: &mut PgConnection,
-    events: &'a mut Vec<Event>,
-) -> Result<&'a mut Vec<Event>> {
+    Ok(events)
+}
+
+async fn insert_event_dates<'a>(conn: &mut PgConnection, events: &'a mut Vec<Event>) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
@@ -265,7 +235,7 @@ ORDER BY
         }
     }
 
-    Ok(events)
+    Ok(())
 }
 
 async fn insert_event_subscribers<'a>(
@@ -447,7 +417,7 @@ async fn update_event(
         }
     }
 
-    let event = fetch_event(&mut tx, id)
+    let event = fetch_event(&mut tx, id, false)
         .await?
         .ok_or_else(|| anyhow!("Error fetching event with id '{}'", id))?;
 
@@ -1164,7 +1134,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
     .execute(&mut *conn)
     .await?;
 
-    let event = fetch_event(&mut *conn, &event_id)
+    let event = fetch_event(&mut *conn, &event_id, false)
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
     let event_counters = fetch_event_counters(&mut *conn, event.lifecycle_status).await?;
@@ -1374,13 +1344,42 @@ v.created"#,
         first_waiting_list_booking = None;
     }
 
-    let event = fetch_event(&mut tx, &event_id)
+    let event = fetch_event(&mut tx, &event_id, false)
         .await?
         .ok_or_else(|| anyhow!("Error fetching event with id '{}'", event_id))?;
 
     tx.commit().await?;
 
     Ok((event, canceled_booking, first_waiting_list_booking))
+}
+
+fn map_event(row: &PgRow) -> Result<Event> {
+    Ok(Event::new(
+        row.try_get("id")?,
+        row.try_get("created")?,
+        row.try_get("closed")?,
+        row.try_get("event_type")?,
+        row.try_get("lifecycle_status")?,
+        row.try_get("name")?,
+        row.try_get("sort_index")?,
+        row.try_get("short_description")?,
+        row.try_get("description")?,
+        row.try_get("image")?,
+        row.try_get("light")?,
+        Vec::new(),
+        row.try_get("custom_date")?,
+        row.try_get("duration_in_minutes")?,
+        row.try_get("max_subscribers")?,
+        row.try_get("max_waiting_list")?,
+        row.try_get("cost_member")?,
+        row.try_get("cost_non_member")?,
+        row.try_get("location")?,
+        row.try_get("booking_template")?,
+        row.try_get("waiting_template")?,
+        row.try_get("alt_booking_button_text")?,
+        row.try_get("alt_email_address")?,
+        row.try_get("external_operator")?,
+    ))
 }
 
 pub(crate) async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscription>> {
