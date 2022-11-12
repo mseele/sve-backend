@@ -8,23 +8,20 @@ use serde::Serialize;
 use crate::models::{Event, EventBooking, ToEuro};
 
 #[derive(Serialize)]
-pub(crate) struct EventTemplateData<'a> {
-    #[serde(rename = "firstname")]
-    first_name: &'a str,
-    #[serde(rename = "lastname")]
-    last_name: &'a str,
+struct EventTemplateData<'a> {
+    firstname: &'a str,
+    lastname: &'a str,
     name: &'a str,
     location: &'a str,
     price: String,
     dates: String,
     payment_id: Option<String>,
-    #[serde(rename = "link")]
-    prebooking_link: Option<String>,
+    link: Option<String>,
     direct_booking: Option<bool>,
 }
 
 impl<'a> EventTemplateData<'a> {
-    pub(crate) fn new(
+    fn new(
         booking: &'a EventBooking,
         event: &'a Event,
         payment_id: Option<String>,
@@ -32,17 +29,29 @@ impl<'a> EventTemplateData<'a> {
         direct_booking: Option<bool>,
     ) -> Self {
         Self {
-            first_name: booking.first_name.trim(),
-            last_name: booking.last_name.trim(),
+            firstname: booking.first_name.trim(),
+            lastname: booking.last_name.trim(),
             name: event.name.trim(),
-            location: &event.location,
+            location: event.location.trim(),
             price: booking.cost(event).to_euro(),
             dates: format_dates(&event),
             payment_id,
-            prebooking_link,
+            link: prebooking_link,
             direct_booking,
         }
     }
+}
+
+fn format_dates(event: &Event) -> String {
+    event
+        .dates
+        .iter()
+        .map(|d| {
+            d.format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 #[derive(Clone, Copy)]
@@ -91,18 +100,6 @@ impl HelperDef for PaydayHelper<'_> {
 
         Ok(())
     }
-}
-
-fn format_dates(event: &Event) -> String {
-    event
-        .dates
-        .iter()
-        .map(|d| {
-            d.format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
-                .to_string()
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 pub(crate) fn render_booking<'a>(
