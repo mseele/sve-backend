@@ -720,10 +720,10 @@ impl From<MessageType> for EmailType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub(crate) struct VerifyPaymentBookingRecord {
     pub(crate) booking_id: i32,
-    event_name: String,
+    pub(crate) event_name: String,
     pub(crate) full_name: String,
     pub(crate) cost: BigDecimal,
     pub(crate) payment_id: String,
@@ -747,7 +747,7 @@ impl VerifyPaymentBookingRecord {
             booking_id,
             event_name,
             full_name,
-            cost,
+            cost: cost.round(2),
             payment_id,
             canceled,
             enrolled,

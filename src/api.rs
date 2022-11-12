@@ -1,7 +1,7 @@
 use crate::logic::{calendar, contact, events, news, tasks};
 use crate::models::{
-    ContactMessage, Email, EventBooking, EventEmail, EventId, LifecycleStatus, NewsSubscription,
-    PartialEvent,
+    ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
+    NewsSubscription, PartialEvent, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use actix_web::http::header::ContentType;
 use actix_web::web::{Data, Json};
@@ -10,8 +10,8 @@ use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
 use chrono::NaiveDate;
 use log::error;
-use serde::de;
 use serde::Deserialize;
+use serde::{de, Serialize};
 use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
@@ -164,8 +164,15 @@ pub(crate) struct EventCountersQueryParams {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct VerifyPaymentInput {
+    event_type: EventType,
     csv: String,
     start_date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct VerifyPaymentOutput {
+    csv_results: Vec<VerifyPaymentResult>,
+    unpaid_bookings: Vec<VerifyPaymentBookingRecord>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -236,8 +243,12 @@ async fn verify_payments(
     pool: Data<PgPool>,
     Json(input): Json<VerifyPaymentInput>,
 ) -> Result<impl Responder, ResponseError> {
-    let result = events::verify_payments(&pool, input.csv, input.start_date).await?;
-    Ok(Json(result))
+    let (csv_results, unpaid_bookings) =
+        events::verify_payments(&pool, input.event_type, input.csv, input.start_date).await?;
+    Ok(Json(VerifyPaymentOutput {
+        csv_results,
+        unpaid_bookings,
+    }))
 }
 
 async fn update_event_booking(
