@@ -284,7 +284,7 @@ pub(crate) enum LifecycleStatus {
     /// No longer deletable - can only be archived by closing the event
     Published,
 
-    /// No longer visible but bookable.
+    /// No longer visible but bookable (via rest call).
     /// Edit & Communication (Confirmation email, etc.) is still possible.
     /// No longer deletable - can only be archived by closing the event
     Running,
