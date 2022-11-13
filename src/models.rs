@@ -770,9 +770,12 @@ impl VerifyPaymentResult {
 
 #[derive(Serialize, Debug)]
 pub(crate) struct UnpaidEventBooking {
-    pub(crate) booking_id: i32,
+    pub(crate) event_id: EventId,
     pub(crate) event_name: String,
-    pub(crate) full_name: String,
+    pub(crate) booking_id: i32,
+    pub(crate) first_name: String,
+    pub(crate) last_name: String,
+    pub(crate) email: String,
     pub(crate) cost: BigDecimal,
     pub(crate) payment_id: String,
     pub(crate) due_in_days: Option<i64>,
@@ -780,17 +783,23 @@ pub(crate) struct UnpaidEventBooking {
 
 impl UnpaidEventBooking {
     pub(crate) fn new(
-        booking_id: i32,
+        event_id: EventId,
         event_name: String,
-        full_name: String,
+        booking_id: i32,
+        first_name: String,
+        last_name: String,
+        email: String,
         cost: BigDecimal,
         payment_id: String,
         due_in_days: Option<i64>,
     ) -> Self {
         Self {
-            booking_id,
+            event_id,
             event_name,
-            full_name,
+            booking_id,
+            first_name,
+            last_name,
+            email,
             cost: cost.round(2),
             payment_id,
             due_in_days,

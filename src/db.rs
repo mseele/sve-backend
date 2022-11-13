@@ -728,12 +728,15 @@ pub(crate) async fn get_event_bookings_without_payment(
     let result = query!(
         r#"
 SELECT
+    e.id AS event_id,
     e.name AS event_name,
     ed.date as first_event_date,
     e.booking_template as event_template,
     b.id,
     b.created,
-    CONCAT (s.first_name, ' ', s.last_name) AS full_name,
+    s.first_name,
+    s.last_name,
+    s.email,
     CASE WHEN s.member IS TRUE
         THEN e.cost_member
         ELSE e.cost_non_member
@@ -768,9 +771,12 @@ ORDER BY
     .map(|row| {
         (
             UnpaidEventBooking::new(
-                row.id,
+                row.event_id.into(),
                 row.event_name,
-                row.full_name.unwrap(),
+                row.id,
+                row.first_name,
+                row.last_name,
+                row.email,
                 row.cost.unwrap(),
                 row.payment_id,
                 None,
