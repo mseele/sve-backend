@@ -127,9 +127,13 @@ ORDER BY
     Ok(events)
 }
 
-pub(crate) async fn get_event(pool: &PgPool, id: &EventId) -> Result<Option<Event>> {
+pub(crate) async fn get_event(
+    pool: &PgPool,
+    id: &EventId,
+    subscribers: bool,
+) -> Result<Option<Event>> {
     let mut conn = pool.acquire().await?;
-    Ok(fetch_event(&mut conn, id, false).await?)
+    Ok(fetch_event(&mut conn, id, subscribers).await?)
 }
 
 /// Fetch a single event by the given event id.

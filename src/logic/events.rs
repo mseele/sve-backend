@@ -256,7 +256,7 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         None
     };
 
-    let event = db::get_event(pool, &data.event_id)
+    let event = db::get_event(pool, &data.event_id, false)
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", data.event_id))?;
 
@@ -359,7 +359,7 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
         // get the event from the cache of from the database
         let key = booking.event_id;
         if !event_cache.contains_key(&key) {
-            let value = db::get_event(&pool, &booking.event_id)
+            let value = db::get_event(&pool, &booking.event_id, false)
                 .await?
                 .ok_or_else(|| anyhow!("Event with id '{}' is missing", key))?;
             event_cache.insert(key, value);
