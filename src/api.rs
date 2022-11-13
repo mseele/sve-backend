@@ -85,7 +85,10 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/booking/{id}", web::patch().to(update_event_booking))
             .route("/booking/{id}", web::delete().to(cancel_event_booking))
             .route("/payments/verify", web::post().to(verify_payments))
-            .route("/payments/unpaid", web::get().to(unpaid_bookings)),
+            .route(
+                "/payments/unpaid/{event_type}",
+                web::get().to(unpaid_bookings),
+            ),
     );
     cfg.service(
         web::scope("/news")
@@ -110,7 +113,11 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
                 web::get().to(check_email_connectivity),
             )
             .route("/renew_calendar_watch", web::get().to(renew_calendar_watch))
-            .route("/send_event_reminders", web::get().to(send_event_reminders)),
+            .route("/send_event_reminders", web::get().to(send_event_reminders))
+            .route(
+                "/send_payment_reminders/{event_type}",
+                web::get().to(send_payment_reminders),
+            ),
     );
 }
 
@@ -167,11 +174,6 @@ pub(crate) struct EventCountersQueryParams {
 pub(crate) struct VerifyPaymentInput {
     csv: String,
     start_date: Option<NaiveDate>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct UnpaidBookingsQueryParams {
-    event_type: EventType,
 }
 
 #[derive(Debug, Deserialize)]
@@ -249,10 +251,10 @@ async fn verify_payments(
 
 async fn unpaid_bookings(
     pool: Data<PgPool>,
-    query: web::Query<UnpaidBookingsQueryParams>,
+    path: web::Path<EventType>,
 ) -> Result<impl Responder, ResponseError> {
     Ok(Json(
-        events::get_unpaid_bookings(&pool, query.event_type).await?,
+        events::get_unpaid_bookings(&pool, path.into_inner()).await?,
     ))
 }
 
@@ -383,5 +385,13 @@ async fn renew_calendar_watch() -> Result<impl Responder, ResponseError> {
 
 async fn send_event_reminders(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
     tasks::send_event_reminders(&pool).await;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn send_payment_reminders(
+    pool: Data<PgPool>,
+    path: web::Path<EventType>,
+) -> Result<impl Responder, ResponseError> {
+    tasks::send_payment_reminders(&pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }

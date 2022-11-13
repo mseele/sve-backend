@@ -1,0 +1,14 @@
+Hallo {{firstname}},
+
+leider haben wir festgestellt, dass du dein gebuchtes Event “{{name}}” noch nicht bezahlt hast.
+Wir möchten Dich bitten, die Anmeldegebühr in Höhe von {{price}} so bald wie möglich auf folgendes Konto zu überweisen:
+
+{{payment_details}}
+
+Sollte der Kurs bis zum ersten Termin nicht bezahlt sein, behalten wir uns vor den Platz an einen Teilnehmer der Warteliste neu zu vergeben.
+Solltest du den Betrag schon überwiesen haben, kannst du diese Email als gegenstandslos betrachten.
+
+Wir wünschen dir viel Spaß beim Event.
+
+Herzliche Grüße
+Team Events@SVE

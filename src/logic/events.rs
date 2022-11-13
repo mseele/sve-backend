@@ -136,8 +136,13 @@ pub(crate) async fn get_unpaid_bookings(
 
     for (mut booking, booking_insert_date, first_event_date, event_template) in result.into_iter() {
         if let Some(first_event_date) = first_event_date {
-            let due_in_days =
-                calc_due_in_days(booking_insert_date, first_event_date, event_template)?;
+            let booking_date;
+            if let Some(payment_reminder_sent) = booking.payment_reminder_sent {
+                booking_date = payment_reminder_sent + Duration::days(3);
+            } else {
+                booking_date = booking_insert_date;
+            }
+            let due_in_days = calc_due_in_days(booking_date, first_event_date, event_template)?;
             booking.due_in_days = Some(due_in_days);
         }
         bookings.push(booking);
@@ -297,7 +302,7 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
         if let Some(subscribers) = &event.subscribers {
             for subscriber in subscribers {
                 // render the body for the email...
-                let body = template::render_reminder(&body, &event, subscriber)?;
+                let body = template::render_event_reminder(&body, &event, subscriber)?;
 
                 // ...and push the email into the messages list
                 messages.push(
@@ -323,6 +328,74 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
 
     // return the count of events for which the reminder has been send
     Ok(events.len())
+}
+
+/// send a reminder email for all bookings which are due with payment
+pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType) -> Result<usize> {
+    // get unpaid bookings and filter for bookings that are due with payment
+    let bookings = get_unpaid_bookings(&pool, event_type)
+        .await?
+        .into_iter()
+        .filter(|booking| match booking.due_in_days {
+            Some(due_in_days) if due_in_days < 0 => true,
+            _ => false,
+        })
+        .collect::<Vec<_>>();
+
+    // prepare for message generation
+    let email_account = email::get_account_by_type(event_type.into())?;
+    let message_type: MessageType = event_type.into();
+    let mut messages = Vec::new();
+
+    // get the subject and body (depending on the event type)
+    let subject = format!("{} Zahlungserinnerung", event_type.subject_prefix());
+    let body = match event_type {
+        EventType::Fitness => include_str!("../../templates/payment_reminder_fitness.txt"),
+        EventType::Events => include_str!("../../templates/payment_reminder_events.txt"),
+    };
+
+    let mut event_cache = HashMap::new();
+    for booking in bookings.iter() {
+        // get the event from the cache of from the database
+        let key = booking.event_id;
+        if !event_cache.contains_key(&key) {
+            let value = db::get_event(&pool, &booking.event_id)
+                .await?
+                .ok_or_else(|| anyhow!("Event with id '{}' is missing", key))?;
+            event_cache.insert(key, value);
+        }
+        let event = event_cache
+            .get(&key)
+            .ok_or_else(|| anyhow!("Event with id '{}' is not in the cache", key))?;
+
+        // render the body for the email...
+        let body = template::render_payment_reminder(&body, &event, &booking)?;
+
+        // ...and push the email into the messages list
+        messages.push(
+            Email::new(
+                message_type,
+                booking.email.clone(),
+                subject.clone(),
+                body,
+                None,
+            )
+            .into_message(&email_account)?,
+        );
+    }
+
+    // send reminder emails to all bookings due with payment
+    email::send_messages(&email_account, messages).await?;
+
+    // mark payment reminder has been sent to the bookings
+    // (to avoid duplicate sending of reminder emails)
+    let booking_ids = bookings
+        .into_iter()
+        .map(|booking| booking.booking_id)
+        .collect::<Vec<_>>();
+    db::mark_as_payment_reminder_sent(pool, &booking_ids).await?;
+
+    Ok(booking_ids.len())
 }
 
 async fn process_event_email(

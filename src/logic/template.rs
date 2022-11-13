@@ -5,7 +5,7 @@ use handlebars::{
 };
 use serde::Serialize;
 
-use crate::models::{Event, EventBooking, EventSubscription, ToEuro};
+use crate::models::{Event, EventBooking, EventSubscription, ToEuro, UnpaidEventBooking};
 
 use super::events;
 
@@ -24,7 +24,7 @@ struct BookingTemplateData<'a> {
 }
 
 impl<'a> BookingTemplateData<'a> {
-    fn new(
+    fn from_booking(
         booking: &'a EventBooking,
         event: &'a Event,
         payment_id: Option<String>,
@@ -42,6 +42,22 @@ impl<'a> BookingTemplateData<'a> {
             payment_id,
             link: prebooking_link,
             direct_booking,
+        }
+    }
+
+    fn from_unpaid_booking(booking: &'a UnpaidEventBooking, event: &'a Event) -> Self {
+        let payment_id = Some(booking.payment_id.clone());
+        Self {
+            firstname: booking.first_name.trim(),
+            lastname: booking.last_name.trim(),
+            name: event.name.trim(),
+            location: event.location.trim(),
+            price: booking.cost.to_euro(),
+            dates: format_dates(&event),
+            payment_details: format_payment_details(&event, &payment_id),
+            payment_id,
+            link: None,
+            direct_booking: None,
         }
     }
 }
@@ -155,12 +171,18 @@ pub(crate) fn render_booking<'a>(
 ) -> Result<String> {
     Ok(render(
         template,
-        BookingTemplateData::new(booking, event, payment_id, prebooking_link, direct_booking),
+        BookingTemplateData::from_booking(
+            booking,
+            event,
+            payment_id,
+            prebooking_link,
+            direct_booking,
+        ),
         Some(PaydayHelper::new(event)),
     )?)
 }
 
-pub(crate) fn render_reminder<'a>(
+pub(crate) fn render_event_reminder<'a>(
     template: &str,
     event: &'a Event,
     subscription: &'a EventSubscription,
@@ -168,6 +190,18 @@ pub(crate) fn render_reminder<'a>(
     Ok(render(
         template,
         ReminderTemplateData::new(event, subscription)?,
+        None,
+    )?)
+}
+
+pub(crate) fn render_payment_reminder<'a>(
+    template: &str,
+    event: &'a Event,
+    booking: &'a UnpaidEventBooking,
+) -> Result<String> {
+    Ok(render(
+        template,
+        BookingTemplateData::from_unpaid_booking(booking, event),
         None,
     )?)
 }
@@ -461,7 +495,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         );
 
         assert_eq!(
-            render_reminder(
+            render_event_reminder(
                 "{{firstname}} {{name}} {{location}} {{start_date}} {{start_time}}",
                 &event,
                 &event_subscription,
@@ -476,7 +510,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         ];
 
         assert_eq!(
-            render_reminder(
+            render_event_reminder(
                 "{{firstname}} {{name}} {{location}} {{start_date}} {{start_time}}",
                 &event,
                 &event_subscription,

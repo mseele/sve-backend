@@ -753,7 +753,8 @@ SELECT
         THEN e.cost_member
         ELSE e.cost_non_member
     END as cost,
-    b.payment_id
+    b.payment_id,
+    b.payment_reminder_sent
 FROM
     events e
     LEFT JOIN (
@@ -792,6 +793,7 @@ ORDER BY
                 row.cost.unwrap(),
                 row.payment_id,
                 None,
+                row.payment_reminder_sent,
             ),
             row.created,
             row.first_event_date,
@@ -1502,6 +1504,30 @@ WHERE
     )
     .execute(pool)
     .await?;
+
+    Ok(())
+}
+
+/// mark the given bookings that the payment reminder email has been sent
+/// (to avoid duplicate sending of reminder emails)
+pub(crate) async fn mark_as_payment_reminder_sent(
+    pool: &PgPool,
+    booking_ids: &Vec<i32>,
+) -> Result<()> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        r#"UPDATE
+        event_bookings
+    SET
+        payment_reminder_sent = NOW()
+    WHERE
+        id IN ("#,
+    );
+    let mut separated = query_builder.separated(", ");
+    for id in booking_ids.iter() {
+        separated.push_bind(id);
+    }
+    separated.push_unseparated(")");
+    query_builder.build().execute(pool).await?;
 
     Ok(())
 }

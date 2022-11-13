@@ -1,6 +1,8 @@
 use super::calendar;
 use super::events;
 use crate::email;
+use crate::models::EventType;
+use anyhow::Result;
 use log::{error, info};
 use sqlx::PgPool;
 
@@ -24,5 +26,20 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) {
         Ok(count) if count > 0 => info!("{} event reminders has been send successfully.", count),
         Ok(_) => (),
         Err(e) => error!("Error while sending event reminders: {}", e),
+    }
+}
+
+/// send a reminder email for all bookings which are due with payment
+pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType) -> Result<()> {
+    match events::send_payment_reminders(pool, event_type).await {
+        Ok(count) if count > 0 => {
+            info!("{} payment reminders has been send successfully.", count);
+            Ok(())
+        }
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("Error while sending payment reminders: {}", e);
+            Err(e)
+        }
     }
 }

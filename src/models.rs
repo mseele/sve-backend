@@ -18,7 +18,7 @@ base64_serde_type!(Base64Standard, STANDARD);
 
 /// Special i32 that is encoded / decoded to a short
 /// unique id on json serialization / deserialization.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub(crate) struct EventId(i32);
 
