@@ -138,14 +138,14 @@ async fn fetch_event(
     id: &EventId,
     subscribers: bool,
 ) -> Result<Option<Event>> {
-    Ok(fetch_events(conn, vec![&id], subscribers).await?.pop())
+    Ok(fetch_events(conn, vec![*id], subscribers).await?.pop())
 }
 
 /// Fetch a list of events by the given event id's.
 /// Subscribers will be attached to the events if `subscribers` is `true`.
 async fn fetch_events(
     conn: &mut PgConnection,
-    ids: Vec<&EventId>,
+    ids: Vec<EventId>,
     subscribers: bool,
 ) -> Result<Vec<Event>> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
@@ -1436,7 +1436,7 @@ v.created"#,
 pub(crate) async fn get_reminder_events(pool: &PgPool) -> Result<Vec<Event>> {
     let mut conn = pool.acquire().await?;
 
-    let event_ids: Vec<i32> = query!(
+    let event_ids: Vec<EventId> = query!(
         r#"
 SELECT
 	e.id
@@ -1466,19 +1466,11 @@ WHERE
 		AND eb.enrolled IS TRUE
 		AND eb.canceled IS NULL)"#
     )
-    .map(|row| row.id)
+    .map(|row| row.id.into())
     .fetch_all(&mut *conn)
     .await?;
 
-    let mut events = Vec::default();
-
-    for event_id in event_ids {
-        events.push(
-            fetch_event(&mut conn, &event_id.into(), true)
-                .await?
-                .ok_or_else(|| anyhow!("Error fetching event with id '{}'", event_id))?,
-        );
-    }
+    let events = fetch_events(&mut conn, event_ids, true).await?;
 
     Ok(events)
 }
