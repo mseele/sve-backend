@@ -51,6 +51,7 @@ SELECT
     e.location,
     e.booking_template,
     e.waiting_template,
+    e.payment_account,
     e.alt_booking_button_text,
     e.alt_email_address,
     e.external_operator,
@@ -171,6 +172,7 @@ SELECT
     e.location,
     e.booking_template,
     e.waiting_template,
+    e.payment_account,
     e.alt_booking_button_text,
     e.alt_email_address,
     e.external_operator
@@ -375,6 +377,11 @@ async fn update_event(
     );
     update_is_needed |= push_bind(
         &mut separated,
+        "PAYMENT_ACCOUNT",
+        partial_event.payment_account,
+    );
+    update_is_needed |= push_bind(
+        &mut separated,
         "ALT_BOOKING_BUTTON_TEXT",
         partial_event.alt_booking_button_text,
     );
@@ -503,6 +510,9 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
     let waiting_template = partial_event
         .waiting_template
         .ok_or_else(|| anyhow!("Attribute 'waiting_template' is missing"))?;
+    let payment_account = partial_event
+        .payment_account
+        .ok_or_else(|| anyhow!("Attribute 'payment_account' is missing"))?;
     let alt_booking_button_text = partial_event.alt_booking_button_text;
     let alt_email_address = partial_event.alt_email_address;
     let external_operator = partial_event
@@ -513,9 +523,9 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
 
     let mut new_event: Event = query!(
         r#"
-INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, alt_booking_button_text, alt_email_address, external_operator"#,
+INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, waiting_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
         closed,
         event_type as EventType,
         lifecycle_status as LifecycleStatus,
@@ -534,6 +544,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
         location,
         booking_template,
         waiting_template,
+        payment_account,
         alt_booking_button_text,
         alt_email_address,
         external_operator
@@ -561,6 +572,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
             row.location,
             row.booking_template,
             row.waiting_template,
+            row.payment_account,
             row.alt_booking_button_text,
             row.alt_email_address,
             row.external_operator,
@@ -1517,6 +1529,7 @@ fn map_event(row: &PgRow) -> Result<Event> {
         row.try_get("location")?,
         row.try_get("booking_template")?,
         row.try_get("waiting_template")?,
+        row.try_get("payment_account")?,
         row.try_get("alt_booking_button_text")?,
         row.try_get("alt_email_address")?,
         row.try_get("external_operator")?,

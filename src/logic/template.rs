@@ -17,6 +17,7 @@ struct BookingTemplateData<'a> {
     location: &'a str,
     price: String,
     dates: String,
+    payment_details: Option<String>,
     payment_id: Option<String>,
     link: Option<String>,
     direct_booking: Option<bool>,
@@ -37,6 +38,7 @@ impl<'a> BookingTemplateData<'a> {
             location: event.location.trim(),
             price: booking.cost(event).to_euro(),
             dates: format_dates(&event),
+            payment_details: format_payment_details(&event, &payment_id),
             payment_id,
             link: prebooking_link,
             direct_booking,
@@ -54,6 +56,17 @@ fn format_dates(event: &Event) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn format_payment_details(event: &Event, payment_id: &Option<String>) -> Option<String> {
+    match payment_id {
+        Some(payment_id) => Some(format!(
+            r#"{}
+Verwendungszweck: {}"#,
+            event.payment_account, payment_id,
+        )),
+        None => None,
+    }
 }
 
 #[derive(Serialize)]
@@ -238,6 +251,10 @@ mod tests {
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
             String::from("waiting_template"),
+            String::from(
+                "Sportverein Eutingen im Gäu e.V.
+IBAN: DE16 6429 1010 0034 4696 05",
+            ),
             None,
             None,
             false,
@@ -246,6 +263,7 @@ mod tests {
         assert_eq!(
             render_booking(
                 "{{firstname}} {{lastname}} {{name}} {{location}} {{price}} {{payday 0}} {{payment_id}}
+{{payment_details}}
 {{dates}}",
                 &booking_member,
                 &event,
@@ -256,6 +274,7 @@ mod tests {
             .unwrap(),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} 
+
 - Mo., 07. März 2022, 19:00 Uhr
 - Di., 08. März 2022, 19:00 Uhr
 - Mi., 09. März 2022, 19:00 Uhr
@@ -269,6 +288,9 @@ mod tests {
         assert_eq!(
             render_booking(
                 "{{firstname}} {{lastname}} {{name}} {{location}} {{price}} {{payday 0}} {{payment_id}}
+
+{{payment_details}}
+
 {{dates}}",
                 &booking_non_member,
                 &event,
@@ -279,6 +301,11 @@ mod tests {
             .unwrap(),
             format!(
                 "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012
+
+Sportverein Eutingen im Gäu e.V.
+IBAN: DE16 6429 1010 0034 4696 05
+Verwendungszweck: 22-1012
+
 - Mo., 07. März 2022, 19:00 Uhr
 - Di., 08. März 2022, 19:00 Uhr
 - Mi., 09. März 2022, 19:00 Uhr
@@ -416,6 +443,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
             String::from("waiting_template"),
+            String::from("payment_account"),
             None,
             None,
             false,
@@ -487,6 +515,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             String::from("location"),
             String::from("booking_template"),
             String::from("waiting_template"),
+            String::from("payment_account"),
             None,
             None,
             false,
