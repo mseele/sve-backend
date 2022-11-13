@@ -178,13 +178,7 @@ impl Event {
     }
 
     pub(crate) fn subject_prefix(&self) -> String {
-        format!(
-            "[{}@SVE]",
-            match self.event_type {
-                EventType::Fitness => "Fitness",
-                EventType::Events => "Events",
-            }
-        )
+        self.event_type.subject_prefix()
     }
 }
 
@@ -223,6 +217,18 @@ pub(crate) struct PartialEvent {
 pub(crate) enum EventType {
     Fitness,
     Events,
+}
+
+impl EventType {
+    pub(crate) fn subject_prefix(&self) -> String {
+        format!(
+            "[{}@SVE]",
+            match self {
+                EventType::Fitness => "Fitness",
+                EventType::Events => "Events",
+            }
+        )
+    }
 }
 
 impl From<EventType> for &str {
@@ -783,6 +789,7 @@ pub(crate) struct UnpaidEventBooking {
     pub(crate) cost: BigDecimal,
     pub(crate) payment_id: String,
     pub(crate) due_in_days: Option<i64>,
+    pub(crate) payment_reminder_sent: Option<DateTime<Utc>>,
 }
 
 impl UnpaidEventBooking {
@@ -796,6 +803,7 @@ impl UnpaidEventBooking {
         cost: BigDecimal,
         payment_id: String,
         due_in_days: Option<i64>,
+        payment_reminder_sent: Option<DateTime<Utc>>,
     ) -> Self {
         Self {
             event_id,
@@ -807,6 +815,7 @@ impl UnpaidEventBooking {
             cost: cost.round(2),
             payment_id,
             due_in_days,
+            payment_reminder_sent,
         }
     }
 }
