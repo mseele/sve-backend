@@ -1,9 +1,9 @@
-use crate::logic::{calendar, contact, events, news, tasks};
+use crate::logic::{calendar, contact, events, export, news, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
     NewsSubscription, PartialEvent,
 };
-use actix_web::http::header::ContentType;
+use actix_web::http::header::{ContentDisposition, ContentType, DispositionParam, DispositionType};
 use actix_web::web::{Data, Json};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
@@ -84,6 +84,10 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("/{id}", web::delete().to(delete))
             .route("/booking/{id}", web::patch().to(update_event_booking))
             .route("/booking/{id}", web::delete().to(cancel_event_booking))
+            .route(
+                "/booking/export/{event_id}",
+                web::get().to(export_event_bookings),
+            )
             .route("/payments/verify", web::post().to(verify_payments))
             .route(
                 "/payments/unpaid/{event_type}",
@@ -277,6 +281,22 @@ async fn cancel_event_booking(
     let booking_id = path.into_inner();
     events::cancel_booking(&pool, booking_id).await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+async fn export_event_bookings(
+    pool: Data<PgPool>,
+    path: web::Path<EventId>,
+) -> Result<impl Responder, ResponseError> {
+    let event_id = path.into_inner();
+    let (filename, bytes) = export::event_bookings(&pool, event_id).await?;
+
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType::octet_stream())
+        .insert_header(ContentDisposition {
+            disposition: DispositionType::Attachment,
+            parameters: vec![DispositionParam::Filename(filename)],
+        })
+        .body(bytes))
 }
 
 // news

@@ -53,6 +53,8 @@ sqlx = { version = "0.6", features = [
 itertools = "0.10"
 harsh = "0.2"
 handlebars = "4.3"
+xlsxwriter = "0.4"
+uuid = { version = "1.2", features = ["v4", "fast-rng"] }
 
 [dev-dependencies]
 pretty_assertions = "1.2"

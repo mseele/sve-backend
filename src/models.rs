@@ -450,9 +450,13 @@ impl BookingResponse {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct EventSubscription {
     pub(crate) id: i32,
+    pub(crate) created: DateTime<Utc>,
     pub(crate) first_name: String,
     pub(crate) last_name: String,
+    pub(crate) street: String,
+    pub(crate) city: String,
     pub(crate) email: String,
+    pub(crate) phone: Option<String>,
     pub(crate) enrolled: bool,
     pub(crate) member: bool,
     pub(crate) payment_id: String,
@@ -463,9 +467,13 @@ pub(crate) struct EventSubscription {
 impl EventSubscription {
     pub(crate) fn new(
         id: i32,
+        created: DateTime<Utc>,
         first_name: String,
         last_name: String,
+        street: String,
+        city: String,
         email: String,
+        phone: Option<String>,
         enrolled: bool,
         member: bool,
         payment_id: String,
@@ -474,9 +482,13 @@ impl EventSubscription {
     ) -> Self {
         Self {
             id,
+            created,
             first_name,
             last_name,
+            street,
+            city,
             email,
+            phone,
             enrolled,
             member,
             payment_id,

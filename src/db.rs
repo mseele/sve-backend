@@ -253,9 +253,13 @@ async fn insert_event_subscribers<'a>(
 SELECT
     v.event_id,
     v.id,
+    v.created,
     v.first_name,
     v.last_name,
+    v.street,
+    v.city,
     v.email,
+    v.phone,
     v.enrolled,
     v.member,
     v.payment_id,
@@ -287,9 +291,13 @@ ORDER BY
             .or_insert_with(|| Vec::new())
             .push(EventSubscription::new(
                 row.try_get("id")?,
+                row.try_get("created")?,
                 row.try_get("first_name")?,
                 row.try_get("last_name")?,
+                row.try_get("street")?,
+                row.try_get("city")?,
                 row.try_get("email")?,
+                row.try_get("phone")?,
                 row.try_get("enrolled")?,
                 row.try_get("member")?,
                 row.try_get("payment_id")?,

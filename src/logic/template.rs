@@ -484,9 +484,13 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         );
         let event_subscription = EventSubscription::new(
             0,
+            Utc::now(),
             String::from("Max"),
             String::from("Mustermann"),
             String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@musterman.de"),
+            None,
             true,
             true,
             String::from("123"),
