@@ -75,13 +75,13 @@ fn format_dates(event: &Event) -> String {
 }
 
 fn format_payment_details(event: &Event, payment_id: &Option<String>) -> Option<String> {
-    match payment_id {
-        Some(payment_id) => Some(format!(
+    match (&event.payment_account, payment_id) {
+        (Some(payment_account), Some(payment_id)) => Some(format!(
             r#"{}
 Verwendungszweck: {}"#,
-            event.payment_account, payment_id,
+            payment_account, payment_id,
         )),
-        None => None,
+        _ => None,
     }
 }
 
@@ -284,10 +284,10 @@ mod tests {
             BigDecimal::from_i8(10).unwrap(),
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
-            String::from(
+            Some(String::from(
                 "Sportverein Eutingen im Gäu e.V.
 IBAN: DE16 6429 1010 0034 4696 05",
-            ),
+            )),
             None,
             None,
             false,
@@ -475,7 +475,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             BigDecimal::from_i8(10).unwrap(),
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
-            String::from("payment_account"),
+            None,
             None,
             None,
             false,
@@ -550,7 +550,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             BigDecimal::from_i8(0).unwrap(),
             String::from("location"),
             String::from("booking_template"),
-            String::from("payment_account"),
+            None,
             None,
             None,
             false,
