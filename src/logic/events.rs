@@ -614,7 +614,7 @@ async fn send_booking_mail(
         None => email::get_account_by_type(event.event_type.into()),
     }?;
     let subject;
-    let template;
+    let template: &str;
     let opt_payment_id;
     if booked {
         subject = format!("{} Bestätigung Buchung", event.subject_prefix());
@@ -622,7 +622,10 @@ async fn send_booking_mail(
         opt_payment_id = Some(payment_id);
     } else {
         subject = format!("{} Bestätigung Warteliste", event.subject_prefix());
-        template = &event.waiting_template;
+        template = match event.event_type {
+            EventType::Fitness => include_str!("../../templates/waiting_list_fitness.txt"),
+            EventType::Events => include_str!("../../templates/waiting_list_events.txt"),
+        };
         opt_payment_id = None;
     }
 

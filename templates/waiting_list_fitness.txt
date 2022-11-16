@@ -1,0 +1,10 @@
+Hallo {{firstname}},
+
+vielen Dank für Deine Anmeldung zum Kurs “{{name}}”. Leider ist Dein gewünschter Kurs schon vollständig ausgebucht.
+
+Wir haben Dich jedoch auf der Warteliste vorgemerkt und melden uns bei Dir, sobald ein Platz frei wird.
+
+Im kommenden Halbjahr startet unser neues Kursangebot, dass wir wieder über sämtliche Kanäle veröffentlichen. Sicher klappt es dann auch direkt mit Deinem Platz, wenn für Dich ein interessantes Angebot dabei ist.
+
+Herzliche Grüße
+Team Fitness@SVE

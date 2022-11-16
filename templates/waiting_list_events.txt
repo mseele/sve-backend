@@ -1,0 +1,10 @@
+Hallo {{firstname}},
+
+vielen Dank für Deine Anmeldung zum Event “{{name}}”. Leider ist Dein gewünschtes Event schon vollständig ausgebucht.
+
+Wir haben Dich jedoch auf der Warteliste vorgemerkt und melden uns bei Dir, sobald ein Platz frei wird.
+
+Wir versuchen unser Angebot ständig zu erweitern und werden auch in Zukunft viele interessante Events anbieten. Sicher klappt es bei einem zukünftigen Event direkt mit Deinem Platz, wenn für Dich etwas Interessantes dabei ist.
+
+Herzliche Grüße
+Team Events@SVE

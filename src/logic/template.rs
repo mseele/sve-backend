@@ -284,7 +284,6 @@ mod tests {
             BigDecimal::from_i8(10).unwrap(),
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
-            String::from("waiting_template"),
             String::from(
                 "Sportverein Eutingen im Gäu e.V.
 IBAN: DE16 6429 1010 0034 4696 05",
@@ -476,7 +475,6 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             BigDecimal::from_i8(10).unwrap(),
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
-            String::from("waiting_template"),
             String::from("payment_account"),
             None,
             None,
@@ -552,7 +550,6 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             BigDecimal::from_i8(0).unwrap(),
             String::from("location"),
             String::from("booking_template"),
-            String::from("waiting_template"),
             String::from("payment_account"),
             None,
             None,
