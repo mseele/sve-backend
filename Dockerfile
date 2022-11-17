@@ -4,7 +4,7 @@
 FROM rust:1.65 AS builder
 
 RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev pkg-config libssl-dev ca-certificates libclang-dev
+RUN apt update && apt install -y musl-tools musl-dev pkg-config libssl-dev ca-certificates llvm-9-dev libclang-9-dev clang-9
 RUN update-ca-certificates
 
 WORKDIR /app
