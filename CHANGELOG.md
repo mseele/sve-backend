@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+## [2.0.0] - 2022-11-17
+
+### Features
+
+- Migrate data storage to PostgreSQL
+
 ## [1.3.3] - 2022-07-12
 
 ### Bug Fixes
@@ -602,7 +608,8 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/mseele/sve-backend/compare/v1.3.3...v2.0.0
 [1.3.3]: https://github.com/mseele/sve-backend/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/mseele/sve-backend/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/mseele/sve-backend/compare/v1.3.0...v1.3.1
