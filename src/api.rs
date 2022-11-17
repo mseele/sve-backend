@@ -79,7 +79,7 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route("", web::get().to(events))
             .route("/counter", web::get().to(counter))
             .route("/booking", web::post().to(booking))
-            .route("/prebooking", web::post().to(prebooking))
+            .route("/prebooking/{hash}", web::get().to(prebooking))
             .route("/update", web::post().to(update))
             .route("/{id}", web::delete().to(delete))
             .route("/booking/{id}", web::patch().to(update_event_booking))
@@ -181,11 +181,6 @@ pub(crate) struct VerifyPaymentInput {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct PrebookingInput {
-    hash: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub(crate) struct UpdateEventBookingQueryParams {
     update_payment: Option<bool>,
 }
@@ -222,9 +217,9 @@ async fn booking(
 
 async fn prebooking(
     pool: Data<PgPool>,
-    Json(input): Json<PrebookingInput>,
+    path: web::Path<String>,
 ) -> Result<impl Responder, ResponseError> {
-    let response = events::prebooking(&pool, input.hash).await;
+    let response = events::prebooking(&pool, path.into_inner()).await;
     Ok(Json(response))
 }
 
