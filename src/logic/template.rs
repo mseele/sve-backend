@@ -268,13 +268,13 @@ mod tests {
             String::from("image"),
             true,
             vec![
-                Utc.ymd(2022, 3, 7).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 8).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 9).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 10).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 11).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 12).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 13).and_hms(19, 00, 00),
+                Utc.with_ymd_and_hms(2022, 3, 7, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 8, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 9, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 10, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 11, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 12, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 13, 19, 00, 00).unwrap(),
             ],
             None,
             0,
@@ -464,8 +464,8 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             String::from("image"),
             true,
             vec![
-                Utc.ymd(2022, 3, 7).and_hms(19, 00, 00),
-                Utc.ymd(2022, 3, 8).and_hms(19, 00, 00),
+                Utc.with_ymd_and_hms(2022, 3, 7, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 8, 19, 00, 00).unwrap(),
             ],
             None,
             0,
@@ -507,8 +507,8 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         );
 
         event.dates = vec![
-            Utc.ymd(2022, 3, 23).and_hms(19, 00, 00),
-            Utc.ymd(2022, 3, 24).and_hms(19, 00, 00),
+            Utc.with_ymd_and_hms(2022, 3, 23, 19, 00, 00).unwrap(),
+            Utc.with_ymd_and_hms(2022, 3, 24, 19, 00, 00).unwrap(),
         ];
 
         assert_eq!(

@@ -45,7 +45,7 @@ fn export(
 ) -> Result<(String, Vec<u8>)> {
     // create a new workbook with a random name
     let uuid = Uuid::new_v4().to_string();
-    let workbook = Workbook::new(&uuid);
+    let workbook = Workbook::new(&uuid)?;
 
     let fmt = workbook
         .add_format()
@@ -216,11 +216,7 @@ fn add_date_column(
     set_new_max_width(column, 26, width_map);
 }
 
-fn create_headers(
-    sheet: &mut Worksheet,
-    bold_fmt: &Format,
-    width_map: &mut HashMap<u16, usize>,
-) {
+fn create_headers(sheet: &mut Worksheet, bold_fmt: &Format, width_map: &mut HashMap<u16, usize>) {
     let _ = sheet.write_string(0, 0, "Id", Some(bold_fmt));
     let _ = sheet.write_string(0, 1, "Buchungsdatum", Some(bold_fmt));
     let _ = sheet.write_string(0, 2, "Vorname", Some(bold_fmt));

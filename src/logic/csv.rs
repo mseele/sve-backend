@@ -295,7 +295,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
             VobaRichCSVReader::default().read(csv).unwrap(),
             vec![
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
                     payee: String::from("Test GmbH"),
                     payee_iban: String::from("DE92500105174132432988"),
                     purpose: String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
@@ -303,7 +303,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     payment_ids: HashSet::new(),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
                     payee: String::from("Max Mustermann"),
                     payee_iban: String::from("DE62500105176261449571"),
                     purpose: String::from("22-1423 22-1154"),
@@ -311,7 +311,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     payment_ids: HashSet::from([String::from("22-1423"), String::from("22-1154")]),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 10).unwrap(),
                     payee: String::from("Erika Mustermann"),
                     payee_iban: String::from("DE91500105176171781279"),
                     purpose: String::from("Erika 22-1425 Mustermann"),
@@ -319,7 +319,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     payment_ids: HashSet::from([String::from("22-1425")]),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 10).unwrap(),
                     payee: String::from("Lieschen Müller"),
                     payee_iban: String::from("DE21500105179625862911"),
                     purpose: String::from("Lieschen Müller 22-1456"),
@@ -327,7 +327,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     payment_ids: HashSet::from([String::from("22-1456")]),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 10).unwrap(),
                     payee: String::from("Otto Normalverbraucher"),
                     payee_iban: String::from("DE21500105179625862911"),
                     purpose: String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),
@@ -375,7 +375,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
             VobaClassicCSVReader::default().read(csv).unwrap(),
             vec![
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
                     payee: String::from("Test GmbH"),
                     payee_iban: String::from("DE92500105174132432988"),
                     purpose: String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
@@ -383,7 +383,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                     payment_ids: HashSet::new(),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 9),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
                     payee: String::from("Max Mustermann"),
                     payee_iban: String::from("DE62500105176261449571"),
                     purpose: String::from("22-1423"),
@@ -391,7 +391,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                     payment_ids: HashSet::from([String::from("22-1423")]),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 10).unwrap(),
                     payee: String::from("Erika Mustermann"),
                     payee_iban: String::from("DE91500105176171781279"),
                     purpose: String::from("Erika 22-1425 Mustermann"),
@@ -399,7 +399,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                     payment_ids: HashSet::from([String::from("22-1425")]),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 10).unwrap(),
                     payee: String::from("Lieschen Müller"),
                     payee_iban: String::from("DE21500105179625862911"),
                     purpose: String::from("Lieschen Müller 22-1456"),
@@ -407,7 +407,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                     payment_ids: HashSet::from([String::from("22-1456")]),
                 },
                 PaymentRecord {
-                    date: NaiveDate::from_ymd(2022, 3, 10),
+                    date: NaiveDate::from_ymd_opt(2022, 3, 10).unwrap(),
                     payee: String::from("Otto Normalverbraucher"),
                     payee_iban: String::from("DE21500105179625862911"),
                     purpose: String::from("Otto Normalverbraucher, Test-Kurs,22-1467"),

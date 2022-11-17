@@ -6,10 +6,12 @@ use google_calendar3::{
     api::{Channel, Event, EventDateTime},
     CalendarHub,
 };
+use hyper::client::HttpConnector;
+use hyper_rustls::HttpsConnector;
 use std::time::{SystemTime, UNIX_EPOCH};
 use yup_oauth2::ServiceAccountKey;
 
-async fn calendar_hub() -> Result<CalendarHub> {
+async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
     let secret: ServiceAccountKey =
         serde_json::from_str(crate::CREDENTIALS).with_context(|| "Error loading credentials")?;
 
