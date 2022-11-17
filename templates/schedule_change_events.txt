@@ -1,0 +1,11 @@
+Hallo {{firstname},
+
+bei deinem gebuchten Event "{{name}}" gibt es eine Terminänderung.
+
+Die neuen Termine sind:
+{{dates}}
+
+Wir wünschen Dir weiterhin viel Spaß beim Event.
+
+Herzliche Grüße
+Team Events@SVE

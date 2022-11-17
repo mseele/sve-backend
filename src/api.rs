@@ -1,19 +1,24 @@
-use crate::logic::{calendar, contact, events, news, tasks};
-use crate::models::{ContactMessage, EventBooking, MassEmails, PartialEvent, Subscription};
-use actix_web::http::header::ContentType;
+use crate::logic::{calendar, contact, events, export, news, tasks};
+use crate::models::{
+    ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
+    NewsSubscription, PartialEvent,
+};
+use actix_web::http::header::{ContentDisposition, ContentType, DispositionParam, DispositionType};
 use actix_web::web::{Data, Json};
 use actix_web::{error, HttpRequest, HttpResponseBuilder};
 use actix_web::{http::header, http::StatusCode};
 use actix_web::{web, HttpResponse, Responder, Result};
 use chrono::NaiveDate;
 use log::error;
+use serde::de;
 use serde::Deserialize;
 use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
-use std::fmt::Display;
+use std::fmt::{self, Display};
+use std::str::FromStr;
 
-pub struct ResponseError {
+pub(crate) struct ResponseError {
     err: anyhow::Error,
 }
 
@@ -68,16 +73,26 @@ impl error::ResponseError for ResponseError {
     }
 }
 
-pub fn config(cfg: &mut web::ServiceConfig) {
+pub(crate) fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/events")
             .route("", web::get().to(events))
             .route("/counter", web::get().to(counter))
             .route("/booking", web::post().to(booking))
-            .route("/prebooking", web::post().to(prebooking))
+            .route("/prebooking/{hash}", web::get().to(prebooking))
             .route("/update", web::post().to(update))
-            .route("/delete", web::post().to(delete))
-            .route("/verify_payments", web::post().to(verify_payments)),
+            .route("/{id}", web::delete().to(delete))
+            .route("/booking/{id}", web::patch().to(update_event_booking))
+            .route("/booking/{id}", web::delete().to(cancel_event_booking))
+            .route(
+                "/booking/export/{event_id}",
+                web::get().to(export_event_bookings),
+            )
+            .route("/payments/verify", web::post().to(verify_payments))
+            .route(
+                "/payments/unpaid/{event_type}",
+                web::get().to(unpaid_bookings),
+            ),
     );
     cfg.service(
         web::scope("/news")
@@ -101,37 +116,94 @@ pub fn config(cfg: &mut web::ServiceConfig) {
                 "/check_email_connectivity",
                 web::get().to(check_email_connectivity),
             )
-            .route("/renew_calendar_watch", web::get().to(renew_calendar_watch)),
+            .route("/renew_calendar_watch", web::get().to(renew_calendar_watch))
+            .route("/send_event_reminders", web::get().to(send_event_reminders))
+            .route(
+                "/send_payment_reminders/{event_type}",
+                web::get().to(send_payment_reminders),
+            ),
     );
 }
 
 // events
 
-#[derive(Debug, Deserialize)]
-pub struct EventsRequest {
-    all: Option<bool>,
-    beta: Option<bool>,
+pub(crate) fn deserialize_lifecycle_status_list<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<LifecycleStatus>>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    struct StringVecVisitor;
+
+    impl<'de> de::Visitor<'de> for StringVecVisitor {
+        type Value = Option<Vec<LifecycleStatus>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter
+                .write_str("a string containing a comma separated list of lifecycle status strings")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            let mut list = Vec::new();
+            for status in v.split(",") {
+                list.push(LifecycleStatus::from_str(status).map_err(E::custom)?);
+            }
+            Ok(match list.len() {
+                0 => None,
+                _ => Some(list),
+            })
+        }
+    }
+
+    deserializer.deserialize_any(StringVecVisitor)
 }
 
 #[derive(Debug, Deserialize)]
-pub struct VerifyPaymentInput {
-    sheet_id: String,
+struct EventsQueryParams {
+    beta: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_lifecycle_status_list")]
+    status: Option<Vec<LifecycleStatus>>,
+    subscribers: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct EventCountersQueryParams {
+    beta: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct VerifyPaymentInput {
     csv: String,
     start_date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PrebookingInput {
-    hash: String,
+pub(crate) struct UpdateEventBookingQueryParams {
+    update_payment: Option<bool>,
 }
 
-async fn events(info: web::Query<EventsRequest>) -> Result<impl Responder, ResponseError> {
-    let events = events::get_events(info.all, info.beta).await?;
+async fn events(
+    pool: Data<PgPool>,
+    mut query: web::Query<EventsQueryParams>,
+) -> Result<impl Responder, ResponseError> {
+    let events = events::get_events(
+        &pool,
+        query.beta.take(),
+        query.status.take(),
+        query.subscribers.take(),
+    )
+    .await?;
     Ok(Json(events))
 }
 
-async fn counter() -> Result<impl Responder, ResponseError> {
-    let event_counters = events::get_event_counters().await?;
+async fn counter(
+    pool: Data<PgPool>,
+    query: web::Query<EventCountersQueryParams>,
+) -> Result<impl Responder, ResponseError> {
+    let event_counters = events::get_event_counters(&pool, query.beta).await?;
     Ok(Json(event_counters))
 }
 
@@ -145,34 +217,88 @@ async fn booking(
 
 async fn prebooking(
     pool: Data<PgPool>,
-    Json(input): Json<PrebookingInput>,
+    path: web::Path<String>,
 ) -> Result<impl Responder, ResponseError> {
-    let response = events::prebooking(&pool, input.hash).await;
+    let response = events::prebooking(&pool, path.into_inner()).await;
     Ok(Json(response))
 }
 
-async fn update(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
-    let event = events::update(partial_event).await?;
+async fn update(
+    pool: Data<PgPool>,
+    Json(partial_event): Json<PartialEvent>,
+) -> Result<impl Responder, ResponseError> {
+    let event = events::update(&pool, partial_event).await?;
     Ok(Json(event))
 }
 
-async fn delete(Json(partial_event): Json<PartialEvent>) -> Result<impl Responder, ResponseError> {
-    events::delete(partial_event).await?;
+async fn delete(
+    pool: Data<PgPool>,
+    path: web::Path<EventId>,
+) -> Result<impl Responder, ResponseError> {
+    events::delete(&pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 async fn verify_payments(
+    pool: Data<PgPool>,
     Json(input): Json<VerifyPaymentInput>,
 ) -> Result<impl Responder, ResponseError> {
-    let result = events::verify_payments(input.sheet_id, input.csv, input.start_date).await?;
-    Ok(Json(result))
+    Ok(Json(
+        events::verify_payments(&pool, input.csv, input.start_date).await?,
+    ))
+}
+
+async fn unpaid_bookings(
+    pool: Data<PgPool>,
+    path: web::Path<EventType>,
+) -> Result<impl Responder, ResponseError> {
+    Ok(Json(
+        events::get_unpaid_bookings(&pool, path.into_inner()).await?,
+    ))
+}
+
+async fn update_event_booking(
+    pool: Data<PgPool>,
+    path: web::Path<i32>,
+    query: web::Query<UpdateEventBookingQueryParams>,
+) -> Result<impl Responder, ResponseError> {
+    let booking_id = path.into_inner();
+    if let Some(update_payment) = query.update_payment {
+        events::update_payment(&pool, booking_id, update_payment).await?;
+    }
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn cancel_event_booking(
+    pool: Data<PgPool>,
+    path: web::Path<i32>,
+) -> Result<impl Responder, ResponseError> {
+    let booking_id = path.into_inner();
+    events::cancel_booking(&pool, booking_id).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn export_event_bookings(
+    pool: Data<PgPool>,
+    path: web::Path<EventId>,
+) -> Result<impl Responder, ResponseError> {
+    let event_id = path.into_inner();
+    let (filename, bytes) = export::event_bookings(&pool, event_id).await?;
+
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType::octet_stream())
+        .insert_header(ContentDisposition {
+            disposition: DispositionType::Attachment,
+            parameters: vec![DispositionParam::Filename(filename)],
+        })
+        .body(bytes))
 }
 
 // news
 
 async fn subscribe(
     pool: Data<PgPool>,
-    Json(subscription): Json<Subscription>,
+    Json(subscription): Json<NewsSubscription>,
 ) -> Result<impl Responder, ResponseError> {
     news::subscribe(&pool, subscription).await?;
     Ok(HttpResponse::Ok().finish())
@@ -180,7 +306,7 @@ async fn subscribe(
 
 async fn unsubscribe(
     pool: Data<PgPool>,
-    Json(subscription): Json<Subscription>,
+    Json(subscription): Json<NewsSubscription>,
 ) -> Result<impl Responder, ResponseError> {
     news::unsubscribe(&pool, subscription).await?;
     Ok(HttpResponse::Ok().finish())
@@ -237,13 +363,26 @@ async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError
 
 // contact
 
+#[derive(Deserialize, Debug)]
+struct EmailsBody {
+    emails: Option<Vec<Email>>,
+    event: Option<EventEmail>,
+}
+
 async fn message(Json(message): Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
     contact::message(message).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
-async fn emails(Json(emails): Json<MassEmails>) -> Result<impl Responder, ResponseError> {
-    contact::emails(emails.emails).await?;
+async fn emails(
+    pool: Data<PgPool>,
+    Json(body): Json<EmailsBody>,
+) -> Result<impl Responder, ResponseError> {
+    if let Some(emails) = body.emails {
+        contact::emails(emails).await?;
+    } else if let Some(event) = body.event {
+        events::send_event_email(&pool, event).await?;
+    }
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -256,5 +395,18 @@ async fn check_email_connectivity() -> Result<impl Responder, ResponseError> {
 
 async fn renew_calendar_watch() -> Result<impl Responder, ResponseError> {
     tasks::renew_calendar_watch().await;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn send_event_reminders(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+    tasks::send_event_reminders(&pool).await;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn send_payment_reminders(
+    pool: Data<PgPool>,
+    path: web::Path<EventType>,
+) -> Result<impl Responder, ResponseError> {
+    tasks::send_payment_reminders(&pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }

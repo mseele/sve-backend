@@ -1,54 +1,54 @@
+use super::csv::PaymentRecord;
+use super::template;
+use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
-    BookingResponse, EventBooking, EventCounter, EventType, Subscription, ToEuro,
-    VerifyPaymentBookingRecord, VerifyPaymentResult,
+    BookingResponse, Email, EmailAttachment, Event, EventBooking, EventCounter, EventEmail,
+    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
+    UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
-use crate::models::{Event, PartialEvent};
-use crate::sheets::{self, BookingDetection};
-use crate::store::{self, BookingResult, GouthInterceptor};
-use anyhow::{bail, Context, Result};
-use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
+use crate::{db, hashids};
+use anyhow::{anyhow, bail, Context, Result};
+use chrono::{Date, DateTime, Duration, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
-use googapis::google::firestore::v1::firestore_client::FirestoreClient;
+use lazy_static::lazy_static;
 use lettre::message::SinglePart;
 use log::{error, info, warn};
 use regex::Regex;
 use sqlx::PgPool;
-use std::collections::BTreeMap;
-use std::str::from_utf8;
-use tonic::codegen::InterceptedService;
-use tonic::transport::Channel;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
 
-pub async fn get_events(all: Option<bool>, beta: Option<bool>) -> Result<Vec<Event>> {
-    let mut client = store::get_client().await?;
-    let mut events = get_and_filter_events(&mut client, all, beta).await?;
-
-    // sort events
-    events.sort_unstable_by(|a, b| {
-        let is_a_booked_up = a.is_booked_up();
-        let is_b_booked_up = b.is_booked_up();
-        if is_a_booked_up == is_b_booked_up {
-            return a.sort_index.cmp(&b.sort_index);
-        }
-        return is_a_booked_up.cmp(&is_b_booked_up);
-    });
-
-    Ok(events)
+pub(crate) async fn get_events(
+    pool: &PgPool,
+    beta: Option<bool>,
+    lifecycle_status: Option<Vec<LifecycleStatus>>,
+    subscribers: Option<bool>,
+) -> Result<Vec<Event>> {
+    let lifecycle_status_list;
+    if let Some(beta) = beta {
+        lifecycle_status_list = Some(vec![into_lifecycle_status(beta)]);
+    } else {
+        lifecycle_status_list = lifecycle_status;
+    }
+    Ok(db::get_events(
+        pool,
+        true,
+        lifecycle_status_list,
+        subscribers.unwrap_or(false),
+    )
+    .await?)
 }
 
-pub async fn get_event_counters() -> Result<Vec<EventCounter>> {
-    let mut client = store::get_client().await?;
-    let event_counters = create_event_counters(&mut client).await?;
-
-    Ok(event_counters)
+pub(crate) async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {
+    Ok(db::get_event_counters(pool, into_lifecycle_status(beta)).await?)
 }
 
-pub async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
-    match do_booking(pool, booking).await {
+pub(crate) async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
+    match book_event(pool, booking).await {
         Ok(response) => response,
         Err(e) => {
             error!("Booking failed: {:?}", e);
@@ -57,8 +57,8 @@ pub async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
     }
 }
 
-pub async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
-    match do_prebooking(pool, hash).await {
+pub(crate) async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
+    match pre_book_event(pool, hash).await {
         Ok(response) => response,
         Err(e) => {
             error!("Prebooking failed: {:?}", e);
@@ -67,22 +67,39 @@ pub async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
     }
 }
 
-pub async fn update(partial_event: PartialEvent) -> Result<Event> {
-    let mut client = store::get_client().await?;
-    let result = store::write_event(&mut client, partial_event).await?;
-
-    Ok(result)
+pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
+    let (event, event_schedule_change) = db::write_event(pool, partial_event).await?;
+    if event_schedule_change
+        && matches!(
+            event.lifecycle_status,
+            LifecycleStatus::Review | LifecycleStatus::Published | LifecycleStatus::Running
+        )
+    {
+        let subject = format!("{} Terminänderung {}", event.subject_prefix(), event.name);
+        let body = match event.event_type {
+            EventType::Fitness => include_str!("../../templates/schedule_change_fitness.txt"),
+            EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
+        };
+        process_event_email(
+            pool,
+            event.clone(),
+            Some(true),
+            subject,
+            body.into(),
+            None,
+            None,
+        )
+        .await?;
+    }
+    Ok(event)
 }
 
-pub async fn delete(partial_event: PartialEvent) -> Result<()> {
-    let mut client = store::get_client().await?;
-    store::delete_event(&mut client, &partial_event.id).await?;
-
-    Ok(())
+pub(crate) async fn delete(pool: &PgPool, event_id: EventId) -> Result<()> {
+    Ok(db::delete_event(pool, event_id).await?)
 }
 
-pub async fn verify_payments(
-    sheet_id: String,
+pub(crate) async fn verify_payments(
+    pool: &PgPool,
     csv: String,
     csv_start_date: Option<NaiveDate>,
 ) -> Result<Vec<VerifyPaymentResult>> {
@@ -92,82 +109,391 @@ pub async fn verify_payments(
         Ok(value) => value,
         Err(e) => bail!("Decoding csv content with ISO 8859: {}", e.into_owned()),
     };
-    let mut bookings = sheets::get_bookings_to_verify_payment(&sheet_id).await?;
-    let (verified_payment_bookings, result) =
-        compare_csv_with_bookings(&csv, csv_start_date, &mut bookings)?;
-    if verified_payment_bookings.len() > 0 {
-        sheets::mark_as_payed(&sheet_id, verified_payment_bookings).await?;
+
+    let payment_records =
+        actix_web::web::block(move || read_payment_records(&csv, csv_start_date)).await??;
+    let payment_ids = payment_records
+        .iter()
+        .flat_map(|r| &r.payment_ids)
+        .collect::<HashSet<_>>();
+    let mut bookings = db::get_bookings_to_verify_payment(pool, payment_ids).await?;
+    let (verified_payments, result) =
+        compare_payment_records_with_bookings(&payment_records, &mut bookings)?;
+    if verified_payments.len() > 0 {
+        db::mark_as_payed(&pool, &verified_payments).await?;
     }
+
     Ok(result)
 }
 
-async fn get_and_filter_events(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    all: Option<bool>,
-    beta: Option<bool>,
-) -> Result<Vec<Event>> {
-    let events = store::get_events(client).await?;
+pub(crate) async fn get_unpaid_bookings(
+    pool: &PgPool,
+    event_type: EventType,
+) -> Result<Vec<UnpaidEventBooking>> {
+    let result = db::get_event_bookings_without_payment(&pool, event_type).await?;
 
-    let events = events
+    let mut bookings = Vec::new();
+
+    for (mut booking, booking_insert_date, first_event_date, event_template) in result.into_iter() {
+        if let Some(first_event_date) = first_event_date {
+            let booking_date;
+            if let Some(payment_reminder_sent) = booking.payment_reminder_sent {
+                booking_date = payment_reminder_sent + Duration::days(3);
+            } else {
+                booking_date = booking_insert_date;
+            }
+            let due_in_days = calc_due_in_days(booking_date, first_event_date, event_template)?;
+            booking.due_in_days = Some(due_in_days);
+        }
+        bookings.push(booking);
+    }
+
+    Ok(bookings)
+}
+
+/// calculate the days until the booking should be payed
+fn calc_due_in_days(
+    booking_date: DateTime<Utc>,
+    first_event_date: DateTime<Utc>,
+    event_template: String,
+) -> Result<i64> {
+    // initialize regex
+    lazy_static! {
+        static ref PAYDAY_REGEX: Regex =
+            Regex::new(r"\{\{payday\s+(\d+)\}\}").expect("regex is valid");
+    }
+
+    // calculate custom days - if defined in the event template
+    let custom_days;
+    if let Some(captures) = PAYDAY_REGEX.captures(&event_template) {
+        custom_days = Some(
+            captures
+                .get(1)
+                .map_or("", |m| m.as_str())
+                .parse::<i64>()
+                .expect("custom day is an integer"),
+        );
+    } else {
+        custom_days = None;
+    }
+
+    // get the payday for the event
+    let payday = calculate_payday(&booking_date, &first_event_date, custom_days);
+
+    // calculate due in days
+    let due_in_days = payday - Utc::today();
+
+    Ok(due_in_days.num_days())
+}
+
+pub(crate) async fn update_payment(
+    pool: &PgPool,
+    booking_id: i32,
+    update_payment: bool,
+) -> Result<()> {
+    Ok(db::update_payment(&pool, booking_id, update_payment).await?)
+}
+
+pub(crate) async fn cancel_booking(pool: &PgPool, booking_id: i32) -> Result<()> {
+    let (event, canceled_booking, waiting_list_booking) =
+        db::cancel_event_booking(&pool, booking_id).await?;
+
+    let email_account = email::get_account_by_type(event.event_type.into())?;
+    let mut messages = Vec::new();
+
+    // create cancellation confirmation email
+    let subject = format!("{} Stornierung Buchung", event.subject_prefix());
+    let body = match event.event_type {
+        EventType::Fitness => include_str!("../../templates/cancel_booking_fitness.txt"),
+        EventType::Events => include_str!("../../templates/cancel_booking_events.txt"),
+    };
+    let body = template::render_booking(&body, &canceled_booking, &event, None, None, None)?;
+    messages.push(
+        email_account
+            .new_message()?
+            .to(canceled_booking.email.parse()?)
+            .bcc(email_account.mailbox()?)
+            .subject(subject)
+            .singlepart(SinglePart::plain(body))?,
+    );
+
+    // create booking confirmation email for the new booking
+    if let Some((new_booking, payment_id)) = waiting_list_booking {
+        let subject = format!("{} Bestätigung Buchung", event.subject_prefix());
+        let body = template::render_booking(
+            &event.booking_template,
+            &new_booking,
+            &event,
+            Some(payment_id),
+            None,
+            Some(false),
+        )?;
+
+        messages.push(
+            email_account
+                .new_message()?
+                .to(new_booking.email.parse()?)
+                .bcc(email_account.mailbox()?)
+                .subject(subject)
+                .singlepart(SinglePart::plain(body))?,
+        );
+    }
+
+    email::send_messages(&email_account, messages).await?;
+
+    Ok(())
+}
+
+pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
+    if !data.bookings && !data.waiting_list {
+        bail!("Either bookings or waiting list option need to be selected to send an event email.")
+    }
+    let enrolled = if data.bookings && !data.waiting_list {
+        Some(true)
+    } else if data.waiting_list && !data.bookings {
+        Some(false)
+    } else {
+        None
+    };
+
+    let event = db::get_event(pool, &data.event_id, false)
+        .await?
+        .ok_or_else(|| anyhow!("Found no event with id '{}'", data.event_id))?;
+
+    process_event_email(
+        pool,
+        event,
+        enrolled,
+        data.subject,
+        data.body,
+        data.attachments,
+        data.prebooking_event_id,
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// send a reminder email for each events that starts next week
+pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
+    // get all events where a event reminder should be send to the subscribers
+    let events = db::get_reminder_events(pool).await?;
+
+    // process each event
+    for event in &events {
+        // prepare for message generation
+        let email_account = email::get_account_by_type(event.event_type.into())?;
+        let message_type: MessageType = event.event_type.into();
+        let mut messages = Vec::new();
+
+        // get the subject and body (depending on the event type)
+        let (subject, body) = match event.event_type {
+            EventType::Fitness => (
+                format!("{} Info zum Kursstart", event.subject_prefix()),
+                include_str!("../../templates/event_reminder_fitness.txt"),
+            ),
+            EventType::Events => (
+                format!("{} Info zum Eventstart", event.subject_prefix()),
+                include_str!("../../templates/event_reminder_events.txt"),
+            ),
+        };
+
+        // iterate all event subscribers (Option should never be None)
+        if let Some(subscribers) = &event.subscribers {
+            for subscriber in subscribers {
+                // render the body for the email...
+                let body = template::render_event_reminder(&body, &event, subscriber)?;
+
+                // ...and push the email into the messages list
+                messages.push(
+                    Email::new(
+                        message_type,
+                        subscriber.email.clone(),
+                        subject.clone(),
+                        body,
+                        None,
+                    )
+                    .into_message(&email_account)?,
+                );
+            }
+
+            // send reminder emails to all event subribers
+            email::send_messages(&email_account, messages).await?;
+
+            // mark reminder has been sent to the event
+            // (to avoid duplicate sending of reminder emails)
+            db::mark_as_reminder_sent(pool, &event.id).await?;
+        }
+    }
+
+    // return the count of events for which the reminder has been send
+    Ok(events.len())
+}
+
+/// send a reminder email for all bookings which are due with payment
+pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType) -> Result<usize> {
+    // get unpaid bookings and filter for bookings that are due with payment
+    let bookings = get_unpaid_bookings(&pool, event_type)
+        .await?
         .into_iter()
-        .filter(|event| {
-            // keep event if all is true
-            if all.unwrap_or(false) {
-                return true;
-            }
-            // keep event if it is visible
-            if event.visible {
-                // and beta is the same state than event
-                if let Some(beta) = beta {
-                    return beta == event.beta;
-                }
-                // and beta is None
-                return true;
-            }
-            return false;
+        .filter(|booking| match booking.due_in_days {
+            Some(due_in_days) if due_in_days < 0 => true,
+            _ => false,
         })
         .collect::<Vec<_>>();
 
-    Ok(events)
-}
+    // prepare for message generation
+    let email_account = email::get_account_by_type(event_type.into())?;
+    let message_type: MessageType = event_type.into();
+    let mut messages = Vec::new();
 
-async fn create_event_counters(
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-) -> Result<Vec<EventCounter>> {
-    let event_counters = get_and_filter_events(client, None, None)
-        .await?
+    // get the subject and body (depending on the event type)
+    let subject = format!("{} Zahlungserinnerung", event_type.subject_prefix());
+    let body = match event_type {
+        EventType::Fitness => include_str!("../../templates/payment_reminder_fitness.txt"),
+        EventType::Events => include_str!("../../templates/payment_reminder_events.txt"),
+    };
+
+    let mut event_cache = HashMap::new();
+    for booking in bookings.iter() {
+        // get the event from the cache of from the database
+        let key = booking.event_id;
+        if !event_cache.contains_key(&key) {
+            let value = db::get_event(&pool, &booking.event_id, false)
+                .await?
+                .ok_or_else(|| anyhow!("Event with id '{}' is missing", key))?;
+            event_cache.insert(key, value);
+        }
+        let event = event_cache
+            .get(&key)
+            .ok_or_else(|| anyhow!("Event with id '{}' is not in the cache", key))?;
+
+        // render the body for the email...
+        let body = template::render_payment_reminder(&body, &event, &booking)?;
+
+        // ...and push the email into the messages list
+        messages.push(
+            Email::new(
+                message_type,
+                booking.email.clone(),
+                subject.clone(),
+                body,
+                None,
+            )
+            .into_message(&email_account)?,
+        );
+    }
+
+    // send reminder emails to all bookings due with payment
+    email::send_messages(&email_account, messages).await?;
+
+    // mark payment reminder has been sent to the bookings
+    // (to avoid duplicate sending of reminder emails)
+    let booking_ids = bookings
         .into_iter()
-        .map(|event| event.into())
-        .collect::<Vec<EventCounter>>();
+        .map(|booking| booking.booking_id)
+        .collect::<Vec<_>>();
+    db::mark_as_payment_reminder_sent(pool, &booking_ids).await?;
 
-    Ok(event_counters)
+    Ok(booking_ids.len())
 }
 
-async fn do_booking(pool: &PgPool, booking: EventBooking) -> Result<BookingResponse> {
-    let mut client = store::get_client().await?;
-    Ok(book_event(pool, &mut client, booking).await?)
-}
-
-async fn book_event(
+async fn process_event_email(
     pool: &PgPool,
-    client: &mut FirestoreClient<InterceptedService<Channel, GouthInterceptor>>,
-    booking: EventBooking,
-) -> Result<BookingResponse> {
-    let booking_result = &store::book_event(client, &booking.event_id).await?;
-    let result = match booking_result {
-        BookingResult::Booked(event, booking_number)
-        | BookingResult::WaitingList(event, booking_number) => {
-            sheets::save_booking(&booking, event, booking_number).await?;
-            subscribe_to_updates(pool, &booking, event).await?;
-            send_mail(&booking, event, booking_result).await?;
-            info!("Booking of Event {} was successfull", booking.event_id);
-            let message;
-            if let BookingResult::Booked(_, _) = booking_result {
-                message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail.";
-            } else {
-                message = "Du stehst jetzt auf der Warteliste. Wir benachrichtigen Dich, wenn Plätze frei werden.";
-            }
-            BookingResponse::success(message, create_event_counters(client).await?)
+    event: Event,
+    enrolled: Option<bool>,
+    subject: String,
+    body: String,
+    attachments: Option<Vec<EmailAttachment>>,
+    prebooking_event_id: Option<EventId>,
+) -> Result<()> {
+    let bookings = db::get_bookings(pool, &event.id, enrolled).await?;
+    if bookings.is_empty() {
+        return Ok(());
+    }
+
+    let email_account = email::get_account_by_type(event.event_type.into())?;
+    let message_type: MessageType = event.event_type.into();
+    let mut messages = Vec::new();
+
+    for (booking, subscriber_id, payment_id) in bookings {
+        let prebooking_link;
+        if let Some(event_id) = prebooking_event_id {
+            prebooking_link = Some(create_prebooking_link(
+                event.event_type,
+                event_id,
+                subscriber_id,
+            )?);
+        } else {
+            prebooking_link = None;
+        }
+
+        let body = template::render_booking(
+            &body,
+            &booking,
+            &event,
+            Some(payment_id),
+            prebooking_link,
+            None,
+        )?;
+
+        let attachments = match &attachments {
+            Some(attachments) => Some(
+                attachments
+                    .into_iter()
+                    .map(|attachment| attachment.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            None => None,
+        };
+
+        messages.push(
+            Email::new(
+                message_type,
+                booking.email,
+                subject.clone(),
+                body,
+                attachments,
+            )
+            .into_message(&email_account)?,
+        );
+    }
+
+    email::send_messages(&email_account, messages).await?;
+
+    Ok(())
+}
+
+fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
+    if beta {
+        LifecycleStatus::Review
+    } else {
+        LifecycleStatus::Published
+    }
+}
+
+async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingResponse> {
+    let booking_result = db::book_event(pool, &booking).await?;
+    let booking_response = match booking_result {
+        BookingResult::Booked(event, counter, payment_id) => {
+            process_booking(pool, &booking, event, counter, true, payment_id).await?
+        }
+        BookingResult::WaitingList(event, counter, payment_id) => {
+            process_booking(pool, &booking, event, counter, false, payment_id).await?
+        }
+        BookingResult::DuplicateBooking => {
+            error!(
+                "Event ({}) booking failed because a duplicate booking has been detected.",
+                booking.event_id
+            );
+            BookingResponse::failure("Wir haben schon eine Buchung mit diesen Anmeldedaten erkannt. Bitte verwende für weitere Buchungen andere Anmeldedaten.")
+        }
+        BookingResult::NotBookable => {
+            error!(
+                "Event ({}) booking failed because the event is in a unbookable state.",
+                booking.event_id
+            );
+            BookingResponse::failure("Das Event kann aktuell leider nicht gebucht werden.")
         }
         BookingResult::BookedOut => {
             error!(
@@ -178,70 +504,91 @@ async fn book_event(
         }
     };
 
-    Ok(result)
+    Ok(booking_response)
 }
 
-async fn do_prebooking(pool: &PgPool, hash: String) -> Result<BookingResponse> {
-    let bytes = base64::decode(&hash)
-        .with_context(|| format!("Error decoding the prebooking hash {}", &hash))?;
-    let decoded = from_utf8(&bytes).with_context(|| {
-        format!(
-            "Error converting the decoded prebooking hash {} into a string slice",
-            &hash
-        )
-    })?;
-    let splitted = decoded.split('#').collect::<Vec<_>>();
+async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> {
+    let ids = hashids::decode(&hash)
+        .with_context(|| format!("Error decoding the prebooking hash {} into ids", &hash))?;
 
     // fail if the length is not correct
-    if splitted.len() != 8 {
+    if ids.len() != 2 {
         bail!(
-            "Booking failed beacuse spitted prebooking hash ({}) has an invalid length: {}",
-            decoded,
-            splitted.len()
+            "Booking failed because decoded prebooking hash ({}) has an invalid length: {}",
+            hash,
+            ids.len()
         );
     }
 
-    let booking = EventBooking::new(
-        splitted[0].into(),
-        splitted[1].into(),
-        splitted[2].into(),
-        splitted[3].into(),
-        splitted[4].into(),
-        splitted[5].into(),
-        // skip ' prefix - if available
-        Some(match splitted[6].starts_with("'") {
-            true => splitted[6][1..].into(),
-            false => splitted[6].into(),
-        }),
-        Some("J".eq(splitted[7])),
-        Some(false),
-        Some(String::from("Pre-Booking")),
-    );
+    let event_id = EventId::from(i32::try_from(ids[0])?);
+    let subscriber_id = ids[1].try_into()?;
 
-    let mut client = store::get_client().await?;
-    let event = store::get_event(&mut client, &booking.event_id).await?;
+    let (booking_result, booking) = db::pre_book_event(pool, event_id, subscriber_id).await?;
+    let booking_response = match booking_result {
+        BookingResult::Booked(event, counter, payment_id) => {
+            process_booking(
+                pool,
+                &booking
+                    .ok_or_else(|| anyhow!("Found no 'virtual' booking. Never should be here."))?,
+                event,
+                counter,
+                true,
+                payment_id,
+            )
+            .await?
+        }
+        BookingResult::WaitingList(event, counter, payment_id) => {
+            process_booking(
+                pool,
+                &booking
+                    .ok_or_else(|| anyhow!("Found no 'virtual' booking. Never should be here."))?,
+                event,
+                counter,
+                false,
+                payment_id,
+            )
+            .await?
+        }
+        BookingResult::DuplicateBooking => {
+            warn!(
+                "Prebooking link data has been detected and invalidated for booking {:?}",
+                booking
+            );
+            BookingResponse::failure("Der Buchungslink wurde schon benutzt und ist daher ungültig.")
+        }
+        BookingResult::NotBookable => {
+            warn!(
+                "Prebooking is not possible because the event is in a unbookable state for booking {:?}",
+                booking
+            );
+            BookingResponse::failure("Das Event kann aktuell leider nicht gebucht werden.")
+        }
+        BookingResult::BookedOut => {
+            BookingResponse::failure("Das Event ist leider schon ausgebucht.")
+        }
+    };
 
-    // prebooking is only available for beta events
-    if !event.beta {
-        warn!("Prebooking has ended for booking {:?}", booking);
-        return Ok(BookingResponse::failure(
-            "Der Buchungslink ist nicht mehr gültig da die Frühbuchungsphase zu Ende ist.",
-        ));
+    Ok(booking_response)
+}
+
+async fn process_booking(
+    pool: &PgPool,
+    booking: &EventBooking,
+    event: Event,
+    counter: Vec<EventCounter>,
+    booked: bool,
+    payment_id: String,
+) -> Result<BookingResponse> {
+    subscribe_to_updates(pool, booking, &event).await?;
+    send_booking_mail(booking, &event, booked, payment_id).await?;
+    info!("Booking of Event {} was successfull", booking.event_id);
+    let message;
+    if booked {
+        message = "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail.";
+    } else {
+        message = "Du stehst jetzt auf der Warteliste. Wir benachrichtigen Dich, wenn Plätze frei werden.";
     }
-
-    // check if prebooking has been used already
-    let result = sheets::detect_booking(&booking, &event).await?;
-    if let BookingDetection::Booked = result {
-        warn!(
-            "Prebooking link data has been detected and invalidated for booking {:?}",
-            booking
-        );
-        return Ok(BookingResponse::failure(
-            "Der Buchungslink wurde schon benutzt und ist daher ungültig.",
-        ));
-    }
-
-    Ok(book_event(pool, &mut client, booking).await?)
+    Ok(BookingResponse::success(message, counter))
 }
 
 async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Event) -> Result<()> {
@@ -249,77 +596,41 @@ async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Eve
     if booking.updates.unwrap_or(false) == false {
         return Ok(());
     }
-    // TODO: try to get rid of clone
     let subscription =
-        Subscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
+        NewsSubscription::new(booking.email.clone(), vec![event.event_type.clone().into()]);
     super::news::subscribe_to_news(pool, subscription, false).await?;
 
     Ok(())
 }
 
-async fn send_mail(
+async fn send_booking_mail(
     booking: &EventBooking,
     event: &Event,
-    booking_result: &BookingResult,
+    booked: bool,
+    payment_id: String,
 ) -> Result<()> {
     let email_account = match &event.alt_email_address {
         Some(email_address) => email::get_account_by_address(email_address),
         None => email::get_account_by_type(event.event_type.into()),
     }?;
-    let subject_prefix = format!(
-        "[{}@SVE]",
-        match event.event_type {
-            EventType::Fitness => "Fitness",
-            EventType::Events => "Events",
-        }
-    );
     let subject;
-    let template;
-    let booking_number;
-    if let BookingResult::Booked(_, b_nr) = booking_result {
-        subject = format!("{} Bestätigung Buchung", subject_prefix);
+    let template: &str;
+    let opt_payment_id;
+    if booked {
+        subject = format!("{} Bestätigung Buchung", event.subject_prefix());
         template = &event.booking_template;
-        booking_number = Some(b_nr);
+        opt_payment_id = Some(payment_id);
     } else {
-        subject = format!("{} Bestätigung Warteliste", subject_prefix);
-        template = &event.waiting_template;
-        booking_number = None;
+        subject = format!("{} Bestätigung Warteliste", event.subject_prefix());
+        template = match event.event_type {
+            EventType::Fitness => include_str!("../../templates/waiting_list_fitness.txt"),
+            EventType::Events => include_str!("../../templates/waiting_list_events.txt"),
+        };
+        opt_payment_id = None;
     }
 
-    let message = email_account
-        .new_message()?
-        .to(booking.email.parse()?)
-        .bcc(email_account.mailbox()?)
-        .subject(subject)
-        .singlepart(SinglePart::plain(create_body(
-            template,
-            booking,
-            event,
-            booking_number,
-        )))?;
+    let mut body = template::render_booking(template, booking, event, opt_payment_id, None, None)?;
 
-    email::send_message(&email_account, message).await?;
-
-    Ok(())
-}
-
-fn create_body(
-    template: &str,
-    booking: &EventBooking,
-    event: &Event,
-    booking_number: Option<&String>,
-) -> String {
-    let mut body = template
-        .replace("${firstname}", booking.first_name.trim())
-        .replace("${lastname}", booking.last_name.trim())
-        .replace("${name}", event.name.trim())
-        .replace("${location}", &event.location)
-        .replace("${price}", &booking.cost(event).to_euro())
-        .replace("${dates}", &format_dates(&event));
-    if let Some(booking_number) = booking_number {
-        body = body.replace("${booking_number}", booking_number);
-    }
-    body = replace_payday(body, &event);
     if booking.updates.unwrap_or(false) {
         body.push_str(
             format!(
@@ -336,62 +647,45 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
             .as_str(),
         )
     }
-    body
+
+    let message = email_account
+        .new_message()?
+        .to(booking.email.parse()?)
+        .bcc(email_account.mailbox()?)
+        .subject(subject)
+        .singlepart(SinglePart::plain(body))?;
+
+    email::send_message(&email_account, message).await?;
+
+    Ok(())
 }
 
-fn format_dates(event: &Event) -> String {
-    event
-        .dates
-        .iter()
-        .map(|d| {
-            DateTime::<Utc>::from_utc(*d, Utc)
-                .format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
-                .to_string()
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+fn create_prebooking_link(
+    event_type: EventType,
+    event_id: EventId,
+    subscriber_id: i32,
+) -> Result<String> {
+    let mut url = String::from("https://www.sv-eutingen.de/");
+    url.push_str(match event_type {
+        EventType::Fitness => "fitness",
+        EventType::Events => "events",
+    });
+    url.push_str("/buchung?code=");
+
+    // create the code
+    url.push_str(&hashids::encode(&[
+        event_id.into_inner().try_into()?,
+        subscriber_id.try_into()?,
+    ]));
+
+    return Ok(url);
 }
 
-fn replace_payday(body: String, event: &Event) -> String {
-    if let Some(first_date) = event.dates.first() {
-        let mut payday_replace_str = "${payday}";
-        let mut days = 14;
-        let payday_regex = Regex::new(r"\$\{payday:(\d+)\}").expect("regex is valid");
-        if let Some(find_result) = payday_regex.find(&body) {
-            payday_replace_str = &body[find_result.start()..find_result.end()];
-            if let Some(captures) = payday_regex.captures(&body) {
-                days = captures
-                    .get(1)
-                    .map_or("", |m| m.as_str())
-                    .parse::<i32>()
-                    .expect("group is an integer");
-            }
-        }
-        let mut payday = *first_date - Duration::days(days.into());
-        let tomorrow = Utc::now().naive_utc() + Duration::days(1);
-        if payday < tomorrow {
-            payday = tomorrow
-        }
-
-        return body.replace(
-            payday_replace_str,
-            &DateTime::<Utc>::from_utc(payday, Utc)
-                .format_localized("%d. %B", Locale::de_DE)
-                .to_string(),
-        );
-    }
-
-    body
-}
-
-fn compare_csv_with_bookings(
+fn read_payment_records(
     csv: &str,
     csv_start_date: Option<NaiveDate>,
-    bookings: &mut Vec<VerifyPaymentBookingRecord>,
-) -> Result<(Vec<VerifyPaymentBookingRecord>, Vec<VerifyPaymentResult>)> {
-    let mut verified_payment_bookings = Vec::new();
-    let mut payment_bookings_with_errors = BTreeMap::new();
-    let mut non_matching_payment_records = Vec::new();
+) -> Result<Vec<PaymentRecord>> {
+    let mut records = Vec::new();
 
     for record in super::csv::read(csv)? {
         // skip all records that are older than the start date
@@ -400,46 +694,99 @@ fn compare_csv_with_bookings(
                 continue;
             }
         }
-        let position = bookings.iter().position(|booking| {
-            booking.booking_number.len() > 0 && record.purpose.contains(&booking.booking_number)
-        });
-        if let Some(index) = position {
-            let booking = bookings.remove(index);
+        records.push(record);
+    }
 
-            if booking.payed_already {
+    Ok(records)
+}
+
+fn compare_payment_records_with_bookings(
+    payment_records: &Vec<PaymentRecord>,
+    bookings: &mut Vec<VerifyPaymentBookingRecord>,
+) -> Result<(HashMap<i32, String>, Vec<VerifyPaymentResult>)> {
+    let mut verified_payment_bookings = Vec::new();
+    let mut verified_ibans = HashMap::new();
+    let mut payment_bookings_with_errors = BTreeMap::new();
+    let mut non_matching_payment_records = Vec::new();
+
+    let mut bookings = bookings
+        .iter()
+        .map(|booking| (&booking.payment_id, booking))
+        .collect::<HashMap<_, _>>();
+
+    for payment_record in payment_records {
+        // TODO: add support for payment record with multiple payment ids
+
+        if payment_record.payment_ids.len() < 1 || payment_record.payment_ids.len() > 1 {
+            non_matching_payment_records.push(format!(
+                "{} / {} / {} / {}",
+                payment_record.payee,
+                payment_record.payee_iban,
+                payment_record.purpose,
+                payment_record.volumne.to_euro()
+            ));
+            continue;
+        }
+        let payment_id = payment_record.payment_ids.iter().next().ok_or_else(|| {
+            anyhow!("Payment record is missing payment ids. Never should be here.")
+        })?;
+
+        let booking = bookings.remove(&payment_id);
+        if let Some(booking) = booking {
+            if booking.payed.is_some() {
                 payment_bookings_with_errors
-                    .entry(booking.booking_number.clone())
+                    .entry(payment_id)
                     .or_insert_with(|| Vec::new())
                     .push(format!(
-                        "Doppelt bezahlt: Buchung war schon als bezahlt markiert"
+                        "Doppelt bezahlt: Buchung ist schon als bezahlt markiert"
                     ));
             }
 
-            let record_volumne = record.volumne.to_euro();
+            if booking.enrolled && booking.canceled.is_some() {
+                payment_bookings_with_errors
+                    .entry(payment_id)
+                    .or_insert_with(|| Vec::new())
+                    .push(format!(
+                        "Falsch bezahlt: Buchung ist als storniert markiert"
+                    ));
+            }
+
+            if !booking.enrolled {
+                payment_bookings_with_errors
+                    .entry(payment_id)
+                    .or_insert_with(|| Vec::new())
+                    .push(format!(
+                        "Falsch bezahlt: Buchung ist von auf der Warteliste"
+                    ));
+            }
+
+            let record_volumne = payment_record.volumne.to_euro();
             let booking_cost = booking.cost.to_euro();
             if !record_volumne.eq(&booking_cost) {
                 payment_bookings_with_errors
-                    .entry(booking.booking_number.clone())
+                    .entry(payment_id)
                     .or_insert_with(|| Vec::new())
                     .push(format!(
                         "Betrag falsch: erwartet {booking_cost} != überwiesen {record_volumne}"
                     ));
             }
 
-            if !payment_bookings_with_errors.contains_key(&booking.booking_number) {
+            if !payment_bookings_with_errors.contains_key(&booking.payment_id) {
                 verified_payment_bookings.push(booking);
+                verified_ibans.insert(booking.booking_id, payment_record.payee_iban.clone());
             }
         } else {
             non_matching_payment_records.push(format!(
                 "{} / {} / {} / {}",
-                record.payee,
-                record.payee_iban,
-                record.purpose,
-                record.volumne.to_euro()
+                payment_record.payee,
+                payment_record.payee_iban,
+                payment_record.purpose,
+                payment_record.volumne.to_euro()
             ));
+            break;
         }
     }
-    verified_payment_bookings.sort_unstable_by(|a, b| a.booking_number.cmp(&b.booking_number));
+    verified_payment_bookings.sort_unstable_by(|a, b| a.payment_id.cmp(&b.payment_id));
 
     let mut compare_result = Vec::new();
 
@@ -455,7 +802,7 @@ fn compare_csv_with_bookings(
         ),
         verified_payment_bookings
             .iter()
-            .map(|booking| booking.booking_number.clone())
+            .map(|booking| booking.payment_id.clone())
             .collect::<Vec<_>>(),
     ));
 
@@ -471,8 +818,8 @@ fn compare_csv_with_bookings(
         ),
         payment_bookings_with_errors
             .into_iter()
-            .map(|(booking_number, mut errors)| {
-                errors.insert(0, booking_number);
+            .map(|(payment_id, mut errors)| {
+                errors.insert(0, payment_id.clone());
                 errors.join(" / ")
             })
             .collect::<Vec<_>>(),
@@ -491,168 +838,66 @@ fn compare_csv_with_bookings(
         non_matching_payment_records,
     ));
 
-    Ok((verified_payment_bookings, compare_result))
+    Ok((verified_ibans, compare_result))
+}
+
+/// Calculate the payday with the first event date.
+pub(super) fn calculate_payday(
+    booking_date: &DateTime<Utc>,
+    first_event_date: &DateTime<Utc>,
+    custom_days: Option<i64>,
+) -> Date<Utc> {
+    // default value is 14 days
+    let mut days = 14;
+
+    // overwrite with custom days - if available
+    if let Some(custom_days) = custom_days {
+        days = custom_days;
+    }
+
+    // calculated payday
+    let mut payday = first_event_date.date() - Duration::days(days);
+
+    // override the payday if it is before the day after the booking date
+    let earliest_paypay = booking_date.date() + Duration::days(1);
+    if payday < earliest_paypay {
+        payday = earliest_paypay
+    }
+
+    payday
 }
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
-    use chrono::{NaiveDate, NaiveDateTime};
+    use bigdecimal::{BigDecimal, FromPrimitive};
+    use chrono::{NaiveDate, Utc};
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_create_body() {
-        let booking_member = EventBooking::new(
-            String::from("id"),
-            String::from("Max"),
-            String::from("Mustermann"),
-            String::from("Haupstraße 1"),
-            String::from("72184 Eutingen"),
-            String::from("max@mustermann.de"),
-            None,
-            Some(true),
-            None,
-            None,
-        );
-        let booking_non_member = EventBooking::new(
-            String::from("id"),
-            String::from("Max"),
-            String::from("Mustermann"),
-            String::from("Haupstraße 1"),
-            String::from("72184 Eutingen"),
-            String::from("max@mustermann.de"),
-            None,
-            None,
-            None,
-            None,
-        );
-        let event = Event::new(
-            String::from("id"),
-            String::from("sheet_id"),
-            0,
-            EventType::Fitness,
-            String::from("FitForFun"),
-            0,
-            true,
-            false,
-            String::from("short_description"),
-            String::from("description"),
-            String::from("image"),
-            true,
-            vec![
-                NaiveDate::from_ymd(2022, 3, 7).and_hms(19, 00, 00),
-                NaiveDate::from_ymd(2022, 3, 8).and_hms(19, 00, 00),
-                NaiveDate::from_ymd(2022, 3, 9).and_hms(19, 00, 00),
-                NaiveDate::from_ymd(2022, 3, 10).and_hms(19, 00, 00),
-                NaiveDate::from_ymd(2022, 3, 11).and_hms(19, 00, 00),
-                NaiveDate::from_ymd(2022, 3, 12).and_hms(19, 00, 00),
-                NaiveDate::from_ymd(2022, 3, 13).and_hms(19, 00, 00),
-            ],
-            None,
-            0,
-            0,
-            0,
-            5.0,
-            10.0,
-            0,
-            0,
-            String::from("Turn- & Festhalle Eutingen"),
-            String::from("booking_template"),
-            String::from("waiting_template"),
-            None,
-            None,
-            false,
-        );
-
+    fn test_create_prebooking_link() {
         assert_eq!(
-            create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${booking_number}
-${dates}",
-                &booking_member,
-                &event,
-                None
-            ),
+            create_prebooking_link(EventType::Fitness, 1.into(), 0.into()).unwrap(),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 5,00 € {} ${{booking_number}}
-- Mo., 07. März 2022, 19:00 Uhr
-- Di., 08. März 2022, 19:00 Uhr
-- Mi., 09. März 2022, 19:00 Uhr
-- Do., 10. März 2022, 19:00 Uhr
-- Fr., 11. März 2022, 19:00 Uhr
-- Sa., 12. März 2022, 19:00 Uhr
-- So., 13. März 2022, 19:00 Uhr",
-                format_payday(Utc::now() + Duration::days(1))
-            ),
+                "https://www.sv-eutingen.de/fitness/buchung?code={}",
+                hashids::encode(&[1, 0])
+            )
         );
         assert_eq!(
-            create_body(
-                "${firstname} ${lastname} ${name} ${location} ${price} ${payday:0} ${booking_number}
-${dates}",
-                &booking_non_member,
-                &event,
-                Some(&String::from("22-1012"))
-            ),
+            create_prebooking_link(EventType::Events, 2.into(), 1.into()).unwrap(),
             format!(
-                "Max Mustermann FitForFun Turn- & Festhalle Eutingen 10,00 € {} 22-1012
-- Mo., 07. März 2022, 19:00 Uhr
-- Di., 08. März 2022, 19:00 Uhr
-- Mi., 09. März 2022, 19:00 Uhr
-- Do., 10. März 2022, 19:00 Uhr
-- Fr., 11. März 2022, 19:00 Uhr
-- Sa., 12. März 2022, 19:00 Uhr
-- So., 13. März 2022, 19:00 Uhr",
-                format_payday(Utc::now() + Duration::days(1))
+                "https://www.sv-eutingen.de/events/buchung?code={}",
+                hashids::encode(&[2, 1])
             )
         );
     }
 
     #[test]
-    fn test_replace_payday() {
-        // event starts in 3 weeks
-        let event = new_event(vec![Utc::now().naive_utc() + Duration::weeks(3)]);
-        assert_eq!(
-            replace_payday("${payday}".into(), &event),
-            format_payday(Utc::now() + Duration::weeks(1))
-        );
-        assert_eq!(
-            replace_payday("${payday:7}".into(), &event),
-            format_payday(Utc::now() + Duration::weeks(2))
-        );
-        assert_eq!(
-            replace_payday("${payday:0}".into(), &event),
-            format_payday(Utc::now() + Duration::weeks(3))
-        );
-        let tomorrow = (Utc::now() + Duration::days(1))
-            .format_localized("%d. %B", Locale::de_DE)
-            .to_string();
-        assert_eq!(replace_payday("${payday:21}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:28}".into(), &event), tomorrow);
-
-        // event starts in 3 days
-        let event = new_event(vec![Utc::now().naive_utc() + Duration::days(3)]);
-        assert_eq!(
-            replace_payday("${payday:1}".into(), &event),
-            format_payday(Utc::now() + Duration::days(2))
-        );
-        assert_eq!(replace_payday("${payday:2}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:3}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:14}".into(), &event), tomorrow);
-
-        // event starts today
-        let event = new_event(vec![Utc::now().naive_utc()]);
-        assert_eq!(replace_payday("${payday}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:7}".into(), &event), tomorrow);
-
-        // event started yesterday
-        let event = new_event(vec![Utc::now().naive_utc() - Duration::days(1)]);
-        assert_eq!(replace_payday("${payday}".into(), &event), tomorrow);
-        assert_eq!(replace_payday("${payday:7}".into(), &event), tomorrow);
-    }
-
-    #[test]
     fn test_compare_csv_with_bookings() {
         // matching bookings with and without errors
-        let csv = ";;;;;;;;;;;;;;;;
+        let csv = r#";;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;
 Umsatzanzeige;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;
@@ -676,74 +921,72 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 ;;;;;;;;;;;;;
 01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
-";
+"#;
         let mut bookings = vec![
             VerifyPaymentBookingRecord::new(
+                1,
                 "Test-Kurs".into(),
-                "F10".into(),
-                27.0,
+                "Max Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
                 "22-1423".into(),
-                false,
-            ),
-            VerifyPaymentBookingRecord::new(
-                "Test-Kurs".into(),
-                "F11".into(),
-                27.0,
-                "22-1425".into(),
-                false,
-            ),
-            VerifyPaymentBookingRecord::new(
-                "Test-Kurs".into(),
-                "F12".into(),
-                27.0,
-                "22-1456".into(),
+                None,
                 true,
+                None,
             ),
             VerifyPaymentBookingRecord::new(
+                2,
                 "Test-Kurs".into(),
-                "F12".into(),
-                45.90,
+                "Erika Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1425".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                3,
+                "Test-Kurs".into(),
+                "Lieschen Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1456".into(),
+                None,
+                true,
+                Some(Utc::now()),
+            ),
+            VerifyPaymentBookingRecord::new(
+                4,
+                "Test-Kurs".into(),
+                "Otto Normalverbraucher".into(),
+                BigDecimal::from_str("45.90").unwrap(),
                 "22-1467".into(),
-                false,
+                Some(Utc::now()),
+                true,
+                None,
             ),
         ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, None, &mut bookings).unwrap(),
-            (
-                vec![
-                    VerifyPaymentBookingRecord::new(
-                        "Test-Kurs".into(),
-                        "F10".into(),
-                        27.0,
-                        "22-1423".into(),
-                        false,
-                    ),
-                    VerifyPaymentBookingRecord::new(
-                        "Test-Kurs".into(),
-                        "F12".into(),
-                        45.90,
-                        "22-1467".into(),
-                        false,
-                    )
-                ],
-                vec![
-                    VerifyPaymentResult::new(
-                        "2 bezahlte Buchungen".into(),
-                        vec!["22-1423".into(), "22-1467".into()]
-                    ),
-                    VerifyPaymentResult::new(
-                        "2 Buchungen mit Problemen".into(),
-                        vec!["22-1425 / Betrag falsch: erwartet 27,00 € != überwiesen 33,50 €".into(),
-                             "22-1456 / Doppelt bezahlt: Buchung war schon als bezahlt markiert".into()]
-                    ),
-                    VerifyPaymentResult::new(
-                        "1 nicht erkannte Buchung".into(),
-                        vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
-                    )
-                ]
+    compare_csv_with_bookings(csv, None, &mut bookings),
+    (
+        HashMap::from([(1, "DE62500105176261449571".into())]),
+        vec![
+            VerifyPaymentResult::new(
+                "1 bezahlte Buchung".into(),
+                vec!["22-1423".into()]
+            ),
+            VerifyPaymentResult::new(
+                "3 Buchungen mit Problemen".into(),
+                vec!["22-1425 / Betrag falsch: erwartet 27,00 € != überwiesen 33,50 €".into(),
+                     "22-1456 / Doppelt bezahlt: Buchung ist schon als bezahlt markiert".into(),
+                     "22-1467 / Falsch bezahlt: Buchung ist als storniert markiert".into()]
+            ),
+            VerifyPaymentResult::new(
+                "1 nicht erkannte Buchung".into(),
+                vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
             )
-        );
+        ]
+    )
+);
 
         // no matching bookings
         let csv = "Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz
@@ -752,49 +995,61 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
 
         let mut bookings = vec![
             VerifyPaymentBookingRecord::new(
+                1,
                 "Test-Kurs".into(),
-                "F10".into(),
-                27.0,
+                "Max Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
                 "22-1423".into(),
-                false,
-            ),
-            VerifyPaymentBookingRecord::new(
-                "Test-Kurs".into(),
-                "F11".into(),
-                27.0,
-                "22-1425".into(),
-                false,
-            ),
-            VerifyPaymentBookingRecord::new(
-                "Test-Kurs".into(),
-                "F12".into(),
-                27.0,
-                "22-1456".into(),
+                None,
                 true,
+                None,
             ),
             VerifyPaymentBookingRecord::new(
+                2,
                 "Test-Kurs".into(),
-                "F12".into(),
-                45.90,
+                "Erika Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1425".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                3,
+                "Test-Kurs".into(),
+                "Lieschen Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1456".into(),
+                None,
+                true,
+                Some(Utc::now()),
+            ),
+            VerifyPaymentBookingRecord::new(
+                4,
+                "Test-Kurs".into(),
+                "Otto Normalverbraucher".into(),
+                BigDecimal::from_str("45.90").unwrap(),
                 "22-1467".into(),
-                false,
+                None,
+                true,
+                None,
             ),
         ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, None, &mut bookings).unwrap(),
-            (
-                vec![],
-                vec![
-                    VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
-                    VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
-                    VerifyPaymentResult::new(
-                        "1 nicht erkannte Buchung".into(),
-                        vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
-                    )
-                ]
+    compare_csv_with_bookings(csv, None, &mut bookings),
+    (
+        HashMap::new(),
+        vec![
+            VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
+            VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
+            VerifyPaymentResult::new(
+                "1 nicht erkannte Buchung".into(),
+                vec!["Test GmbH / DE92500105174132432988 / Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH / -24,15 €".into()]
             )
-        );
+        ]
+    )
+);
 
         // matching bookings with and without errors
         let csv = ";;;;;;;;;;;;;;;;
@@ -824,46 +1079,51 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 ";
         let mut bookings = vec![
             VerifyPaymentBookingRecord::new(
+                1,
                 "Test-Kurs".into(),
-                "F10".into(),
-                27.0,
+                "Max Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
                 "22-1423".into(),
-                false,
-            ),
-            VerifyPaymentBookingRecord::new(
-                "Test-Kurs".into(),
-                "F11".into(),
-                27.0,
-                "22-1425".into(),
-                false,
-            ),
-            VerifyPaymentBookingRecord::new(
-                "Test-Kurs".into(),
-                "F12".into(),
-                27.0,
-                "22-1456".into(),
+                None,
                 true,
+                None,
             ),
             VerifyPaymentBookingRecord::new(
+                2,
                 "Test-Kurs".into(),
-                "F12".into(),
-                45.90,
+                "Erika Mustermann".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1425".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                3,
+                "Test-Kurs".into(),
+                "Lieschen Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-1456".into(),
+                None,
+                true,
+                Some(Utc::now()),
+            ),
+            VerifyPaymentBookingRecord::new(
+                4,
+                "Test-Kurs".into(),
+                "Otto Normalverbraucher".into(),
+                BigDecimal::from_str("45.90").unwrap(),
                 "22-1467".into(),
-                false,
+                None,
+                true,
+                None,
             ),
         ];
 
         assert_eq!(
-            compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 11), &mut bookings)
-                .unwrap(),
+            compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 11), &mut bookings),
             (
-                vec![VerifyPaymentBookingRecord::new(
-                    "Test-Kurs".into(),
-                    "F12".into(),
-                    45.90,
-                    "22-1467".into(),
-                    false,
-                )],
+                HashMap::from([(4, "DE21500105179625862911".into())]),
                 vec![
                     VerifyPaymentResult::new("1 bezahlte Buchung".into(), vec!["22-1467".into()]),
                     VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
@@ -873,10 +1133,9 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         );
 
         assert_eq!(
-            compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 12), &mut bookings)
-                .unwrap(),
+            compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 03, 12), &mut bookings),
             (
-                vec![],
+                HashMap::new(),
                 vec![
                     VerifyPaymentResult::new("0 bezahlte Buchungen".into(), vec![]),
                     VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
@@ -886,41 +1145,131 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         );
     }
 
-    fn format_payday(date_time: DateTime<Utc>) -> String {
-        date_time
-            .format_localized("%d. %B", Locale::de_DE)
-            .to_string()
+    fn compare_csv_with_bookings(
+        csv: &str,
+        csv_start_date: Option<NaiveDate>,
+        bookings: &mut Vec<VerifyPaymentBookingRecord>,
+    ) -> (HashMap<i32, String>, Vec<VerifyPaymentResult>) {
+        let payment_records = read_payment_records(&csv, csv_start_date).unwrap();
+        compare_payment_records_with_bookings(&payment_records, bookings).unwrap()
     }
 
-    fn new_event(dates: Vec<NaiveDateTime>) -> Event {
-        Event::new(
-            String::from("id"),
-            String::from("sheet_id"),
-            0,
-            EventType::Fitness,
-            String::from("name"),
-            0,
-            true,
-            false,
-            String::from("short_description"),
-            String::from("description"),
-            String::from("image"),
-            true,
-            dates,
-            None,
-            0,
-            0,
-            0,
-            0.0,
-            0.0,
-            0,
-            0,
-            String::from("location"),
-            String::from("booking_template"),
-            String::from("waiting_template"),
-            None,
-            None,
-            false,
-        )
+    #[test]
+    fn test_calculate_payday() {
+        let booking_date = Utc::now();
+
+        // event starts in 3 weeks
+        let start_date = Utc::now() + Duration::weeks(3);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, None),
+            Utc::today() + Duration::weeks(1)
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            Utc::today() + Duration::weeks(2)
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(0)),
+            Utc::today() + Duration::weeks(3)
+        );
+        let tomorrow = Utc::today() + Duration::days(1);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(21)),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(28)),
+            tomorrow
+        );
+
+        // event starts in 3 days
+        let start_date = Utc::now() + Duration::days(3);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(1)),
+            Utc::today() + Duration::days(2)
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(2)),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(3)),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(14)),
+            tomorrow
+        );
+
+        // event starts today
+        let start_date = Utc::now();
+        assert_eq!(calculate_payday(&booking_date, &start_date, None), tomorrow);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            tomorrow
+        );
+
+        // event started yesterday
+        let start_date = Utc::now() - Duration::days(1);
+        assert_eq!(calculate_payday(&booking_date, &start_date, None), tomorrow);
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            tomorrow
+        );
+
+        // negative paydays (because the bookings are in the past)
+        let booking_date = Utc::now() - Duration::days(31);
+        let start_date = Utc::now();
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, None),
+            Utc::today() - Duration::days(14)
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)),
+            Utc::today() - Duration::days(7)
+        );
+    }
+
+    #[test]
+    fn test_calc_due_in_days() {
+        // without custom days
+        let booking_date = Utc::now();
+        let start_date = Utc::now() + Duration::days(28);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("")).unwrap(),
+            14
+        );
+
+        let booking_date = Utc::now();
+        let start_date = Utc::now() + Duration::days(14);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("")).unwrap(),
+            1
+        );
+
+        let booking_date = Utc::now() - Duration::days(4);
+        let start_date = Utc::now() + Duration::days(7);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday}}")).unwrap(),
+            -3
+        );
+
+        // with custom days
+        let booking_date = Utc::now();
+        let start_date = Utc::now() + Duration::days(7);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday 7}}")).unwrap(),
+            1
+        );
+        let booking_date = Utc::now() - Duration::days(31);
+        let start_date = Utc::now() + Duration::days(7);
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday 1}}")).unwrap(),
+            6
+        );
+        assert_eq!(
+            calc_due_in_days(booking_date, start_date, String::from("{{payday 14}}")).unwrap(),
+            -7
+        );
     }
 }

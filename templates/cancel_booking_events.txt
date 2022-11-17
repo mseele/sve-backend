@@ -1,0 +1,8 @@
+Hallo {{firstname}},
+
+wir haben dein gebuchtes Event "{{name}}" storniert.
+
+Wir wünschen Dir noch einen schönen Tag und hoffen das in unserem vielfältigen Angebot vielleicht mal wieder etwas für Dich dabei ist.
+
+Herzliche Grüße
+Team Events@SVE

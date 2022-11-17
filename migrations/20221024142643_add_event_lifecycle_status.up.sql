@@ -1,0 +1,1 @@
+-- Dropping a enum type is not supported right now

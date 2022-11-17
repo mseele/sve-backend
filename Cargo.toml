@@ -33,24 +33,28 @@ base64 = "0.13"
 base64-serde = "0.6"
 chrono = { version = "0.4", features = ["serde", "unstable-locales"] }
 chrono-tz = { version = "0.6" }
-googapis = { version = "0.6", features = ["google-firestore-v1"] }
-gouth = { version = "0.2" }
-tonic = { version = "0.6", features = ["tls"] }
-google-sheets4 = "3.1"
 google-calendar3 = "3.1"
 yup-oauth2 = "6.6"
 hyper = "0.14"
 hyper-rustls = "0.23"
 lettre = { version = "0.10.0-rc.6", features = ["tokio1-native-tls"] }
 regex = "1.5"
+lazy_static = "1.4.0"
 csv = "1.1"
 encoding = "0.2"
+bigdecimal = { version = "0.3", features = ["serde"] }
 sqlx = { version = "0.6", features = [
   "postgres",
   "runtime-tokio-rustls",
   "chrono",
+  "bigdecimal",
   "offline",
 ] }
+itertools = "0.10"
+harsh = "0.2"
+handlebars = "4.3"
+xlsxwriter = "0.4"
+uuid = { version = "1.2", features = ["v4", "fast-rng"] }
 
 [dev-dependencies]
 pretty_assertions = "1.2"

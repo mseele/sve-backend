@@ -4,7 +4,7 @@ use lettre::{AsyncTransport, Message};
 
 const EMAIL_DATA: &str = include_str!("../secrets/email.json");
 
-pub async fn test_connection() -> Result<()> {
+pub(crate) async fn test_connection() -> Result<()> {
     let mut errors = Vec::new();
     for email_account in email_accounts()? {
         let result = email_account.mailer()?.test_connection().await;
@@ -35,11 +35,11 @@ pub async fn test_connection() -> Result<()> {
     Ok(())
 }
 
-pub async fn send_message(from: &EmailAccount, message: Message) -> Result<()> {
+pub(crate) async fn send_message(from: &EmailAccount, message: Message) -> Result<()> {
     send_messages(from, vec![message]).await
 }
 
-pub async fn send_messages(from: &EmailAccount, messages: Vec<Message>) -> Result<()> {
+pub(crate) async fn send_messages(from: &EmailAccount, messages: Vec<Message>) -> Result<()> {
     let mailer = from.mailer()?;
     for message in messages {
         mailer.send(message).await?;
@@ -47,7 +47,7 @@ pub async fn send_messages(from: &EmailAccount, messages: Vec<Message>) -> Resul
     Ok(())
 }
 
-pub fn get_account_by_address(email_address: &str) -> Result<EmailAccount> {
+pub(crate) fn get_account_by_address(email_address: &str) -> Result<EmailAccount> {
     let email_account = email_accounts()?
         .into_iter()
         .find(|account| account.address == email_address)
@@ -60,7 +60,7 @@ pub fn get_account_by_address(email_address: &str) -> Result<EmailAccount> {
     Ok(email_account)
 }
 
-pub fn get_account_by_type(email_type: EmailType) -> Result<EmailAccount> {
+pub(crate) fn get_account_by_type(email_type: EmailType) -> Result<EmailAccount> {
     let email_account = email_accounts()?
         .into_iter()
         .find(|account| account.email_type == email_type)

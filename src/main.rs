@@ -7,14 +7,32 @@ mod db;
 mod email;
 mod logic;
 mod models;
-mod sheets;
-mod store;
+mod hashids {
+    use harsh::{Error, Harsh};
+
+    fn harsh() -> Harsh {
+        return Harsh::builder()
+            .salt("#mehralseinverein")
+            .length(10)
+            .alphabet("abcdefghijklmnopqrstuvwxyz")
+            .build()
+            .unwrap();
+    }
+
+    pub(crate) fn encode(values: &[u64]) -> String {
+        harsh().encode(values)
+    }
+
+    pub(crate) fn decode<T: AsRef<str>>(input: T) -> Result<Vec<u64>, Error> {
+        harsh().decode(input)
+    }
+}
 
 use actix_cors::Cors;
 use actix_web::{dev::Service, web, App, HttpServer};
 use log::error;
 
-pub const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
+pub(crate) const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {

@@ -1,0 +1,12 @@
+Hallo {{firstname}},
+
+Du hast einen Platz in unserem SVE-Event "{{name}}” gebucht.
+Kommende Woche geht es los und wir möchten Dir letzte Infos geben:
+
+Das Event beginnt am {{start_date}} um {{start_time}} und findet hier statt:
+{{location}}.
+
+Wir freuen uns auf Deine Teilnahme und wünschen Dir viel Freude beim Event.
+
+Herzliche Grüße
+Team Fitness@SVE

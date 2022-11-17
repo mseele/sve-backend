@@ -31,7 +31,7 @@ async fn calendar_hub() -> Result<CalendarHub> {
     Ok(hub)
 }
 
-pub async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
+pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
     // now + 1 year
     let expiration =
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() + (1000 * 60 * 60 * 24 * 365);
@@ -55,7 +55,7 @@ pub async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) -> Resu
     Ok(())
 }
 
-pub async fn appointments(calendar_id: &str, max_results: i32) -> Result<Vec<Appointment>> {
+pub(crate) async fn appointments(calendar_id: &str, max_results: i32) -> Result<Vec<Appointment>> {
     let hub = calendar_hub().await?;
 
     let time_min = Utc::now().with_timezone(&Berlin).to_rfc3339();
