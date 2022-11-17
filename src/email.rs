@@ -24,7 +24,7 @@ pub(crate) async fn test_connection() -> Result<()> {
         }
     }
 
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         bail!(
             "{} errors while testing connections:\n\n{}",
             errors.len(),

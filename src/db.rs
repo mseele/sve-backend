@@ -111,7 +111,7 @@ ORDER BY
             if is_a_booked_up == is_b_booked_up {
                 return a.sort_index.cmp(&b.sort_index);
             }
-            return is_a_booked_up.cmp(&is_b_booked_up);
+            is_a_booked_up.cmp(&is_b_booked_up)
         })
     }
     events = iter.map(|(event, _)| event).collect();
@@ -132,7 +132,7 @@ pub(crate) async fn get_event(
     subscribers: bool,
 ) -> Result<Option<Event>> {
     let mut conn = pool.acquire().await?;
-    Ok(fetch_event(&mut conn, id, subscribers).await?)
+    fetch_event(&mut conn, id, subscribers).await
 }
 
 /// Fetch a single event by the given event id.
@@ -204,7 +204,7 @@ WHERE
     Ok(events)
 }
 
-async fn insert_event_dates<'a>(conn: &mut PgConnection, events: &'a mut Vec<Event>) -> Result<()> {
+async fn insert_event_dates<'a>(conn: &mut PgConnection, events: &'a mut [Event]) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
@@ -230,11 +230,11 @@ ORDER BY
     for row in query_builder.build().fetch_all(conn).await? {
         let id: i32 = row.try_get("event_id")?;
         let date: DateTime<Utc> = row.try_get("date")?;
-        result.entry(id).or_insert_with(|| Vec::new()).push(date);
+        result.entry(id).or_insert_with(Vec::new).push(date);
     }
 
     for event in events.iter_mut() {
-        if let Some(dates) = result.remove(&event.id.get_ref()) {
+        if let Some(dates) = result.remove(event.id.get_ref()) {
             event.dates = dates;
         }
     }
@@ -244,7 +244,7 @@ ORDER BY
 
 async fn insert_event_subscribers<'a>(
     conn: &mut PgConnection,
-    events: &'a mut Vec<Event>,
+    events: &'a mut [Event],
 ) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
@@ -286,7 +286,7 @@ ORDER BY
         let id: i32 = row.try_get("event_id")?;
         result
             .entry(id)
-            .or_insert_with(|| Vec::new())
+            .or_insert_with(Vec::new)
             .push(EventSubscription::new(
                 row.try_get("id")?,
                 row.try_get("created")?,
@@ -305,7 +305,7 @@ ORDER BY
     }
 
     for event in events.iter_mut() {
-        if let Some(subscribers) = result.remove(&event.id.get_ref()) {
+        if let Some(subscribers) = result.remove(event.id.get_ref()) {
             event.subscribers = Some(subscribers);
         } else {
             event.subscribers = Some(Default::default());
@@ -552,7 +552,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     )
     .map(|row| {
         Event::new(
-            row.id.into(),
+            row.id,
             row.created,
             row.closed,
             row.event_type,
@@ -872,7 +872,7 @@ pub(crate) async fn get_event_counters(
 ) -> Result<Vec<EventCounter>> {
     let mut conn = pool.acquire().await?;
 
-    Ok(fetch_event_counters(&mut conn, lifecycle_status).await?)
+    fetch_event_counters(&mut conn, lifecycle_status).await
 }
 
 pub(crate) async fn get_bookings(
@@ -968,7 +968,7 @@ WHERE
         // try_into is needed to convert the i64 into a i16
         // both unwraps can never fail
         EventCounter::new(
-            row.id.into(),
+            row.id,
             row.max_subscribers.unwrap(),
             row.max_waiting_list.unwrap(),
             row.subscribers.unwrap().try_into().unwrap(),
@@ -1226,7 +1226,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
     .execute(&mut *conn)
     .await?;
 
-    let event = fetch_event(&mut *conn, &event_id, false)
+    let event = fetch_event(&mut *conn, event_id, false)
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
     let event_counters = fetch_event_counters(&mut *conn, event.lifecycle_status).await?;
@@ -1246,7 +1246,7 @@ async fn insert_event_subscriber(
     conn: &mut PgConnection,
     booking: &EventBooking,
 ) -> Result<EventSubscriberId> {
-    if let Some(id) = get_event_subscriber_id(conn, &booking).await? {
+    if let Some(id) = get_event_subscriber_id(conn, booking).await? {
         return Ok(EventSubscriberId::Existing(id));
     }
 
@@ -1359,7 +1359,7 @@ WHERE
     .map(|row| {
         // unwrap is needed because we fetch from a view
         EventBooking::new(
-            row.event_id.unwrap().into(),
+            row.event_id.unwrap(),
             row.first_name.unwrap(),
             row.last_name.unwrap(),
             row.street.unwrap(),
@@ -1512,7 +1512,7 @@ WHERE
 /// (to avoid duplicate sending of reminder emails)
 pub(crate) async fn mark_as_payment_reminder_sent(
     pool: &PgPool,
-    booking_ids: &Vec<i32>,
+    booking_ids: &[i32],
 ) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"UPDATE
@@ -1575,7 +1575,7 @@ pub(crate) async fn get_subscriptions(pool: &PgPool) -> Result<Vec<NewsSubscript
                 if row.fitness {
                     types.push(NewsTopic::Fitness);
                 }
-                return NewsSubscription::new(row.email, types);
+                NewsSubscription::new(row.email, types)
             })
             .fetch_all(pool)
             .await?;

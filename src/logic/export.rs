@@ -85,7 +85,7 @@ fn export(
     fs::remove_file(&uuid)?;
 
     // create a filename and return it with the bytes
-    let filename = format!("{}.xlsx", event.name.replace(" ", "_").to_lowercase());
+    let filename = format!("{}.xlsx", event.name.replace(' ', "_").to_lowercase());
 
     Ok((filename, bytes))
 }
@@ -102,21 +102,21 @@ fn create_sheet(
     let mut width_map: HashMap<u16, usize> = HashMap::new();
 
     let mut sheet = workbook.add_worksheet(Some(&format!("{name} ({})", subscribers.len())))?;
-    create_headers(&mut sheet, &bold_fmt, &mut width_map);
+    create_headers(&mut sheet, bold_fmt, &mut width_map);
 
     for (i, value) in subscribers.into_iter().enumerate() {
         add_row(
             i as u32,
-            &event,
+            event,
             &value,
             &mut sheet,
-            &date_fmt,
+            date_fmt,
             &mut width_map,
         );
     }
 
     width_map.iter().for_each(|(k, v)| {
-        let _ = sheet.set_column(*k as u16, *k as u16, *v as f64 * 1.2, Some(&fmt));
+        let _ = sheet.set_column(*k as u16, *k as u16, *v as f64 * 1.2, Some(fmt));
     });
 
     Ok(())
@@ -180,7 +180,7 @@ fn add_opt_string_column(
     width_map: &mut HashMap<u16, usize>,
 ) {
     if let Some(data) = data {
-        add_string_column(row, column, &data, sheet, width_map);
+        add_string_column(row, column, data, sheet, width_map);
     }
 }
 
@@ -189,10 +189,10 @@ fn add_string_column(
     column: u16,
     data: &str,
     sheet: &mut Worksheet,
-    mut width_map: &mut HashMap<u16, usize>,
+    width_map: &mut HashMap<u16, usize>,
 ) {
     let _ = sheet.write_string(row + 1, column, data, None);
-    set_new_max_width(column, data.len(), &mut width_map);
+    set_new_max_width(column, data.len(), width_map);
 }
 
 fn add_date_column(
@@ -200,7 +200,7 @@ fn add_date_column(
     column: u16,
     date: &DateTime<Utc>,
     sheet: &mut Worksheet,
-    mut width_map: &mut HashMap<u16, usize>,
+    width_map: &mut HashMap<u16, usize>,
     date_fmt: &Format,
 ) {
     let d = xlsxwriter::DateTime::new(
@@ -213,13 +213,13 @@ fn add_date_column(
     );
 
     let _ = sheet.write_datetime(row + 1, column, &d, Some(date_fmt));
-    set_new_max_width(column, 26, &mut width_map);
+    set_new_max_width(column, 26, width_map);
 }
 
 fn create_headers(
     sheet: &mut Worksheet,
     bold_fmt: &Format,
-    mut width_map: &mut HashMap<u16, usize>,
+    width_map: &mut HashMap<u16, usize>,
 ) {
     let _ = sheet.write_string(0, 0, "Id", Some(bold_fmt));
     let _ = sheet.write_string(0, 1, "Buchungsdatum", Some(bold_fmt));
@@ -235,19 +235,19 @@ fn create_headers(
     let _ = sheet.write_string(0, 11, "Bezahlt", Some(bold_fmt));
     let _ = sheet.write_string(0, 12, "Kommentar", Some(bold_fmt));
 
-    set_new_max_width(0, "Id".len(), &mut width_map);
-    set_new_max_width(1, "Buchungsdatum".len(), &mut width_map);
-    set_new_max_width(2, "Vorname".len(), &mut width_map);
-    set_new_max_width(3, "Nachname".len(), &mut width_map);
-    set_new_max_width(4, "Straße & Nr".len(), &mut width_map);
-    set_new_max_width(5, "PLZ & Ort".len(), &mut width_map);
-    set_new_max_width(6, "Email".len(), &mut width_map);
-    set_new_max_width(7, "Telefon".len(), &mut width_map);
-    set_new_max_width(8, "Mitglied".len(), &mut width_map);
-    set_new_max_width(9, "Betrag".len(), &mut width_map);
-    set_new_max_width(10, "Buchungsnr".len(), &mut width_map);
-    set_new_max_width(11, "Bezahlt".len(), &mut width_map);
-    set_new_max_width(12, "Kommentar".len(), &mut width_map);
+    set_new_max_width(0, "Id".len(), width_map);
+    set_new_max_width(1, "Buchungsdatum".len(), width_map);
+    set_new_max_width(2, "Vorname".len(), width_map);
+    set_new_max_width(3, "Nachname".len(), width_map);
+    set_new_max_width(4, "Straße & Nr".len(), width_map);
+    set_new_max_width(5, "PLZ & Ort".len(), width_map);
+    set_new_max_width(6, "Email".len(), width_map);
+    set_new_max_width(7, "Telefon".len(), width_map);
+    set_new_max_width(8, "Mitglied".len(), width_map);
+    set_new_max_width(9, "Betrag".len(), width_map);
+    set_new_max_width(10, "Buchungsnr".len(), width_map);
+    set_new_max_width(11, "Bezahlt".len(), width_map);
+    set_new_max_width(12, "Kommentar".len(), width_map);
 }
 
 fn set_new_max_width(col: u16, new: usize, width_map: &mut HashMap<u16, usize>) {

@@ -39,17 +39,21 @@ pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) 
     let hub = calendar_hub().await?;
 
     // stop the current watch
-    let mut request = Channel::default();
-    request.id = Some(id.into());
-    request.resource_id = Some(resource_id.into());
+    let request = Channel {
+        id: Some(id.into()),
+        resource_id: Some(resource_id.into()),
+        ..Default::default()
+    };
     hub.channels().stop(request).doit().await?;
 
     // add a new watch
-    let mut request = Channel::default();
-    request.id = Some(id.into());
-    request.type_ = Some("web_hook".into());
-    request.address = Some("https://sve-backend.appspot.com/api/calendar/notifications".into());
-    request.expiration = Some(format!("{}", expiration));
+    let request = Channel {
+        id: Some(id.into()),
+        type_: Some("web_hook".into()),
+        address: Some("https://sve-backend.appspot.com/api/calendar/notifications".into()),
+        expiration: Some(format!("{}", expiration)),
+        ..Default::default()
+    };
     hub.events().watch(request, calendar_id).doit().await?;
 
     Ok(())
@@ -78,7 +82,7 @@ pub(crate) async fn appointments(calendar_id: &str, max_results: i32) -> Result<
                 let sort_index = index
                     .try_into()
                     .with_context(|| format!("Error converting index {} into sort index", index))?;
-                Ok(into_appointment(event, sort_index)?)
+                into_appointment(event, sort_index)
             })
             .collect::<Result<Vec<_>>>()?,
         None => vec![],
@@ -107,7 +111,7 @@ fn into_date(date: &Option<EventDateTime>, days_to_add: i8) -> Result<Option<Nai
     let option = match date {
         Some(value) => match &value.date {
             Some(s) => {
-                let result = NaiveDate::parse_from_str(&s, "%Y-%m-%d")?;
+                let result = NaiveDate::parse_from_str(s, "%Y-%m-%d")?;
                 result.checked_add_signed(Duration::days(days_to_add.into()))
             }
             None => None,

@@ -58,8 +58,8 @@ impl PaymentRecord {
 }
 
 trait CSVReader {
-    fn is_valid_reader(self: &Self, csv: &str) -> bool;
-    fn read(self: &Self, csv: &str) -> Result<Vec<PaymentRecord>>;
+    fn is_valid_reader(&self, csv: &str) -> bool;
+    fn read(&self, csv: &str) -> Result<Vec<PaymentRecord>>;
 }
 
 // impl for voba csv file with header and footer
@@ -110,7 +110,7 @@ impl From<VobaRichPaymentRecord> for PaymentRecord {
             record.payee,
             record.payee_iban,
             record.purpose,
-            volumne.to_owned(),
+            volumne,
         )
     }
 }
@@ -130,11 +130,11 @@ impl VobaRichPaymentRecord {
 }
 
 impl CSVReader for VobaRichCSVReader {
-    fn is_valid_reader(self: &Self, csv: &str) -> bool {
+    fn is_valid_reader(&self, csv: &str) -> bool {
         VobaRichPaymentRecord::find_start(csv).is_some()
     }
 
-    fn read(self: &Self, csv: &str) -> Result<Vec<PaymentRecord>> {
+    fn read(&self, csv: &str) -> Result<Vec<PaymentRecord>> {
         let csv_records_suffix = ";;;;;;;;;;;;;";
         let start = VobaRichPaymentRecord::find_start(csv)
             .ok_or_else(|| anyhow!("Title row in csv did not match:\n\n{}", csv))?;
@@ -218,11 +218,11 @@ impl From<VobaClassicPaymentRecord> for PaymentRecord {
 }
 
 impl CSVReader for VobaClassicCSVReader {
-    fn is_valid_reader(self: &Self, csv: &str) -> bool {
+    fn is_valid_reader(&self, csv: &str) -> bool {
         csv.starts_with("Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Kategorie;Steuerrelevant;Glaeubiger ID;Mandatsreferenz")
     }
 
-    fn read(self: &Self, csv: &str) -> Result<Vec<PaymentRecord>> {
+    fn read(&self, csv: &str) -> Result<Vec<PaymentRecord>> {
         let mut reader = csv::ReaderBuilder::new()
             .delimiter(b';')
             .from_reader(csv.as_bytes());

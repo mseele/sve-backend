@@ -12,7 +12,7 @@ const WATCH_ID: &str = "01234567-89ab-cdef-0123456789ab";
 const WATCH_RESOURCE_ID: &str = "9-xc9GFSc2LvPpsJiw8HveIDA3c";
 
 pub(crate) async fn appointments() -> Result<Vec<Appointment>> {
-    Ok(calendar::appointments(GENERAL_ID, 100).await?)
+    calendar::appointments(GENERAL_ID, 100).await
 }
 
 pub(crate) async fn notifications(channel_id: &str) -> Result<()> {
@@ -43,5 +43,5 @@ pub(crate) async fn notifications(channel_id: &str) -> Result<()> {
 }
 
 pub(crate) async fn renew_watch() -> Result<()> {
-    Ok(calendar::renew_watch(GENERAL_ID, WATCH_ID, WATCH_RESOURCE_ID).await?)
+    calendar::renew_watch(GENERAL_ID, WATCH_ID, WATCH_RESOURCE_ID).await
 }

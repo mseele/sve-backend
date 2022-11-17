@@ -37,8 +37,8 @@ impl<'a> BookingTemplateData<'a> {
             name: event.name.trim(),
             location: event.location.trim(),
             price: booking.cost(event).to_euro(),
-            dates: format_dates(&event),
-            payment_details: format_payment_details(&event, &payment_id),
+            dates: format_dates(event),
+            payment_details: format_payment_details(event, &payment_id),
             payment_id,
             link: prebooking_link,
             direct_booking,
@@ -53,8 +53,8 @@ impl<'a> BookingTemplateData<'a> {
             name: event.name.trim(),
             location: event.location.trim(),
             price: booking.cost.to_euro(),
-            dates: format_dates(&event),
-            payment_details: format_payment_details(&event, &payment_id),
+            dates: format_dates(event),
+            payment_details: format_payment_details(event, &payment_id),
             payment_id,
             link: None,
             direct_booking: None,
@@ -147,7 +147,7 @@ impl HelperDef for PaydayHelper<'_> {
                     param
                         .value()
                         .as_i64()
-                        .ok_or(RenderError::new("payday extension is no integer"))?,
+                        .ok_or_else(|| RenderError::new("payday extension is no integer"))?,
                 ),
                 None => None,
             };
@@ -169,7 +169,7 @@ pub(crate) fn render_booking<'a>(
     prebooking_link: Option<String>,
     direct_booking: Option<bool>,
 ) -> Result<String> {
-    Ok(render(
+    render(
         template,
         BookingTemplateData::from_booking(
             booking,
@@ -179,7 +179,7 @@ pub(crate) fn render_booking<'a>(
             direct_booking,
         ),
         Some(PaydayHelper::new(event)),
-    )?)
+    )
 }
 
 pub(crate) fn render_event_reminder<'a>(
@@ -187,11 +187,11 @@ pub(crate) fn render_event_reminder<'a>(
     event: &'a Event,
     subscription: &'a EventSubscription,
 ) -> Result<String> {
-    Ok(render(
+    render(
         template,
         ReminderTemplateData::new(event, subscription)?,
         None,
-    )?)
+    )
 }
 
 pub(crate) fn render_payment_reminder<'a>(
@@ -199,11 +199,11 @@ pub(crate) fn render_payment_reminder<'a>(
     event: &'a Event,
     booking: &'a UnpaidEventBooking,
 ) -> Result<String> {
-    Ok(render(
+    render(
         template,
         BookingTemplateData::from_unpaid_booking(booking, event),
         None,
-    )?)
+    )
 }
 
 fn render<D>(template: &str, data: D, payday_helper: Option<PaydayHelper>) -> Result<String>

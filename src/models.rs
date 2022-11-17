@@ -70,7 +70,7 @@ impl<'de> Deserialize<'de> for EventId {
         let value = String::deserialize(deserializer)?;
         let ids = hashids::decode(value).map_err(serde::de::Error::custom)?;
         let id = i32::try_from(ids[0]).map_err(serde::de::Error::custom)?;
-        return Ok(EventId(id));
+        Ok(EventId(id))
     }
 }
 
@@ -112,6 +112,7 @@ pub(crate) struct Event {
 }
 
 impl Event {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         id: i32,
         created: DateTime<Utc>,
@@ -167,7 +168,7 @@ impl Event {
         }
     }
 
-    pub(crate) fn cost<'a>(&'a self, is_member: bool) -> &BigDecimal {
+    pub(crate) fn cost(&self, is_member: bool) -> &BigDecimal {
         match is_member {
             true => &self.cost_member,
             false => &self.cost_non_member,
@@ -348,6 +349,7 @@ pub(crate) struct EventBooking {
 }
 
 impl EventBooking {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         event_id: i32,
         first_name: String,
@@ -413,8 +415,7 @@ impl EventCounter {
         if self.max_subscribers == -1 {
             return false;
         }
-        return self.subscribers >= self.max_subscribers
-            && self.waiting_list >= self.max_waiting_list;
+        self.subscribers >= self.max_subscribers && self.waiting_list >= self.max_waiting_list
     }
 }
 
@@ -461,6 +462,7 @@ pub(crate) struct EventSubscription {
 }
 
 impl EventSubscription {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         id: i32,
         created: DateTime<Utc>,
@@ -526,7 +528,7 @@ pub(crate) enum NewsTopic {
 }
 
 impl NewsTopic {
-    pub(crate) fn display_name(self: &Self) -> &str {
+    pub(crate) fn display_name(&self) -> &str {
         match self {
             NewsTopic::General => "Allgemein",
             NewsTopic::Events => "Events",
@@ -582,6 +584,7 @@ pub(crate) struct Appointment {
 }
 
 impl Appointment {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         id: Option<String>,
         sort_index: u32,
@@ -751,6 +754,7 @@ pub(crate) struct VerifyPaymentBookingRecord {
 }
 
 impl VerifyPaymentBookingRecord {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         booking_id: i32,
         event_name: String,
@@ -801,6 +805,7 @@ pub(crate) struct UnpaidEventBooking {
 }
 
 impl UnpaidEventBooking {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         event_id: EventId,
         event_name: String,
@@ -837,35 +842,35 @@ pub(crate) trait ToEuro {
 }
 
 pub(crate) trait FromEuro {
-    fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError>;
-    fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError>;
+    fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError>;
+    fn from_euro_with_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError>;
 }
 
 impl ToEuro for BigDecimal {
     fn to_euro_without_symbol(&self) -> String {
         let formatted = format!("{:.2}", self);
-        formatted.replace(".", ",")
+        formatted.replace('.', ",")
     }
 }
 
 impl FromEuro for String {
-    fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
-        BigDecimal::from_str(&self.replace(".", "").replace(",", "."))
+    fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
+        BigDecimal::from_str(&self.replace('.', "").replace(',', "."))
     }
 
-    fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
-        self.trim_end_matches("€")
+    fn from_euro_with_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
+        self.trim_end_matches('€')
             .trim_end_matches(char::is_whitespace)
             .from_euro_without_symbol()
     }
 }
 
 impl FromEuro for &str {
-    fn from_euro_without_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
+    fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
         self.to_string().from_euro_without_symbol()
     }
-    fn from_euro_with_symbol(self) -> Result<BigDecimal, ParseBigDecimalError> {
-        self.trim_end_matches("€")
+    fn from_euro_with_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
+        self.trim_end_matches('€')
             .trim_end_matches(char::is_whitespace)
             .from_euro_without_symbol()
     }

@@ -11,12 +11,12 @@ mod hashids {
     use harsh::{Error, Harsh};
 
     fn harsh() -> Harsh {
-        return Harsh::builder()
+        Harsh::builder()
             .salt("#mehralseinverein")
             .length(10)
             .alphabet("abcdefghijklmnopqrstuvwxyz")
             .build()
-            .unwrap();
+            .unwrap()
     }
 
     pub(crate) fn encode(values: &[u64]) -> String {

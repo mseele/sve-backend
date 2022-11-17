@@ -148,7 +148,7 @@ where
             E: de::Error,
         {
             let mut list = Vec::new();
-            for status in v.split(",") {
+            for status in v.split(',') {
                 list.push(LifecycleStatus::from_str(status).map_err(E::custom)?);
             }
             Ok(match list.len() {

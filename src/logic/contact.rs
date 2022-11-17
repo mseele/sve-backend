@@ -20,7 +20,7 @@ pub(crate) async fn message(contact_message: ContactMessage) -> Result<()> {
         email
     );
     if let Some(phone) = contact_message.phone {
-        if phone.trim().len() > 0 {
+        if !phone.trim().is_empty() {
             body.push_str(&format!("Telefon: {}\n", phone.trim()))
         }
     }
@@ -52,7 +52,7 @@ pub(crate) async fn emails(emails: Vec<Email>) -> Result<()> {
         let email_type = email.message_type.into();
         grouped_emails
             .entry(email_type)
-            .or_insert_with(|| Vec::new())
+            .or_insert_with(Vec::new)
             .push(email);
     }
     for (email_type, emails) in grouped_emails {
