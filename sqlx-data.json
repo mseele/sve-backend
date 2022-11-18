@@ -348,24 +348,6 @@
     },
     "query": "\nSELECT\n    e.id AS event_id,\n    e.name AS event_name,\n    ed.date as first_event_date,\n    e.booking_template as event_template,\n    b.id,\n    b.created,\n    s.first_name,\n    s.last_name,\n    s.email,\n    CASE WHEN s.member IS TRUE\n        THEN e.cost_member\n        ELSE e.cost_non_member\n    END as cost,\n    b.payment_id,\n    b.payment_reminder_sent\nFROM\n    events e\n    LEFT JOIN (\n        SELECT\n            ied.event_id,\n            MIN(ied.date) as date\n        FROM\n            event_dates ied\n        GROUP BY\n            ied.event_id) ed ON\n        e.id = ed.event_id,\n    event_bookings b,\n    event_subscribers s\nWHERE\n    e.event_type = $1\n    AND e.id = b.event_id\n    AND b.subscriber_id = s.id\n    AND b.enrolled IS TRUE\n    AND b.canceled IS NULL\n    AND b.payed IS NULL\n\tAND e.lifecycle_status IN('Review', 'Published', 'Running')\nORDER BY\n    e.name,\n    b.created"
   },
-  "6a23e3fde55c8286df3a431723f5c5123c3850dc4e0a3371f2b3a9e463ce973e": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "\nSELECT\n\te.id\nFROM\n\tevents e\nINNER JOIN (\n\tSELECT\n\t\tied.event_id,\n\t\tMIN(ied.date) as date\n\tFROM\n\t\tevent_dates ied\n\tGROUP BY\n\t\tied.event_id) ed ON\n\te.id = ed.event_id\nWHERE\n\te.reminder_sent IS NULL\n\tAND e.lifecycle_status IN('Review', 'Running')\n\tAND ed.date >= (CURRENT_DATE + INTERVAL '1' DAY)\n\tAND ed.date <= (CURRENT_DATE + INTERVAL '6' DAY)\n\tAND EXISTS (\n\tSELECT\n\t\t*\n\tFROM\n\t\tevent_bookings eb\n\tWHERE\n\t\te.id = eb.event_id\n\t\tAND eb.enrolled IS TRUE\n\t\tAND eb.canceled IS NULL)"
-  },
   "6a879d2036b5885360d3b0e137afdba8677d4eee7d28a8d9d13ff097014812a2": {
     "describe": {
       "columns": [],
@@ -634,6 +616,24 @@
       }
     },
     "query": "\nSELECT\n    v.id,\n    v.max_subscribers,\n    v.max_waiting_list,\n    v.subscribers,\n    v.waiting_list\nFROM\n    v_event_counters v\nWHERE\n    v.id = $1"
+  },
+  "98068ef4be53c481a34f4c53854b00800ccefd27b49f25c59a832d1fa5459d5b": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\nSELECT\n\te.id\nFROM\n\tevents e\nINNER JOIN (\n\tSELECT\n\t\tied.event_id,\n\t\tMIN(ied.date) as date\n\tFROM\n\t\tevent_dates ied\n\tGROUP BY\n\t\tied.event_id) ed ON\n\te.id = ed.event_id\nWHERE\n\te.reminder_sent IS NULL\n\tAND e.lifecycle_status IN('Review', 'Published', 'Running')\n\tAND ed.date >= (CURRENT_DATE + INTERVAL '1' DAY)\n\tAND ed.date <= (CURRENT_DATE + INTERVAL '6' DAY)\n\tAND EXISTS (\n\tSELECT\n\t\t*\n\tFROM\n\t\tevent_bookings eb\n\tWHERE\n\t\te.id = eb.event_id\n\t\tAND eb.enrolled IS TRUE\n\t\tAND eb.canceled IS NULL)"
   },
   "a63500c1b6d38506b36953d5a795204879d007b90d8e36d920a781ac68daffa8": {
     "describe": {

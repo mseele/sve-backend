@@ -1467,7 +1467,7 @@ INNER JOIN (
 	e.id = ed.event_id
 WHERE
 	e.reminder_sent IS NULL
-	AND e.lifecycle_status IN('Review', 'Running')
+	AND e.lifecycle_status IN('Review', 'Published', 'Running')
 	AND ed.date >= (CURRENT_DATE + INTERVAL '1' DAY)
 	AND ed.date <= (CURRENT_DATE + INTERVAL '6' DAY)
 	AND EXISTS (
