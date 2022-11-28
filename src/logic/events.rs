@@ -617,7 +617,7 @@ async fn send_booking_mail(
         opt_payment_id = None;
     }
 
-    let mut body = template::render_booking(template, booking, event, opt_payment_id, None, None)?;
+    let mut body = template::render_booking(template, booking, event, opt_payment_id, None, Some(true))?;
 
     if booking.updates.unwrap_or(false) {
         body.push_str(
