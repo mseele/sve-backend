@@ -318,10 +318,10 @@ ORDER BY
 pub(crate) async fn write_event(
     pool: &PgPool,
     partial_event: PartialEvent,
-) -> Result<(Event, bool)> {
+) -> Result<(Event, Option<Vec<DateTime<Utc>>>)> {
     match partial_event.id {
         Some(id) => update_event(pool, &id, partial_event).await,
-        None => Ok((save_new_event(pool, partial_event).await?, false)),
+        None => Ok((save_new_event(pool, partial_event).await?, None)),
     }
 }
 
@@ -329,7 +329,7 @@ async fn update_event(
     pool: &PgPool,
     id: &EventId,
     partial_event: PartialEvent,
-) -> Result<(Event, bool)> {
+) -> Result<(Event, Option<Vec<DateTime<Utc>>>)> {
     let mut tx = pool.begin().await?;
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("UPDATE events SET ");
@@ -418,14 +418,19 @@ async fn update_event(
         query_builder.build().execute(&mut tx).await?;
     }
 
-    let mut event_schedule_change = false;
+    let mut removed_dates = None;
 
     if let Some(new_dates) = partial_event.dates {
         let current_dates = get_event_dates(&mut tx, id).await?;
         if current_dates != new_dates {
+            removed_dates = Some(
+                current_dates
+                    .into_iter()
+                    .filter(|date| !new_dates.contains(&date))
+                    .collect::<Vec<_>>(),
+            );
             delete_event_dates(&mut tx, id).await?;
             save_event_dates(&mut tx, id, new_dates).await?;
-            event_schedule_change = true;
         }
     }
 
@@ -435,7 +440,7 @@ async fn update_event(
 
     tx.commit().await?;
 
-    Ok((event, event_schedule_change))
+    Ok((event, removed_dates))
 }
 
 fn push_bind<'gb, 'args, T>(

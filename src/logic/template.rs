@@ -37,7 +37,7 @@ impl<'a> BookingTemplateData<'a> {
             name: event.name.trim(),
             location: event.location.trim(),
             price: booking.cost(event).to_euro(),
-            dates: format_dates(event),
+            dates: format_dates(&event.dates),
             payment_details: format_payment_details(event, &payment_id),
             payment_id,
             link: prebooking_link,
@@ -53,7 +53,7 @@ impl<'a> BookingTemplateData<'a> {
             name: event.name.trim(),
             location: event.location.trim(),
             price: booking.cost.to_euro(),
-            dates: format_dates(event),
+            dates: format_dates(&event.dates),
             payment_details: format_payment_details(event, &payment_id),
             payment_id,
             link: None,
@@ -62,26 +62,22 @@ impl<'a> BookingTemplateData<'a> {
     }
 }
 
-fn format_dates(event: &Event) -> String {
-    event
-        .dates
-        .iter()
-        .map(|d| {
-            d.format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
-                .to_string()
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+#[derive(Serialize)]
+struct ScheduleChangeTemplateData<'a> {
+    firstname: &'a str,
+    name: &'a str,
+    removed_dates: String,
+    new_dates: String,
 }
 
-fn format_payment_details(event: &Event, payment_id: &Option<String>) -> Option<String> {
-    match (&event.payment_account, payment_id) {
-        (Some(payment_account), Some(payment_id)) => Some(format!(
-            r#"{}
-Verwendungszweck: {}"#,
-            payment_account, payment_id,
-        )),
-        _ => None,
+impl<'a> ScheduleChangeTemplateData<'a> {
+    fn new(booking: &'a EventBooking, event: &'a Event, removed_dates: &Vec<DateTime<Utc>>) -> Self {
+       Self {
+            firstname: booking.first_name.trim(),
+            name: event.name.trim(),
+            removed_dates: format_dates(removed_dates),
+            new_dates: format_dates(&event.dates),
+        }
     }
 }
 
@@ -161,6 +157,28 @@ impl HelperDef for PaydayHelper<'_> {
     }
 }
 
+fn format_dates(dates: &[DateTime<Utc>]) -> String {
+    dates
+        .iter()
+        .map(|d| {
+            d.format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn format_payment_details(event: &Event, payment_id: &Option<String>) -> Option<String> {
+    match (&event.payment_account, payment_id) {
+        (Some(payment_account), Some(payment_id)) => Some(format!(
+            r#"{}
+Verwendungszweck: {}"#,
+            payment_account, payment_id,
+        )),
+        _ => None,
+    }
+}
+
 pub(crate) fn render_booking<'a>(
     template: &str,
     booking: &'a EventBooking,
@@ -202,6 +220,19 @@ pub(crate) fn render_payment_reminder<'a>(
     render(
         template,
         BookingTemplateData::from_unpaid_booking(booking, event),
+        None,
+    )
+}
+
+pub(crate) fn render_schedule_change<'a>(
+    template: &str,
+    booking: &'a EventBooking,
+    event: &'a Event,
+    removed_dates: &Vec<DateTime<Utc>>,
+) -> Result<String> {
+    render(
+        template,
+        ScheduleChangeTemplateData::new(booking, event, removed_dates),
         None,
     )
 }

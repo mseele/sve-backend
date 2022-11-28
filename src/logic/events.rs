@@ -69,28 +69,44 @@ pub(crate) async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
 }
 
 pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
-    let (event, event_schedule_change) = db::write_event(pool, partial_event).await?;
-    if event_schedule_change
-        && matches!(
+    let (event, removed_dates) = db::write_event(pool, partial_event).await?;
+    if let Some(removed_dates) = removed_dates {
+        if matches!(
             event.lifecycle_status,
             LifecycleStatus::Review | LifecycleStatus::Published | LifecycleStatus::Running
-        )
-    {
-        let subject = format!("{} Terminänderung {}", event.subject_prefix(), event.name);
-        let body = match event.event_type {
-            EventType::Fitness => include_str!("../../templates/schedule_change_fitness.txt"),
-            EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
-        };
-        process_event_email(
-            pool,
-            event.clone(),
-            Some(true),
-            subject,
-            body.into(),
-            None,
-            None,
-        )
-        .await?;
+        ) {
+            let bookings = db::get_bookings(pool, &event.id, Some(true)).await?;
+            if bookings.is_empty() {
+                return Ok(event);
+            }
+
+            let subject = format!("{} Terminänderung {}", event.subject_prefix(), event.name);
+            let template = match event.event_type {
+                EventType::Fitness => include_str!("../../templates/schedule_change_fitness.txt"),
+                EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
+            };
+
+            let email_account = email::get_account_by_type(event.event_type.into())?;
+            let message_type: MessageType = event.event_type.into();
+            let mut messages = Vec::new();
+
+            for (booking, _, _) in bookings {
+                let body = template::render_schedule_change(template, &booking, &event, &removed_dates)?;
+
+                messages.push(
+                    Email::new(
+                        message_type,
+                        booking.email,
+                        subject.clone(),
+                        body,
+                        None,
+                    )
+                    .into_message(&email_account)?,
+                );
+            }
+
+            email::send_messages(&email_account, messages).await?;
+        }
     }
     Ok(event)
 }
@@ -617,7 +633,8 @@ async fn send_booking_mail(
         opt_payment_id = None;
     }
 
-    let mut body = template::render_booking(template, booking, event, opt_payment_id, None, Some(true))?;
+    let mut body =
+        template::render_booking(template, booking, event, opt_payment_id, None, Some(true))?;
 
     if booking.updates.unwrap_or(false) {
         body.push_str(

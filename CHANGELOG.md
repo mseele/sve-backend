@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+### Refactor
+
+- Display removed dates in the schedule changed email
+
 ## [2.0.2] - 2022-11-22
 
 ### Bug Fixes

@@ -2,8 +2,11 @@ Hallo {{firstname}},
 
 bei deinem gebuchten Kurs "{{name}}" gibt es eine Terminänderung.
 
+Die folgenden Kurstermine entfallen:
+{{removed_dates}}
+
 Die neuen Kurstermine sind:
-{{dates}}
+{{new_dates}}
 
 Wir wünschen Dir weiterhin viel Spaß beim Kurs.
 
