@@ -1,4 +1,4 @@
-Hallo {{firstname},
+Hallo {{firstname}},
 
 bei deinem gebuchten Event "{{name}}" gibt es eine Terminänderung.
 
