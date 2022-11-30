@@ -610,7 +610,7 @@ impl Appointment {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub(crate) struct EmailAccount {
     #[serde(rename = "type")]
     pub(crate) email_type: EmailType,
