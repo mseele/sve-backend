@@ -100,8 +100,8 @@ pub(crate) struct Event {
     pub(crate) duration_in_minutes: i16,
     pub(crate) max_subscribers: i16,
     pub(crate) max_waiting_list: i16,
-    pub(crate) cost_member: BigDecimal,
-    pub(crate) cost_non_member: BigDecimal,
+    pub(crate) price_member: BigDecimal,
+    pub(crate) price_non_member: BigDecimal,
     pub(crate) location: String,
     pub(crate) booking_template: String,
     pub(crate) payment_account: Option<String>,
@@ -130,8 +130,8 @@ impl Event {
         duration_in_minutes: i16,
         max_subscribers: i16,
         max_waiting_list: i16,
-        cost_member: BigDecimal,
-        cost_non_member: BigDecimal,
+        price_member: BigDecimal,
+        price_non_member: BigDecimal,
         location: String,
         booking_template: String,
         payment_account: Option<String>,
@@ -156,8 +156,8 @@ impl Event {
             duration_in_minutes,
             max_subscribers,
             max_waiting_list,
-            cost_member: cost_member.round(2),
-            cost_non_member: cost_non_member.round(2),
+            price_member: price_member.round(2),
+            price_non_member: price_non_member.round(2),
             location,
             booking_template,
             payment_account,
@@ -168,10 +168,10 @@ impl Event {
         }
     }
 
-    pub(crate) fn cost(&self, is_member: bool) -> &BigDecimal {
+    pub(crate) fn price(&self, is_member: bool) -> &BigDecimal {
         match is_member {
-            true => &self.cost_member,
-            false => &self.cost_non_member,
+            true => &self.price_member,
+            false => &self.price_non_member,
         }
     }
 
@@ -199,8 +199,8 @@ pub(crate) struct PartialEvent {
     pub(crate) duration_in_minutes: Option<i16>,
     pub(crate) max_subscribers: Option<i16>,
     pub(crate) max_waiting_list: Option<i16>,
-    pub(crate) cost_member: Option<BigDecimal>,
-    pub(crate) cost_non_member: Option<BigDecimal>,
+    pub(crate) price_member: Option<BigDecimal>,
+    pub(crate) price_non_member: Option<BigDecimal>,
     pub(crate) location: Option<String>,
     pub(crate) booking_template: Option<String>,
     pub(crate) payment_account: Option<String>,
@@ -380,8 +380,8 @@ impl EventBooking {
         self.member.unwrap_or(false)
     }
 
-    pub(crate) fn cost<'a>(&'a self, event: &'a Event) -> &BigDecimal {
-        event.cost(self.is_member())
+    pub(crate) fn price<'a>(&'a self, event: &'a Event) -> &BigDecimal {
+        event.price(self.is_member())
     }
 }
 
@@ -746,7 +746,7 @@ pub(crate) struct VerifyPaymentBookingRecord {
     pub(crate) booking_id: i32,
     pub(crate) event_name: String,
     pub(crate) full_name: String,
-    pub(crate) cost: BigDecimal,
+    pub(crate) price: BigDecimal,
     pub(crate) payment_id: String,
     pub(crate) canceled: Option<DateTime<Utc>>,
     pub(crate) enrolled: bool,
@@ -759,7 +759,7 @@ impl VerifyPaymentBookingRecord {
         booking_id: i32,
         event_name: String,
         full_name: String,
-        cost: BigDecimal,
+        price: BigDecimal,
         payment_id: String,
         canceled: Option<DateTime<Utc>>,
         enrolled: bool,
@@ -769,7 +769,7 @@ impl VerifyPaymentBookingRecord {
             booking_id,
             event_name,
             full_name,
-            cost: cost.round(2),
+            price: price.round(2),
             payment_id,
             canceled,
             enrolled,
@@ -798,7 +798,7 @@ pub(crate) struct UnpaidEventBooking {
     pub(crate) first_name: String,
     pub(crate) last_name: String,
     pub(crate) email: String,
-    pub(crate) cost: BigDecimal,
+    pub(crate) price: BigDecimal,
     pub(crate) payment_id: String,
     pub(crate) due_in_days: Option<i64>,
     pub(crate) payment_reminder_sent: Option<DateTime<Utc>>,
@@ -813,7 +813,7 @@ impl UnpaidEventBooking {
         first_name: String,
         last_name: String,
         email: String,
-        cost: BigDecimal,
+        price: BigDecimal,
         payment_id: String,
         due_in_days: Option<i64>,
         payment_reminder_sent: Option<DateTime<Utc>>,
@@ -825,7 +825,7 @@ impl UnpaidEventBooking {
             first_name,
             last_name,
             email,
-            cost: cost.round(2),
+            price: price.round(2),
             payment_id,
             due_in_days,
             payment_reminder_sent,
@@ -883,7 +883,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_cost() {
+    fn test_price() {
         let member = EventBooking::new(
             0,
             String::from("first_name"),
@@ -910,23 +910,23 @@ mod tests {
         );
 
         let event = new_event("59.0", "69");
-        let cost = member.cost(&event);
-        assert_eq!(cost, &BigDecimal::from_i8(59).unwrap());
-        assert_eq!(cost.to_euro(), "59,00 €");
-        let cost = no_member.cost(&event);
-        assert_eq!(cost, &BigDecimal::from_i8(69).unwrap());
-        assert_eq!(cost.to_euro(), "69,00 €");
+        let price = member.price(&event);
+        assert_eq!(price, &BigDecimal::from_i8(59).unwrap());
+        assert_eq!(price.to_euro(), "59,00 €");
+        let price = no_member.price(&event);
+        assert_eq!(price, &BigDecimal::from_i8(69).unwrap());
+        assert_eq!(price.to_euro(), "69,00 €");
 
         let event = new_event("5.99", "9.99");
-        let cost = member.cost(&event);
-        assert_eq!(cost, &BigDecimal::from_str("5.99").unwrap());
-        assert_eq!(cost.to_euro(), "5,99 €");
-        let cost = no_member.cost(&event);
-        assert_eq!(cost, &BigDecimal::from_str("9.99").unwrap());
-        assert_eq!(cost.to_euro(), "9,99 €");
+        let price = member.price(&event);
+        assert_eq!(price, &BigDecimal::from_str("5.99").unwrap());
+        assert_eq!(price.to_euro(), "5,99 €");
+        let price = no_member.price(&event);
+        assert_eq!(price, &BigDecimal::from_str("9.99").unwrap());
+        assert_eq!(price.to_euro(), "9,99 €");
     }
 
-    fn new_event(cost_member: &str, cost_non_member: &str) -> Event {
+    fn new_event(price_member: &str, price_non_member: &str) -> Event {
         Event::new(
             0,
             Utc::now(),
@@ -944,8 +944,8 @@ mod tests {
             0,
             0,
             0,
-            BigDecimal::from_str(cost_member).unwrap(),
-            BigDecimal::from_str(cost_non_member).unwrap(),
+            BigDecimal::from_str(price_member).unwrap(),
+            BigDecimal::from_str(price_non_member).unwrap(),
             String::from("location"),
             String::from("booking_template"),
             None,

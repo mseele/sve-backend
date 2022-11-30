@@ -91,17 +91,12 @@ pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result
             let mut messages = Vec::new();
 
             for (booking, _, _) in bookings {
-                let body = template::render_schedule_change(template, &booking, &event, &removed_dates)?;
+                let body =
+                    template::render_schedule_change(template, &booking, &event, &removed_dates)?;
 
                 messages.push(
-                    Email::new(
-                        message_type,
-                        booking.email,
-                        subject.clone(),
-                        body,
-                        None,
-                    )
-                    .into_message(&email_account)?,
+                    Email::new(message_type, booking.email, subject.clone(), body, None)
+                        .into_message(&email_account)?,
                 );
             }
 
@@ -760,13 +755,13 @@ fn compare_payment_records_with_bookings(
             }
 
             let record_volumne = payment_record.volumne.to_euro();
-            let booking_cost = booking.cost.to_euro();
-            if !record_volumne.eq(&booking_cost) {
+            let booking_price = booking.price.to_euro();
+            if !record_volumne.eq(&booking_price) {
                 payment_bookings_with_errors
                     .entry(payment_id)
                     .or_insert_with(Vec::new)
                     .push(format!(
-                        "Betrag falsch: erwartet {booking_cost} != überwiesen {record_volumne}"
+                        "Betrag falsch: erwartet {booking_price} != überwiesen {record_volumne}"
                     ));
             }
 

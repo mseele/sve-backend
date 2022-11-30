@@ -36,7 +36,7 @@ impl<'a> BookingTemplateData<'a> {
             lastname: booking.last_name.trim(),
             name: event.name.trim(),
             location: event.location.trim(),
-            price: booking.cost(event).to_euro(),
+            price: booking.price(event).to_euro(),
             dates: format_dates(&event.dates),
             payment_details: format_payment_details(event, &payment_id),
             payment_id,
@@ -52,7 +52,7 @@ impl<'a> BookingTemplateData<'a> {
             lastname: booking.last_name.trim(),
             name: event.name.trim(),
             location: event.location.trim(),
-            price: booking.cost.to_euro(),
+            price: booking.price.to_euro(),
             dates: format_dates(&event.dates),
             payment_details: format_payment_details(event, &payment_id),
             payment_id,
@@ -71,8 +71,12 @@ struct ScheduleChangeTemplateData<'a> {
 }
 
 impl<'a> ScheduleChangeTemplateData<'a> {
-    fn new(booking: &'a EventBooking, event: &'a Event, removed_dates: &Vec<DateTime<Utc>>) -> Self {
-       Self {
+    fn new(
+        booking: &'a EventBooking,
+        event: &'a Event,
+        removed_dates: &Vec<DateTime<Utc>>,
+    ) -> Self {
+        Self {
             firstname: booking.first_name.trim(),
             name: event.name.trim(),
             removed_dates: format_dates(removed_dates),

@@ -106,7 +106,7 @@ fn create_sheet(
                 value.email,
                 opt(value.phone),
                 bool(value.member),
-                event.cost(value.member).to_euro(),
+                event.price(value.member).to_euro(),
                 value.payment_id,
                 bool(value.payed),
                 opt(value.comment)

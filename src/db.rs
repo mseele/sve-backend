@@ -46,8 +46,8 @@ SELECT
     e.duration_in_minutes,
     e.max_subscribers,
     e.max_waiting_list,
-    e.cost_member,
-    e.cost_non_member,
+    e.price_member,
+    e.price_non_member,
     e.location,
     e.booking_template,
     e.payment_account,
@@ -170,8 +170,8 @@ SELECT
     e.duration_in_minutes,
     e.max_subscribers,
     e.max_waiting_list,
-    e.cost_member,
-    e.cost_non_member,
+    e.price_member,
+    e.price_non_member,
     e.location,
     e.booking_template,
     e.payment_account,
@@ -368,11 +368,11 @@ async fn update_event(
         "MAX_WAITING_LIST",
         partial_event.max_waiting_list,
     );
-    update_is_needed |= push_bind(&mut separated, "COST_MEMBER", partial_event.cost_member);
+    update_is_needed |= push_bind(&mut separated, "PRICE_MEMBER", partial_event.price_member);
     update_is_needed |= push_bind(
         &mut separated,
-        "COST_NON_MEMBER",
-        partial_event.cost_non_member,
+        "PRICE_NON_MEMBER",
+        partial_event.price_non_member,
     );
     update_is_needed |= push_bind(&mut separated, "LOCATION", partial_event.location);
     update_is_needed |= push_bind(
@@ -505,12 +505,12 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
     let max_waiting_list = partial_event
         .max_waiting_list
         .ok_or_else(|| anyhow!("Attribute 'max_waiting_list' is missing"))?;
-    let cost_member = partial_event
-        .cost_member
-        .ok_or_else(|| anyhow!("Attribute 'cost_member' is missing"))?;
-    let cost_non_member = partial_event
-        .cost_non_member
-        .ok_or_else(|| anyhow!("Attribute 'cost_non_member' is missing"))?;
+    let price_member = partial_event
+        .price_member
+        .ok_or_else(|| anyhow!("Attribute 'price_member' is missing"))?;
+    let price_non_member = partial_event
+        .price_non_member
+        .ok_or_else(|| anyhow!("Attribute 'price_non_member' is missing"))?;
     let location = partial_event
         .location
         .ok_or_else(|| anyhow!("Attribute 'location' is missing"))?;
@@ -530,9 +530,9 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
 
     let mut new_event: Event = query!(
         r#"
-INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)
+INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, cost_member, cost_non_member, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
+RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
         closed,
         event_type as EventType,
         lifecycle_status as LifecycleStatus,
@@ -546,8 +546,8 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
         duration_in_minutes,
         max_subscribers,
         max_waiting_list,
-        cost_member,
-        cost_non_member,
+        price_member,
+        price_non_member,
         location,
         booking_template,
         payment_account,
@@ -573,8 +573,8 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
             row.duration_in_minutes,
             row.max_subscribers,
             row.max_waiting_list,
-            row.cost_member,
-            row.cost_non_member,
+            row.price_member,
+            row.price_non_member,
             row.location,
             row.booking_template,
             row.payment_account,
@@ -686,9 +686,9 @@ SELECT
     e.name AS event_name,
     CONCAT (s.first_name, ' ', s.last_name) AS full_name,
     CASE WHEN s.member IS TRUE
-        THEN e.cost_member
-        ELSE e.cost_non_member
-    END as cost,
+        THEN e.price_member
+        ELSE e.price_non_member
+    END as price,
     b.payment_id,
     b.canceled,
     b.enrolled,
@@ -718,7 +718,7 @@ ORDER BY
                 row.get("id"),
                 row.get("event_name"),
                 row.get("full_name"),
-                row.get("cost"),
+                row.get("price"),
                 row.get("payment_id"),
                 row.get("canceled"),
                 row.get("enrolled"),
@@ -755,9 +755,9 @@ SELECT
     s.last_name,
     s.email,
     CASE WHEN s.member IS TRUE
-        THEN e.cost_member
-        ELSE e.cost_non_member
-    END as cost,
+        THEN e.price_member
+        ELSE e.price_non_member
+    END as price,
     b.payment_id,
     b.payment_reminder_sent
 FROM
@@ -795,7 +795,7 @@ ORDER BY
                 row.first_name,
                 row.last_name,
                 row.email,
-                row.cost.unwrap(),
+                row.price.unwrap(),
                 row.payment_id,
                 None,
                 row.payment_reminder_sent,
@@ -1555,8 +1555,8 @@ fn map_event(row: &PgRow) -> Result<Event> {
         row.try_get("duration_in_minutes")?,
         row.try_get("max_subscribers")?,
         row.try_get("max_waiting_list")?,
-        row.try_get("cost_member")?,
-        row.try_get("cost_non_member")?,
+        row.try_get("price_member")?,
+        row.try_get("price_non_member")?,
         row.try_get("location")?,
         row.try_get("booking_template")?,
         row.try_get("payment_account")?,
