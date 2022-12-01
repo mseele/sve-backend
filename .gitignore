@@ -1,4 +1,5 @@
 /target
 /secrets
+/pgsync
 .vscode/launch.json
 .env
