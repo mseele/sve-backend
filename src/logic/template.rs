@@ -317,6 +317,7 @@ mod tests {
             0,
             BigDecimal::from_i8(5).unwrap(),
             BigDecimal::from_i8(10).unwrap(),
+            None,
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
             Some(String::from(
@@ -508,6 +509,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             0,
             BigDecimal::from_i8(5).unwrap(),
             BigDecimal::from_i8(10).unwrap(),
+            None,
             String::from("Turn- & Festhalle Eutingen"),
             String::from("booking_template"),
             None,
@@ -583,6 +585,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             0,
             BigDecimal::from_i8(0).unwrap(),
             BigDecimal::from_i8(0).unwrap(),
+            None,
             String::from("location"),
             String::from("booking_template"),
             None,

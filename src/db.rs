@@ -48,6 +48,7 @@ SELECT
     e.max_waiting_list,
     e.price_member,
     e.price_non_member,
+    e.cost_per_date,
     e.location,
     e.booking_template,
     e.payment_account,
@@ -172,6 +173,7 @@ SELECT
     e.max_waiting_list,
     e.price_member,
     e.price_non_member,
+    e.cost_per_date,
     e.location,
     e.booking_template,
     e.payment_account,
@@ -374,6 +376,7 @@ async fn update_event(
         "PRICE_NON_MEMBER",
         partial_event.price_non_member,
     );
+    update_is_needed |= push_bind(&mut separated, "COST_PER_DATE", partial_event.cost_per_date);
     update_is_needed |= push_bind(&mut separated, "LOCATION", partial_event.location);
     update_is_needed |= push_bind(
         &mut separated,
@@ -511,6 +514,7 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
     let price_non_member = partial_event
         .price_non_member
         .ok_or_else(|| anyhow!("Attribute 'price_non_member' is missing"))?;
+    let cost_per_date = partial_event.cost_per_date;
     let location = partial_event
         .location
         .ok_or_else(|| anyhow!("Attribute 'location' is missing"))?;
@@ -530,9 +534,9 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
 
     let mut new_event: Event = query!(
         r#"
-INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
+INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
         closed,
         event_type as EventType,
         lifecycle_status as LifecycleStatus,
@@ -548,6 +552,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
         max_waiting_list,
         price_member,
         price_non_member,
+        cost_per_date,
         location,
         booking_template,
         payment_account,
@@ -575,6 +580,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
             row.max_waiting_list,
             row.price_member,
             row.price_non_member,
+            row.cost_per_date,
             row.location,
             row.booking_template,
             row.payment_account,
@@ -1557,6 +1563,7 @@ fn map_event(row: &PgRow) -> Result<Event> {
         row.try_get("max_waiting_list")?,
         row.try_get("price_member")?,
         row.try_get("price_non_member")?,
+        row.try_get("cost_per_date")?,
         row.try_get("location")?,
         row.try_get("booking_template")?,
         row.try_get("payment_account")?,
