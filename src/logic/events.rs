@@ -3,9 +3,9 @@ use super::template;
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
-    BookingResponse, Email, EmailAttachment, Event, EventBooking, EventCounter, EventEmail,
-    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
-    UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
+    BookingResponse, Email, Event, EventBooking, EventCounter, EventEmail, EventId, EventType,
+    LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro, UnpaidEventBooking,
+    VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};

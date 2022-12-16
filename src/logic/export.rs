@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     db,
     models::{Event, EventId, EventSubscription, ToEuro},
