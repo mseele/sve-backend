@@ -272,16 +272,54 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", data.event_id))?;
 
-    process_event_email(
-        pool,
-        event,
-        enrolled,
-        data.subject,
-        data.body,
-        data.attachments,
-        data.prebooking_event_id,
-    )
-    .await?;
+    let bookings = db::get_bookings(pool, &event.id, enrolled).await?;
+    if bookings.is_empty() {
+        return Ok(());
+    }
+
+    let email_account = email::get_account_by_type(event.event_type.into())?;
+    let message_type: MessageType = event.event_type.into();
+    let mut messages = Vec::new();
+
+    for (booking, subscriber_id, payment_id) in bookings {
+        let prebooking_link;
+        if let Some(event_id) = data.prebooking_event_id {
+            prebooking_link = Some(create_prebooking_link(
+                event.event_type,
+                event_id,
+                subscriber_id,
+            )?);
+        } else {
+            prebooking_link = None;
+        }
+
+        let body = template::render_booking(
+            &data.body,
+            &booking,
+            &event,
+            Some(payment_id),
+            prebooking_link,
+            None,
+        )?;
+
+        let attachments = data
+            .attachments
+            .as_ref()
+            .map(|attachments| attachments.to_vec());
+
+        messages.push(
+            Email::new(
+                message_type,
+                booking.email,
+                data.subject.clone(),
+                body,
+                attachments,
+            )
+            .into_message(&email_account)?,
+        );
+    }
+
+    email::send_messages(&email_account, messages).await?;
 
     Ok(())
 }
@@ -405,64 +443,6 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
     db::mark_as_payment_reminder_sent(pool, &booking_ids).await?;
 
     Ok(booking_ids.len())
-}
-
-async fn process_event_email(
-    pool: &PgPool,
-    event: Event,
-    enrolled: Option<bool>,
-    subject: String,
-    body: String,
-    attachments: Option<Vec<EmailAttachment>>,
-    prebooking_event_id: Option<EventId>,
-) -> Result<()> {
-    let bookings = db::get_bookings(pool, &event.id, enrolled).await?;
-    if bookings.is_empty() {
-        return Ok(());
-    }
-
-    let email_account = email::get_account_by_type(event.event_type.into())?;
-    let message_type: MessageType = event.event_type.into();
-    let mut messages = Vec::new();
-
-    for (booking, subscriber_id, payment_id) in bookings {
-        let prebooking_link;
-        if let Some(event_id) = prebooking_event_id {
-            prebooking_link = Some(create_prebooking_link(
-                event.event_type,
-                event_id,
-                subscriber_id,
-            )?);
-        } else {
-            prebooking_link = None;
-        }
-
-        let body = template::render_booking(
-            &body,
-            &booking,
-            &event,
-            Some(payment_id),
-            prebooking_link,
-            None,
-        )?;
-
-        let attachments = attachments.as_ref().map(|attachments| attachments.to_vec());
-
-        messages.push(
-            Email::new(
-                message_type,
-                booking.email,
-                subject.clone(),
-                body,
-                attachments,
-            )
-            .into_message(&email_account)?,
-        );
-    }
-
-    email::send_messages(&email_account, messages).await?;
-
-    Ok(())
 }
 
 fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
