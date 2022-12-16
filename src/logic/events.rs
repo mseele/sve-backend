@@ -268,14 +268,20 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         None
     };
 
-    let event = db::get_event(pool, &data.event_id, false)
-        .await?
-        .ok_or_else(|| anyhow!("Found no event with id '{}'", data.event_id))?;
-
-    let bookings = db::get_bookings(pool, &event.id, enrolled).await?;
+    let bookings = db::get_bookings(pool, &data.event_id, enrolled).await?;
     if bookings.is_empty() {
         return Ok(());
     }
+
+    // calculate correct event id
+    let event_id = match &data.prebooking_event_id {
+        Some(event_id) => event_id,
+        None => &data.event_id,
+    };
+
+    let event = db::get_event(pool, event_id, false)
+        .await?
+        .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
 
     let email_account = email::get_account_by_type(event.event_type.into())?;
     let message_type: MessageType = event.event_type.into();
