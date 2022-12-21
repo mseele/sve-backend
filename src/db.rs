@@ -11,12 +11,19 @@ use sqlx::{
     query_builder::Separated,
     query_scalar, FromRow, PgConnection, PgPool, Postgres, QueryBuilder, Row,
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 const DATABASE_URL: &str = include_str!("../secrets/database_url.env");
 
 pub(crate) async fn init_pool() -> Result<PgPool> {
-    let pool = PgPoolOptions::new().connect(DATABASE_URL).await?;
+    let pool = PgPoolOptions::new()
+        .max_connections(3)
+        .idle_timeout(Some(Duration::from_secs(5 * 60)))
+        .connect(DATABASE_URL)
+        .await?;
     Ok(pool)
 }
 
