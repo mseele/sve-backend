@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 <!-- next-header -->
 ## [Unreleased]
 
+## [2.0.5] - 2022-12-22
+
+### Refactor
+
+- Improve database pool settings
+
 ## [2.0.4] - 2022-12-16
 
 ### Bug Fixes
@@ -636,7 +642,8 @@ All notable changes to this project will be documented in this file.
 - Configure conventional commits
 
 <!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v2.0.4...HEAD
+[Unreleased]: https://github.com/mseele/sve-backend/compare/v2.0.5...HEAD
+[2.0.5]: https://github.com/mseele/sve-backend/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/mseele/sve-backend/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/mseele/sve-backend/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/mseele/sve-backend/compare/v2.0.1...v2.0.2
