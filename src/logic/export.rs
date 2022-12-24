@@ -21,7 +21,7 @@ pub(crate) async fn event_bookings(pool: &PgPool, event_id: EventId) -> Result<(
     // separate the subscribers into bookings and waiting list
     let mut bookings = Vec::new();
     let mut waiting_list = Vec::new();
-    for subscriber in subscribers.into_iter() {
+    for subscriber in subscribers {
         if subscriber.enrolled {
             bookings.push(subscriber);
         } else {
@@ -93,7 +93,7 @@ fn create_sheet(
             "Kommentar"
         ])?;
 
-        for value in subscribers.into_iter() {
+        for value in subscribers {
             sheet_writer.append_row(row![
                 value.id.to_string(),
                 value.created.naive_utc(),
