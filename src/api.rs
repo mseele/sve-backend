@@ -88,6 +88,10 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
                 "/booking/export/{event_id}",
                 web::get().to(export_event_bookings),
             )
+            .route(
+                "/booking/participants_list/{event_id}",
+                web::get().to(export_event_participants_list),
+            )
             .route("/payments/verify", web::post().to(verify_payments))
             .route(
                 "/payments/unpaid/{event_type}",
@@ -287,6 +291,22 @@ async fn export_event_bookings(
 
     Ok(HttpResponse::Ok()
         .content_type(ContentType::octet_stream())
+        .insert_header(ContentDisposition {
+            disposition: DispositionType::Attachment,
+            parameters: vec![DispositionParam::Filename(filename)],
+        })
+        .body(bytes))
+}
+
+async fn export_event_participants_list(
+    pool: Data<PgPool>,
+    path: web::Path<EventId>,
+) -> Result<impl Responder, ResponseError> {
+    let event_id = path.into_inner();
+    let (filename, bytes) = export::event_participants_list(&pool, event_id).await?;
+
+    Ok(HttpResponse::Ok()
+        .content_type(ContentType(mime::APPLICATION_PDF))
         .insert_header(ContentDisposition {
             disposition: DispositionType::Attachment,
             parameters: vec![DispositionParam::Filename(filename)],
