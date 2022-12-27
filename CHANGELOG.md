@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [2.0.6] - 2022-12-27
 
 ### Bug Fixes
 
@@ -13,19 +13,11 @@ All notable changes to this project will be documented in this file.
 
 - Add participant list export
 
-### Miscellaneous Tasks
-
-- Bump dependencies
-
 ### Refactor
 
 - Remove unused into_iter() call
 
 ## [2.0.5] - 2022-12-22
-
-### Miscellaneous Tasks
-
-- Release 2.0.5
 
 ### Refactor
 
@@ -37,13 +29,6 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Use correct event for prebooking email
-
-### Miscellaneous Tasks
-
-- Update gitignore
-- Bump dependencies
-- Bump rust to 1.66
-- Release 2.0.4
 
 ### Refactor
 
@@ -61,20 +46,12 @@ All notable changes to this project will be documented in this file.
 
 - Add cost per date field
 
-### Miscellaneous Tasks
-
-- Release 2.0.3
-
 ### Refactor
 
 - Display removed dates in the schedule changed email
 - Rename cost to price
 
 ## [2.0.2] - 2022-11-22
-
-### Miscellaneous Tasks
-
-- Release 2.0.2
 
 ### Refactor
 
@@ -85,10 +62,6 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Add 'Published' lifecycle when fetching reminder events
-
-### Miscellaneous Tasks
-
-- Release 2.0.1
 
 ## [2.0.0] - 2022-11-17
 
@@ -135,21 +108,6 @@ All notable changes to this project will be documented in this file.
 - Integrate unpaid bookings into verify payments result
 - Add ability to send payment reminders
 - Add excel export of bookings
-
-### Miscellaneous Tasks
-
-- Bump dependencies
-- Remove todo
-- Cargo update
-- Remove not needed &
-- Add todo
-- Add todo's
-- Correct comment
-- Improve comment
-- Bump to rust 1.65
-- Bump dependencies
-- Release 2.0.0
-- Bump dependencies
 
 ### Refactor
 
@@ -201,24 +159,11 @@ All notable changes to this project will be documented in this file.
 
 - Correct typo
 
-### Miscellaneous Tasks
-
-- Bump dependencies
-- Bump to rust 1.62
-- Release
-
 ### Refactor
 
 - Only use as much workers as cpu's
 
 ## [1.3.2] - 2022-05-28
-
-### Miscellaneous Tasks
-
-- Bump rust to 1.61
-- Add db secret
-- Release
-- Bump dependencies
 
 ### Refactor
 
@@ -236,20 +181,11 @@ All notable changes to this project will be documented in this file.
 - Add db migrations for events
 - Add db migrations for news
 
-### Miscellaneous Tasks
-
-- Release
-
 ## [1.3.0] - 2022-05-04
 
 ### Features
 
 - Implement support for a second csv format
-
-### Miscellaneous Tasks
-
-- Bump dependencies
-- Release
 
 ### Refactor
 
@@ -261,10 +197,6 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Add utf-8 encoding for email content
-
-### Miscellaneous Tasks
-
-- Release
 
 ## [1.2.0] - 2022-04-22
 
@@ -410,101 +342,6 @@ All notable changes to this project will be documented in this file.
 - Generate unique booking number per booking
 - Implement verify_payments
 - Add support for csv start date
-
-### Miscellaneous Tasks
-
-- 1.4.2
-- Simplify changelog
-- Fix changelog typo
-- Bump google-auth-library-oauth2-http from 0.20.0 to 0.21.0
-- Bump google-cloud-logging-logback from 0.117.0-alpha to 0.118.0-alpha
-- Bump appengine-gradle-plugin from 2.2.0 to 2.3.0
-- Bump google-cloud-firestore from 1.34.0 to 1.35.0
-- Bump com.diffplug.eclipse.apt from 3.22.0 to 3.23.0
-- Bump com.github.johnrengelman.shadow from 5.2.0 to 6.0.0
-- Bump jettyVersion from 9.4.29.v20200521 to 9.4.30.v20200611
-- 1.5.0
-- 1.5.1
-- Bump gae version from "6" to "7"
-- 1.6.0
-- 1.7.0
-- 1.8.0
-- 1.9.0
-- 1.9.1
-- Bump appengine version from 9 to 10
-- 1.9.2
-- Bump dependencies
-- Bump gradle from 6.3 to 6.8
-- 1.10.0
-- Bump gae version from "10" to "11"
-- Move cron.yaml into correct directory
-- Bump dependencies
-- Bump gae version from "11" to "12"
-- Switch to F1 instance
-- Work on logging
-- Bump gradle to 7.1
-- Bump gae version from "12" to "13"
-- 1.11.0
-- 1.11.1
-- Bump gae version from "13" to "14"
-- 1.12.0
-- Bump dependencies
-- Change button text attribute name
-- 1.13.0
-- Bump gae version from "14" to "15"
-- Fix typo
-- Initialize rust
-- Add actix as server
-- Change - to _
-- Setup deploy
-- Bump actix-web version
-- Add TODO'S
-- Add comment
-- Bump dependencies
-- Bump dependencies
-- Remove commented out code
-- Finalize build system
-- Bump dependencies
-- Rename github action
-- Release 1.0.0
-- Fix tag syntax
-- Add comment
-- Release 1.0.1
-- Release 1.0.2
-- Bump dependencies
-- Release 1.0.3
-- Release 1.0.4
-- Work on release pipeline
-- Bump dependencies
-- Release
-- Release 1.0.6
-- Release
-- Release
-- Update dependencies
-- Release
-- Release
-- Fix changelog
-- Release
-- Allow manual action trigger
-- Allow manual action trigger
-- Bump dependencies
-- Release
-- Release
-- Fix changelog
-- Release
-- Release
-- Release
-- Release
-- Add comments
-- Release
-- Update dependencies
-- Bump dependencies
-- Release
-- Rustfmt
-- Swicth to dedicated rust version
-- Cargo update
-- Switch cargo release branch
-- Release
 
 ### Refactor
 
