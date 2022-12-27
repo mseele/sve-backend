@@ -20,15 +20,15 @@ pre-release-replacements = [
 ]
 
 [dependencies]
-openssl = { version = "0.10.44", features = ["vendored"] }
+openssl = { version = "0.10.45", features = ["vendored"] }
 env_logger = "0.10.0"
 log = "0.4.17"
 actix-web = "4.2.1"
 actix-cors = "0.6.4"
-anyhow = { version = "1.0.66", features = ["backtrace"] }
+anyhow = { version = "1.0.68", features = ["backtrace"] }
 mime = "0.3.16"
-serde = { version = "1.0.151", features = ["derive"] }
-serde_json = "1.0.89"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
 base64 = "0.13.1"
 base64-serde = "0.6.1"
 chrono = { version = "0.4.23", features = ["serde", "unstable-locales"] }
@@ -52,7 +52,7 @@ sqlx = { version = "0.6.2", features = [
 ] }
 itertools = "0.10.5"
 harsh = "0.2.2"
-handlebars = "4.3.5"
+handlebars = "4.3.6"
 simple_excel_writer = { version = "0.2.0", features = ["chrono"] }
 printpdf = { version = "0.5.3", features = ["svg", "embedded_images"] }
 image = "0.24.5"
