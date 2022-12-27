@@ -2,36 +2,83 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- next-header -->
-## [Unreleased]
+## [unreleased]
 
-## [2.0.5] - 2022-12-22
+### Bug Fixes
+
+- Allow canceled bookings to re-asign
+- Use alternative email account for all actions
+
+### Features
+
+- Add participant list export
+
+### Miscellaneous Tasks
+
+- Bump dependencies
 
 ### Refactor
 
-- Improve database pool settings
+- Remove unused into_iter() call
+
+## [2.0.5] - 2022-12-22
+
+### Miscellaneous Tasks
+
+- Release 2.0.5
+
+### Refactor
+
+- Optimize imports
+- Improve db connection pool settings
 
 ## [2.0.4] - 2022-12-16
 
 ### Bug Fixes
 
-- Use correct Event for prebooking email
+- Use correct event for prebooking email
+
+### Miscellaneous Tasks
+
+- Update gitignore
+- Bump dependencies
+- Bump rust to 1.66
+- Release 2.0.4
+
+### Refactor
+
+- Inline code
 
 ## [2.0.3] - 2022-12-01
 
+### Bug Fixes
+
+- Correct typo
+- Correct direct booking variable
+- Remove not needed Debug derive
+
 ### Features
 
-- Add cost_per_date field
+- Add cost per date field
+
+### Miscellaneous Tasks
+
+- Release 2.0.3
 
 ### Refactor
 
 - Display removed dates in the schedule changed email
+- Rename cost to price
 
 ## [2.0.2] - 2022-11-22
 
-### Bug Fixes
+### Miscellaneous Tasks
 
-- Fix excel export failure by replacing excel library
+- Release 2.0.2
+
+### Refactor
+
+- Replace excel crate
 
 ## [2.0.1] - 2022-11-18
 
@@ -39,216 +86,202 @@ All notable changes to this project will be documented in this file.
 
 - Add 'Published' lifecycle when fetching reminder events
 
+### Miscellaneous Tasks
+
+- Release 2.0.1
+
 ## [2.0.0] - 2022-11-17
+
+### Bug Fixes
+
+- Correct events view
+- Get updated event inside the transaction
+- Add event subscribers unique key
+- Round cost values to 2 digits after the decimal point
+- Disallow booking in some lifecycle states
+- Correct typo
+- New event has no event dates to delete
+- Remove subscriber id from booking struct
+- Correct text
+- Use false if member is not set
+- Sort enrolled before not enrolled
+- Correct visibility and function order
+- Use booking date for payday calculation
+- Correct column names
+- Add libclang-dev package
+- Add libxlsxwriter-sys dependencies
+- Use openssl md5 function to avoid build errors
+- Disable md5 feature to avoid build errors
+- Correct libxlsxwriter-sys dependencies
 
 ### Features
 
-- Migrate data storage to PostgreSQL
+- Work on set/get of events into psql
+- Add event counters db view
+- Implement get event counters from psql
+- Implement booking into psql
+- Add sort & lifecycle status option
+- Create new EventId struct
+- Create new EventId struct
+- Migrate the remaining event logic to psql
+- Get events by lifecycle status
+- Add close date
+- Make it possible to send emails per event
+- Send emails if event schedule changes
+- Optionally add event bookings to event
+- Provide update booking payment possibility
+- Implement cancel booking
+- Send reminder emails if needed
+- Integrate unpaid bookings into verify payments result
+- Add ability to send payment reminders
+- Add excel export of bookings
+
+### Miscellaneous Tasks
+
+- Bump dependencies
+- Remove todo
+- Cargo update
+- Remove not needed &
+- Add todo
+- Add todo's
+- Correct comment
+- Improve comment
+- Bump to rust 1.65
+- Bump dependencies
+- Release 2.0.0
+- Bump dependencies
+
+### Refactor
+
+- Rename news subscription model
+- Use connection instead of executor
+- Improve iteration of events
+- Use event lifecycle_status on booking
+- Remove legacy code
+- Rename lifecycle status to status
+- Remove camel case option
+- Rename booking_number to payment_id
+- Use Self instead of specific type
+- Switch from pub to pub(crate)
+- Finish prebooking migration
+- Add event lifecycle status "Running"
+- Add event lifecycle status "Running"
+- Improve function names
+- Add event lifecycle status "Running"
+- Share subject prefix code
+- Split method
+- Improve function name
+- Inline subject prefix
+- Format code
+- Check is empty outside of insert_event_dates
+- Imrove delete api
+- Optimize imports
+- Improve naming
+- Improve api
+- Use handlebars for templates
+- Add fetch_events and insert subsribers if requested
+- Split verify payment and return of unpaid bookings
+- Extract payday calculation from template module
+- Simplify code
+- Use new struct for unpaid bookings
+- Extend unpaid booking attributes
+- Use fetch_events
+- Add payment account event attribute
+- Improve api
+- Move subject prefix generation into EventType struct
+- Provide the possibility to get subscribers via get_event
+- Use static waiting list templates
+- Make event payment account optional
+- Simplify prebooking url
+- Cargo clippy --fix
 
 ## [1.3.3] - 2022-07-12
 
 ### Bug Fixes
 
-- Correct event button text attribute typo
+- Correct typo
 
-## [1.3.2] - 2022-05-28
+### Miscellaneous Tasks
+
+- Bump dependencies
+- Bump to rust 1.62
+- Release
 
 ### Refactor
 
-- Move subscriber data into postgresql database
+- Only use as much workers as cpu's
+
+## [1.3.2] - 2022-05-28
+
+### Miscellaneous Tasks
+
+- Bump rust to 1.61
+- Add db secret
+- Release
+- Bump dependencies
+
+### Refactor
+
+- Migrate news subscriptions from firestore to psql
+- Migrate news subscriptions from firestore to psql
 
 ## [1.3.1] - 2022-05-25
 
 ### Bug Fixes
 
-- Avoid missing email addresses in news subscription output
+- Avoid missing email adresses
+
+### Features
+
+- Add db migrations for events
+- Add db migrations for news
+
+### Miscellaneous Tasks
+
+- Release
 
 ## [1.3.0] - 2022-05-04
 
 ### Features
 
-- Add support for different csv formats
-
-## [1.2.1] - 2022-04-22
-
-### Bug Fixes
-
-- Use utf-8 for all emails
-
-## [1.2.0] - 2022-04-20
-
-### Features
-
-- Add support for csv start date
-
-## [1.1.6] - 2022-04-04
-
-### Refactor
-
-- Switch to json from plain text
-
-## [1.1.5] - 2022-03-31
-
-### Bug Fixes
-
-- Strip € suffix from "Betrag" values
-
-## [1.1.4] - 2022-03-21
-
-### Bug Fixes
-
-- Skip phone number prefix (') for prebooking check
-- Log backtraces, finally
-- Use 4 workers
-
-## [1.1.3] - 2022-03-21
-
-### Bug Fixes
-
-- Remove euro conversion via steel-cent
-
-## [1.1.2] - 2022-03-18
-
-### Bug Fixes
-
-- Remove thousands separator
+- Implement support for a second csv format
 
 ### Miscellaneous Tasks
 
-- Fix changelog
-
-## [1.1.1] - 2022-03-18
-
-### Bug Fixes
-
-- Use ISO 8859 for csv encoding
-
-### Miscellaneous Tasks
-
-- Bump dependencies
-
-### Refactor
-
-- Add encoding & mime-type to emails
-
-## [1.1.0] - 2022-03-16
-
-### Features
-
-- Implement verify_payments
-
-### Miscellaneous Tasks
-
-- Update dependencies
-- Allow manual action trigger
-
-### Refactor
-
-- Introduce ToEuro traid
-
-### Styling
-
-- Format code
-
-## [1.0.8] - 2022-03-13
-
-### Bug Fixes
-
-- Email bounce from gmx/web.de
-
-## [1.0.7] - 2022-03-13
-
-### Bug Fixes
-
-- Use message_id with localhost
-
-## [1.0.6] - 2022-03-13
-
-### Bug Fixes
-
-- Add date to emails
-
-### Miscellaneous Tasks
-
-- Release 1.0.6
-
-## [1.0.5] - 2022-03-12
-
-### Bug Fixes
-
-- Reduce visibility
-
-### Miscellaneous Tasks
-
-- Work on release pipeline
 - Bump dependencies
 - Release
 
 ### Refactor
 
-- Optimize imports
-- Destruct json arg directly as method argument
-- Reduce clones by avoid borrowing
-- Reduce clone by using take
+- Move csv parser into separate module
+- Remove id from payment record
 
-### Styling
-
-- Format code
-
-## [1.0.4] - 2022-03-11
+## [1.2.1] - 2022-04-24
 
 ### Bug Fixes
 
-- Switch from post to get
+- Add utf-8 encoding for email content
 
 ### Miscellaneous Tasks
 
-- Release 1.0.4
+- Release
 
-## [1.0.3] - 2022-03-09
-
-### Bug Fixes
-
-- Add ' prefix only if we have a phone number
-- Compare not all values on prebooking check
-
-### Features
-
-- Generate unique booking number per booking
-
-### Miscellaneous Tasks
-
-- Bump dependencies
-- Release 1.0.3
-
-### Refactor
-
-- Rename headers_indices to header_indices
-
-## [1.0.2] - 2022-03-09
+## [1.2.0] - 2022-04-22
 
 ### Bug Fixes
 
-- Add ca-certificates into final image
-
-### Miscellaneous Tasks
-
-- Release 1.0.2
-
-## [1.0.1] - 2022-03-09
-
-### Bug Fixes
-
-- Add install of ca-certificates
-
-### Miscellaneous Tasks
-
-- Release 1.0.1
-
-## [1.0.0] - 2022-03-09
-
-### Bug Fixes
-
+- Improve error logging
+- Log warn message if booking link is invalid
+- Fix wrong if clause when checking prebooking
+- Invalidate prebooking for non-beta events
+- Add id and sortIndex to appointment
+- Fix bcc recipients bug
+- Fix possible NPE when using customDate
+- Do not use wildcard to work on older browsers
+- Remove caching
+- Remove race-condition when multiple bookings happen in parallel
+- Switch to DEBUG filter
+- Query parameter name
 - Make logging work again
 - Avoid NPE when obj and defaultObj are both null
 - Remove appending slash
@@ -263,9 +296,41 @@ All notable changes to this project will be documented in this file.
 - Correct newsletter url
 - Create directory
 - Add tag to docker image
+- Add install of ca-certificates
+- Add ca-certificates into final image
+- Add ' prefix only if we have a phone number
+- Compare not all values on prebooking check
+- Switch from post to get
+- Reduce visibility
+- Add date to emails
+- Use message_id with localhost
+- Email bounce from gmx/web.de
+- Use ISO 8859 for csv encoding
+- Remove thousands separator
+- Remove thousands separator
+- Remove euro conversion via steel-cent
+- Skip phone number prefix (') for prebooking check
+- Log backtraces, finally
+- Strip € suffix from "Betrag" values
+- Add dot behind short weekday
 
 ### Features
 
+- New tools web ui for the backend
+- Implement pre-booking support
+- Identify duplicate link clicks
+- Add refresh post request
+- Implement calendar access
+- Add notifications hook
+- Add watch/stop calendar api calls
+- Add html link to appointment
+- Trigger re-deploy on calendar change
+- Send multiple emails via 1 smtp session
+- Add check email connectivity task
+- Add renew calendar watch task
+- Add new all param for events api
+- Make booking button text configurable
+- Add support for alternative email addresses as sender
 - Implement events store
 - Implement first api method
 - Add environment variables
@@ -342,9 +407,50 @@ All notable changes to this project will be documented in this file.
 - Work on build
 - Work on build
 - Work on build
+- Generate unique booking number per booking
+- Implement verify_payments
+- Add support for csv start date
 
 ### Miscellaneous Tasks
 
+- 1.4.2
+- Simplify changelog
+- Fix changelog typo
+- Bump google-auth-library-oauth2-http from 0.20.0 to 0.21.0
+- Bump google-cloud-logging-logback from 0.117.0-alpha to 0.118.0-alpha
+- Bump appengine-gradle-plugin from 2.2.0 to 2.3.0
+- Bump google-cloud-firestore from 1.34.0 to 1.35.0
+- Bump com.diffplug.eclipse.apt from 3.22.0 to 3.23.0
+- Bump com.github.johnrengelman.shadow from 5.2.0 to 6.0.0
+- Bump jettyVersion from 9.4.29.v20200521 to 9.4.30.v20200611
+- 1.5.0
+- 1.5.1
+- Bump gae version from "6" to "7"
+- 1.6.0
+- 1.7.0
+- 1.8.0
+- 1.9.0
+- 1.9.1
+- Bump appengine version from 9 to 10
+- 1.9.2
+- Bump dependencies
+- Bump gradle from 6.3 to 6.8
+- 1.10.0
+- Bump gae version from "10" to "11"
+- Move cron.yaml into correct directory
+- Bump dependencies
+- Bump gae version from "11" to "12"
+- Switch to F1 instance
+- Work on logging
+- Bump gradle to 7.1
+- Bump gae version from "12" to "13"
+- 1.11.0
+- 1.11.1
+- Bump gae version from "13" to "14"
+- 1.12.0
+- Bump dependencies
+- Change button text attribute name
+- 1.13.0
 - Bump gae version from "14" to "15"
 - Fix typo
 - Initialize rust
@@ -363,9 +469,46 @@ All notable changes to this project will be documented in this file.
 - Release 1.0.0
 - Fix tag syntax
 - Add comment
+- Release 1.0.1
+- Release 1.0.2
+- Bump dependencies
+- Release 1.0.3
+- Release 1.0.4
+- Work on release pipeline
+- Bump dependencies
+- Release
+- Release 1.0.6
+- Release
+- Release
+- Update dependencies
+- Release
+- Release
+- Fix changelog
+- Release
+- Allow manual action trigger
+- Allow manual action trigger
+- Bump dependencies
+- Release
+- Release
+- Fix changelog
+- Release
+- Release
+- Release
+- Release
+- Add comments
+- Release
+- Update dependencies
+- Bump dependencies
+- Release
+- Rustfmt
+- Swicth to dedicated rust version
+- Cargo update
+- Switch cargo release branch
+- Release
 
 ### Refactor
 
+- Move failure message to constant
 - Remove unused import
 - Reduce files
 - Reduce files
@@ -386,251 +529,25 @@ All notable changes to this project will be documented in this file.
 - Include project id into code
 - Switch from include_str! to env!
 - Switch back to file based secrets
+- Rename headers_indices to header_indices
+- Optimize imports
+- Destruct json arg directly as method argument
+- Reduce clones by avoid borrowing
+- Reduce clone by using take
+- Introduce ToEuro traid
+- Add encoding & mime-type to emails
+- Use 4 workers
+- Move trait method into trait as default impl
+- Switch to json instead of plain text
+
+### Styling
+
+- Format code
+- Format code
 
 ### Testing
 
 - Add create body test
-
-## [1.13.0] - 2021-12-18
-
-### Features
-
-- Add support for alternative email addresses as sender
-
-### Miscellaneous Tasks
-
-- Bump dependencies
-- Change button text attribute name
-- 1.13.0
-
-## [1.12.0] - 2021-12-07
-
-### Features
-
-- Make booking button text configurable
-
-### Miscellaneous Tasks
-
-- Bump gae version from "13" to "14"
-- 1.12.0
-
-## [1.11.1] - 2021-08-26
-
-### Bug Fixes
-
-- Query parameter name
-
-### Miscellaneous Tasks
-
-- 1.11.1
-
-## [1.11.0] - 2021-08-26
-
-### Bug Fixes
-
-- Remove caching
-- Remove race-condition when multiple bookings happen in parallel
-- Switch to DEBUG filter
-
-### Features
-
-- Add new all param for events api
-
-### Miscellaneous Tasks
-
-- Bump gae version from "10" to "11"
-- Move cron.yaml into correct directory
-- Bump dependencies
-- Bump gae version from "11" to "12"
-- Switch to F1 instance
-- Work on logging
-- Bump gradle to 7.1
-- Bump gae version from "12" to "13"
-- 1.11.0
-
-## [1.10.0] - 2021-01-09
-
-### Features
-
-- Add check email connectivity task
-- Add renew calendar watch task
-
-### Miscellaneous Tasks
-
-- Bump dependencies
-- Bump gradle from 6.3 to 6.8
-- 1.10.0
-
-### Build
-
-- Bump google-cloud-firestore from 2.0.0 to 2.1.0
-- Fix factorypath
-
-## [1.9.2] - 2020-11-08
-
-### Bug Fixes
-
-- Fix possible NPE when using customDate
-- Do not use wildcard to work on older browsers
-
-### Miscellaneous Tasks
-
-- Bump appengine version from 9 to 10
-- 1.9.2
-
-### Build
-
-- Bump com.github.ben-manes.versions from 0.29.0 to 0.33.0
-- Bump com.diffplug.eclipse.apt from 3.24.0 to 3.25.0
-- Bump appengine-gradle-plugin from 2.3.0 to 2.4.1
-- Bump google-api-services-calendar
-- Bump jerseyVersion from 2.31 to 2.32
-- Bump google-api-services-sheets
-- Bump jettyVersion from 9.4.31.v20200723 to 9.4.32.v20200930
-- Bump com.github.johnrengelman.shadow from 6.0.0 to 6.1.0
-- Bump google-auth-library-oauth2-http from 0.21.1 to 0.22.0
-
-## [1.9.1] - 2020-08-21
-
-### Bug Fixes
-
-- Fix bcc recipients bug
-
-### Miscellaneous Tasks
-
-- 1.9.1
-
-### Build
-
-- Bump google-cloud-firestore from 1.35.2 to 2.0.0
-- Bump google-api-services-sheets
-
-## [1.9.0] - 2020-08-13
-
-### Features
-
-- Trigger re-deploy on calendar change
-- Send multiple emails via 1 smtp session
-
-### Miscellaneous Tasks
-
-- 1.9.0
-
-### Build
-
-- Switch from npm to yarn
-- Bump google-cloud-logging-logback
-
-## [1.8.0] - 2020-08-11
-
-### Bug Fixes
-
-- Add id and sortIndex to appointment
-
-### Features
-
-- Add notifications hook
-- Add watch/stop calendar api calls
-- Add html link to appointment
-
-### Miscellaneous Tasks
-
-- 1.8.0
-
-### Build
-
-- Bump google-api-services-calendar
-- Bump jettyVersion from 9.4.30.v20200611 to 9.4.31.v20200723
-- Fix factorypath
-- Bump com.diffplug.eclipse.apt from 3.23.0 to 3.24.0
-
-## [1.7.0] - 2020-07-27
-
-### Features
-
-- Implement calendar access
-
-### Miscellaneous Tasks
-
-- 1.7.0
-
-### Build
-
-- Increase version
-
-## [1.6.0] - 2020-07-27
-
-### Bug Fixes
-
-- Log warn message if booking link is invalid
-- Fix wrong if clause when checking prebooking
-- Invalidate prebooking for non-beta events
-
-### Features
-
-- Identify duplicate link clicks
-- Add refresh post request
-
-### Miscellaneous Tasks
-
-- Bump gae version from "6" to "7"
-- 1.6.0
-
-### Build
-
-- Bump google-cloud-firestore from 1.35.1 to 1.35.2
-- Bump google-cloud-logging-logback
-- Bump commons-text from 1.8 to 1.9
-- Increase gae version
-
-## [1.5.1] - 2020-06-26
-
-### Bug Fixes
-
-- Improve error logging
-
-### Miscellaneous Tasks
-
-- 1.5.1
-
-### Build
-
-- Increase gae version
-
-## [1.5.0] - 2020-06-26
-
-### Features
-
-- New tools web ui for the backend
-- Implement pre-booking support
-
-### Miscellaneous Tasks
-
-- Simplify changelog
-- Fix changelog typo
-- Bump google-auth-library-oauth2-http from 0.20.0 to 0.21.0
-- Bump google-cloud-logging-logback from 0.117.0-alpha to 0.118.0-alpha
-- Bump appengine-gradle-plugin from 2.2.0 to 2.3.0
-- Bump google-cloud-firestore from 1.34.0 to 1.35.0
-- Bump com.diffplug.eclipse.apt from 3.22.0 to 3.23.0
-- Bump com.github.johnrengelman.shadow from 5.2.0 to 6.0.0
-- Bump jettyVersion from 9.4.29.v20200521 to 9.4.30.v20200611
-- 1.5.0
-
-### Refactor
-
-- Move failure message to constant
-
-### Build
-
-- Fix eclipse factorypath
-- Move tools into separate repository
-
-## [1.4.2] - 2020-06-09
-
-### Miscellaneous Tasks
-
-- 1.4.2
 
 ### Bugfix
 
@@ -640,25 +557,32 @@ All notable changes to this project will be documented in this file.
 ### Build
 
 - Configure conventional commits
+- Fix eclipse factorypath
+- Move tools into separate repository
+- Increase gae version
+- Bump google-cloud-firestore from 1.35.1 to 1.35.2
+- Bump google-cloud-logging-logback
+- Bump commons-text from 1.8 to 1.9
+- Increase gae version
+- Increase version
+- Bump google-api-services-calendar
+- Bump jettyVersion from 9.4.30.v20200611 to 9.4.31.v20200723
+- Fix factorypath
+- Bump com.diffplug.eclipse.apt from 3.23.0 to 3.24.0
+- Switch from npm to yarn
+- Bump google-cloud-logging-logback
+- Bump google-cloud-firestore from 1.35.2 to 2.0.0
+- Bump google-api-services-sheets
+- Bump com.github.ben-manes.versions from 0.29.0 to 0.33.0
+- Bump com.diffplug.eclipse.apt from 3.24.0 to 3.25.0
+- Bump appengine-gradle-plugin from 2.3.0 to 2.4.1
+- Bump google-api-services-calendar
+- Bump jerseyVersion from 2.31 to 2.32
+- Bump google-api-services-sheets
+- Bump jettyVersion from 9.4.31.v20200723 to 9.4.32.v20200930
+- Bump com.github.johnrengelman.shadow from 6.0.0 to 6.1.0
+- Bump google-auth-library-oauth2-http from 0.21.1 to 0.22.0
+- Bump google-cloud-firestore from 2.0.0 to 2.1.0
+- Fix factorypath
 
-<!-- next-url -->
-[Unreleased]: https://github.com/mseele/sve-backend/compare/v2.0.5...HEAD
-[2.0.5]: https://github.com/mseele/sve-backend/compare/v2.0.4...v2.0.5
-[2.0.4]: https://github.com/mseele/sve-backend/compare/v2.0.3...v2.0.4
-[2.0.3]: https://github.com/mseele/sve-backend/compare/v2.0.2...v2.0.3
-[2.0.2]: https://github.com/mseele/sve-backend/compare/v2.0.1...v2.0.2
-[2.0.1]: https://github.com/mseele/sve-backend/compare/v2.0.0...v2.0.1
-[2.0.0]: https://github.com/mseele/sve-backend/compare/v1.3.3...v2.0.0
-[1.3.3]: https://github.com/mseele/sve-backend/compare/v1.3.2...v1.3.3
-[1.3.2]: https://github.com/mseele/sve-backend/compare/v1.3.1...v1.3.2
-[1.3.1]: https://github.com/mseele/sve-backend/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/mseele/sve-backend/compare/v1.2.1...v1.3.0
-[1.2.1]: https://github.com/mseele/sve-backend/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/mseele/sve-backend/compare/v1.1.6...v1.2.0
-[1.1.6]: https://github.com/mseele/sve-backend/compare/v1.1.5...v1.1.6
-[1.1.5]: https://github.com/mseele/sve-backend/compare/v1.1.4...v1.1.5
-[1.1.4]: https://github.com/mseele/sve-backend/compare/v1.1.3...v1.1.4
-[1.1.3]: https://github.com/mseele/sve-backend/compare/v1.1.2...v1.1.3
-[1.1.2]: https://github.com/mseele/sve-backend/compare/v1.1.1...v1.1.2
-[1.1.1]: https://github.com/mseele/sve-backend/compare/v1.1.0...v1.1.1
-[1.1.0]: https://github.com/mseele/sve-backend/compare/v1.0.8...v1.1.0
+<!-- generated by git-cliff -->
