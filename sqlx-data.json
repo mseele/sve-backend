@@ -1,26 +1,5 @@
 {
   "db": "PostgreSQL",
-  "04419935018bca4cd81253714cb9296c1b6116f882306f09b8a7023c93fc78b3": {
-    "describe": {
-      "columns": [
-        {
-          "name": "count",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        null
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4"
-        ]
-      }
-    },
-    "query": "\nSELECT\n\tCOUNT(1)\nFROM\n\tevent_bookings e\nWHERE\n\te.event_id = $1\n\tAND e.subscriber_id = $2\n"
-  },
   "08bdba04d89a88a8d1fea196318a18ea93f7905d2977860462569a14ec6b340b": {
     "describe": {
       "columns": [],
@@ -787,6 +766,27 @@
       }
     },
     "query": "SELECT nextval('payment_id')"
+  },
+  "8389b069f909e0f22f40957c0f875731cc64884619c64b0455bab42c2b6b827a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "count",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\nSELECT\n\tCOUNT(1)\nFROM\n\tevent_bookings e\nWHERE\n\te.event_id = $1\n\tAND e.subscriber_id = $2\n    AND e.canceled IS NULL\n"
   },
   "91092a9a0e93550a4397d9475bc61710916273a523de3a51b25e0d6dba6a86a4": {
     "describe": {

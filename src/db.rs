@@ -1206,6 +1206,7 @@ FROM
 WHERE
 	e.event_id = $1
 	AND e.subscriber_id = $2
+    AND e.canceled IS NULL
 "#,
             event_id.get_ref(),
             id
