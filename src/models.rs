@@ -12,7 +12,7 @@ use std::ops::Deref;
 use std::str::from_utf8;
 use std::str::FromStr;
 
-use crate::hashids;
+use crate::{hashids, email};
 
 base64_serde_type!(Base64Standard, STANDARD);
 
@@ -180,6 +180,13 @@ impl Event {
 
     pub(crate) fn subject_prefix(&self) -> String {
         self.event_type.subject_prefix()
+    }
+
+    pub(crate) fn get_associated_email_account(&self) -> Result<EmailAccount> {
+        match &self.alt_email_address {
+            Some(email_address) => email::get_account_by_address(email_address),
+            None => email::get_account_by_type(self.event_type.into()),
+        }
     }
 }
 
