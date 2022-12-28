@@ -1,0 +1,9 @@
+Hallo {{firstname}},
+
+vielen Dank für deine Teilnahme an unserem Kurs "{{name}}".
+Im Anhang befindet sich deine Teilnahmebestätigung.
+
+Wir hoffen du hattest viel Freude mit dem Kurs.
+
+Herzliche Grüße
+Team Fitness@SVE

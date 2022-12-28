@@ -119,6 +119,21 @@ impl<'a> ReminderTemplateData<'a> {
     }
 }
 
+#[derive(Serialize)]
+struct ParticipationConfirmationData<'a> {
+    firstname: &'a str,
+    name: &'a str,
+}
+
+impl<'a> ParticipationConfirmationData<'a> {
+    fn new(event: &'a Event, subscription: &'a EventSubscription) -> Result<Self> {
+        Ok(Self {
+            firstname: subscription.first_name.trim(),
+            name: event.name.trim(),
+        })
+    }
+}
+
 #[derive(Clone, Copy)]
 struct PaydayHelper<'a> {
     first_event_date: Option<&'a DateTime<Utc>>,
@@ -212,6 +227,18 @@ pub(crate) fn render_event_reminder<'a>(
     render(
         template,
         ReminderTemplateData::new(event, subscription)?,
+        None,
+    )
+}
+
+pub(crate) fn render_participation_confirmation<'a>(
+    template: &str,
+    event: &'a Event,
+    subscription: &'a EventSubscription,
+) -> Result<String> {
+    render(
+        template,
+        ParticipationConfirmationData::new(event, subscription)?,
         None,
     )
 }
@@ -556,6 +583,65 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             )
             .unwrap(),
             "Max FitForFun Turn- & Festhalle Eutingen Mittwoch, 23. März 2022 19:00 Uhr",
+        );
+    }
+
+    #[test]
+    fn test_render_participation_confirmation() {
+        let mut event = Event::new(
+            0,
+            Utc::now(),
+            None,
+            EventType::Fitness,
+            LifecycleStatus::Draft,
+            String::from("FitForFun"),
+            0,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            vec![
+                Utc.with_ymd_and_hms(2022, 3, 7, 19, 00, 00).unwrap(),
+                Utc.with_ymd_and_hms(2022, 3, 8, 19, 00, 00).unwrap(),
+            ],
+            None,
+            0,
+            0,
+            0,
+            BigDecimal::from_i8(5).unwrap(),
+            BigDecimal::from_i8(10).unwrap(),
+            None,
+            String::from("Turn- & Festhalle Eutingen"),
+            String::from("booking_template"),
+            None,
+            None,
+            None,
+            false,
+        );
+        let event_subscription = EventSubscription::new(
+            0,
+            Utc::now(),
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@musterman.de"),
+            None,
+            true,
+            true,
+            String::from("123"),
+            true,
+            None,
+        );
+
+        assert_eq!(
+            render_participation_confirmation(
+                "{{firstname}} {{name}}",
+                &event,
+                &event_subscription,
+            )
+            .unwrap(),
+            "Max FitForFun",
         );
     }
 

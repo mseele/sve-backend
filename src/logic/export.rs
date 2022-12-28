@@ -395,3 +395,184 @@ fn create_participant_list_page(
 
     Ok(())
 }
+
+pub(crate) async fn create_participation_confirmation(
+    first_name: String,
+    last_name: String,
+    event_name: String,
+    first_date: String,
+    last_date: String,
+    price: String,
+    dates: String,
+) -> Result<Vec<u8>> {
+    actix_web::rt::spawn(async {
+        _create_participation_confirmation(
+            first_name, last_name, event_name, first_date, last_date, price, dates,
+        )
+    })
+    .await?
+}
+
+fn _create_participation_confirmation(
+    first_name: String,
+    last_name: String,
+    event_name: String,
+    first_date: String,
+    last_date: String,
+    price: String,
+    dates: String,
+) -> Result<Vec<u8>> {
+    let (doc, page, layer) =
+        PdfDocument::new("Teilnahmebescheinigung", Mm(210.0), Mm(297.0), "Layer");
+    let current_layer = doc.get_page(page).get_layer(layer);
+
+    let mut font_reader =
+        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Regular.ttf").as_ref());
+    let font_regular = doc.add_external_font(&mut font_reader).unwrap();
+
+    let mut font_reader =
+        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Medium.ttf").as_ref());
+    let font_medium = doc.add_external_font(&mut font_reader).unwrap();
+
+    let mut font_reader =
+        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Italic.ttf").as_ref());
+    let font_italic = doc.add_external_font(&mut font_reader).unwrap();
+
+    // header
+    current_layer.use_text(
+        "SV Eutingen 1947 e.V.",
+        18.0,
+        Mm(20.0),
+        Mm(252.0),
+        &font_regular,
+    );
+    current_layer.use_text(
+        "Fussball • Fitness • Ernährung • Volleyball",
+        11.0,
+        Mm(20.0),
+        Mm(244.0),
+        &font_regular,
+    );
+
+    let line = Line {
+        points: vec![
+            (Point::new(Mm(20.0), Mm(240.0)), false),
+            (Point::new(Mm(141.0), Mm(240.0)), false),
+        ],
+        has_stroke: true,
+        ..Default::default()
+    };
+    let color = Color::Rgb(Rgb::new(162.0 / 255.0, 33.0 / 255.0, 34.0 / 255.0, None));
+    current_layer.set_outline_color(color);
+    current_layer.add_shape(line);
+
+    let svg = Svg::parse(include_str!("../assets/logo.svg"))?;
+    svg.add_to_layer(
+        &current_layer,
+        SvgTransform {
+            translate_x: Some(Mm(156.0).into()),
+            translate_y: Some(Mm(220.0).into()),
+            scale_x: Some(0.75),
+            scale_y: Some(0.75),
+            ..Default::default()
+        },
+    );
+
+    current_layer.use_text(
+        "Teilnahmebestätigung",
+        12.0,
+        Mm(20.0),
+        Mm(213.0),
+        &font_medium,
+    );
+
+    current_layer.begin_text_section();
+    current_layer.set_font(&font_medium, 12.0);
+    current_layer.set_text_cursor(Mm(20.0), Mm(192.0));
+    current_layer.write_text(format!("{first_name} {last_name}"), &font_medium);
+    current_layer.set_font(&font_regular, 12.0);
+    current_layer.write_text(
+        " hat erfolgreich an folgendem Kurs teilgenommen:",
+        &font_regular,
+    );
+    current_layer.end_text_section();
+
+    current_layer.use_text(event_name, 12.0, Mm(20.0), Mm(177.0), &font_medium);
+
+    current_layer.use_text("Kursbeginn:", 12.0, Mm(20.0), Mm(167.0), &font_regular);
+    current_layer.use_text(first_date, 12.0, Mm(48.0), Mm(167.0), &font_regular);
+    current_layer.use_text("Kursende:", 12.0, Mm(96.0), Mm(167.0), &font_regular);
+    current_layer.use_text(last_date, 12.0, Mm(119.0), Mm(167.0), &font_regular);
+    current_layer.use_text("Kosten:", 12.0, Mm(20.0), Mm(159.0), &font_regular);
+    current_layer.use_text(price, 12.0, Mm(48.0), Mm(159.0), &font_regular);
+    current_layer.use_text("Termine:", 12.0, Mm(20.0), Mm(151.0), &font_regular);
+    current_layer.use_text(dates, 12.0, Mm(48.0), Mm(151.0), &font_regular);
+
+    current_layer.use_text(
+        "Der Kurs wurde von einer lizenzierten Trainerin bzw. einem lizenzierten Trainer geleitet.",
+        12.0,
+        Mm(20.0),
+        Mm(137.0),
+        &font_regular,
+    );
+
+    current_layer.begin_text_section();
+    current_layer.set_font(&font_regular, 12.0);
+    current_layer.set_text_cursor(Mm(20.0), Mm(122.0));
+    current_layer.set_line_height(18.0);
+    current_layer.write_text(
+        "Wir bedanken uns sehr herzlich und freuen uns über eine erneute Teilnahme an den",
+        &font_regular,
+    );
+    current_layer.add_line_break();
+    current_layer.write_text("verschiedenen Sportangeboten des Vereins.", &font_regular);
+    current_layer.end_text_section();
+
+    current_layer.use_text(
+        "Für den Sportverein Eutingen 1947 e.V.",
+        12.0,
+        Mm(20.0),
+        Mm(81.0),
+        &font_regular,
+    );
+
+    let mut reader = Cursor::new(include_bytes!("../assets/sign.jpg").as_ref());
+    let image = Image::try_from(JpegDecoder::new(&mut reader)?)?;
+    image.add_to_layer(
+        current_layer.clone(),
+        ImageTransform {
+            translate_x: Some(Mm(24.0)),
+            translate_y: Some(Mm(67.0)),
+            scale_x: Some(1.0),
+            scale_y: Some(1.0),
+            ..Default::default()
+        },
+    );
+
+    current_layer.begin_text_section();
+    current_layer.set_font(&font_italic, 12.0);
+    current_layer.set_text_cursor(Mm(20.0), Mm(61.0));
+    current_layer.set_line_height(28.0);
+    current_layer.write_text("Gez. Sebastian Lazar", &font_italic);
+    current_layer.add_line_break();
+    current_layer.write_text("- 1. Vorsitzender -", &font_italic);
+    current_layer.end_text_section();
+
+    // footer
+    current_layer.use_text(
+        "SV Eutingen 1947 e.V. • Marktstr. 84 • 72184 Eutingen im Gäu • info@sv-eutingen.de",
+        10.0,
+        Mm(34.0),
+        Mm(24.0),
+        &font_regular,
+    );
+    current_layer.use_text(
+        "www.sv-eutingen.de • facebook.com/sveutingen",
+        10.0,
+        Mm(64.0),
+        Mm(19.0),
+        &font_regular,
+    );
+
+    Ok(doc.save_to_bytes()?)
+}

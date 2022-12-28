@@ -1,5 +1,5 @@
 use super::csv::PaymentRecord;
-use super::template;
+use super::{export, template};
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
@@ -9,11 +9,12 @@ use crate::models::{
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{Date, DateTime, Duration, NaiveDate, Utc};
+use chrono::{Date, DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
 use lazy_static::lazy_static;
-use lettre::message::SinglePart;
+use lettre::message::header::ContentType;
+use lettre::message::{Attachment, MultiPart, SinglePart};
 use log::{error, info, warn};
 use regex::Regex;
 use sqlx::PgPool;
@@ -842,6 +843,97 @@ pub(super) fn calculate_payday(
     }
 
     payday
+}
+
+/// send participation confirmation after finished event
+pub(crate) async fn send_participation_confirmation(
+    pool: &PgPool,
+    event_id: EventId,
+) -> Result<usize> {
+    // fetch the event with all subscribers
+    let mut event = db::get_event(pool, &event_id, true)
+        .await?
+        .ok_or_else(|| anyhow!("Error fetching event with id '{}'", event_id.get_ref()))?;
+    let subscribers = event.subscribers.take().ok_or_else(|| {
+        anyhow!(
+            "Subscribers of event with id '{}' are missing",
+            event_id.get_ref()
+        )
+    })?;
+
+    let template = match event.event_type {
+        EventType::Fitness => Ok(include_str!(
+            "../../templates/participation_confirmation_fitness.txt"
+        )),
+        EventType::Events => Err(anyhow!(
+            "Participation confirmation is not supported for event type 'Events'."
+        )),
+    }?;
+
+    let dates_len = event.dates.len();
+    // abort if the event has no dates
+    if dates_len < 1 {
+        return Err(anyhow!(
+            "Participation confirmation is not supported for an event without dates."
+        ));
+    }
+
+    let fmt = "%d. %B %Y";
+    let first_date = event
+        .dates
+        .first()
+        .ok_or_else(|| anyhow!("Event with id '{}' has no first date", event_id))?
+        .format_localized(fmt, Locale::de_DE)
+        .to_string();
+    let last_date = event
+        .dates
+        .last()
+        .ok_or_else(|| anyhow!("Event with id '{}' has no last date", event_id))?
+        .format_localized(fmt, Locale::de_DE)
+        .to_string();
+    let dates = format!("{dates_len} x {} Minuten", event.duration_in_minutes);
+
+    // send an email per participant
+    let email_account = event.get_associated_email_account()?;
+    let subject = format!("{} Teilnahmebestätigung", event.subject_prefix());
+    let mut count = 0;
+    for subscriber in subscribers {
+        if subscriber.enrolled {
+            let price = event.price(subscriber.member).to_euro();
+
+            let bytes = export::create_participation_confirmation(
+                subscriber.first_name.clone(),
+                subscriber.last_name.clone(),
+                event.name.clone(),
+                first_date.clone(),
+                last_date.clone(),
+                price,
+                dates.clone(),
+            )
+            .await?;
+
+            let body = template::render_participation_confirmation(template, &event, &subscriber)?;
+
+            let message = email_account
+                .new_message()?
+                .to(subscriber.email.parse()?)
+                .subject(subject.clone())
+                .multipart(
+                    MultiPart::mixed()
+                        .singlepart(SinglePart::plain(body))
+                        .singlepart(
+                            Attachment::new(String::from("Teilnahmebestätigung.pdf"))
+                                .body(bytes, ContentType::parse("application/pdf")?),
+                        ),
+                )?;
+
+            email::send_message(&email_account, message).await?;
+
+            count += 1;
+        }
+    }
+
+    Ok(count)
 }
 
 #[cfg(test)]

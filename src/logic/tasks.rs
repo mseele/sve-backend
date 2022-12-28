@@ -1,6 +1,7 @@
 use super::calendar;
 use super::events;
 use crate::email;
+use crate::models::EventId;
 use crate::models::EventType;
 use anyhow::Result;
 use log::{error, info};
@@ -39,6 +40,21 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
         Ok(_) => Ok(()),
         Err(e) => {
             error!("Error while sending payment reminders: {}", e);
+            Err(e)
+        }
+    }
+}
+
+/// send participation confirmation after finished event
+pub(crate) async fn send_participation_confirmation(pool: &PgPool, event_id: EventId) -> Result<()> {
+    match events::send_participation_confirmation(pool, event_id).await {
+        Ok(count) if count > 0 => {
+            info!("{} participation confirmations has been send successfully.", count);
+            Ok(())
+        }
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("Error while sending participation confirmations: {}", e);
             Err(e)
         }
     }

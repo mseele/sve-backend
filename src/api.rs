@@ -125,6 +125,10 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             .route(
                 "/send_payment_reminders/{event_type}",
                 web::get().to(send_payment_reminders),
+            )
+            .route(
+                "/send_participation_confirmation/{event_id}",
+                web::get().to(send_participation_confirmation),
             ),
     );
 }
@@ -428,5 +432,13 @@ async fn send_payment_reminders(
     path: web::Path<EventType>,
 ) -> Result<impl Responder, ResponseError> {
     tasks::send_payment_reminders(&pool, path.into_inner()).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn send_participation_confirmation(
+    pool: Data<PgPool>,
+    path: web::Path<EventId>,
+) -> Result<impl Responder, ResponseError> {
+    tasks::send_participation_confirmation(&pool, path.into_inner()).await?;
     Ok(HttpResponse::Ok().finish())
 }
