@@ -156,7 +156,7 @@ pub(crate) async fn event_participants_list(
             event_id.get_ref()
         )
     })?;
-    // extract  the subscribers into bookings and waiting list
+    // extract the participants
     let mut participants = Vec::new();
     for subscriber in subscribers {
         if subscriber.enrolled {
