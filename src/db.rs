@@ -1222,6 +1222,12 @@ WHERE
         }
     }
 
+    // trim comment
+    let comment = comments
+        .as_ref()
+        .map(|comment| comment.trim())
+        .filter(|comment| !comment.is_empty());
+
     // generate payment id
     let payment_id: Option<i64> = query_scalar!("SELECT nextval('payment_id')")
         .fetch_one(&mut *conn)
@@ -1239,7 +1245,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
         enrolled,
         pre_booking,
         subscriber_id.get_id(),
-        *comments,
+        comment,
         payment_id
     )
     .execute(&mut *conn)
