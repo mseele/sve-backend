@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.7] - 2022-12-29
+
+### Bug Fixes
+
+- Trim and filter empty comment
+
+### Features
+
+- Send participation confirmation after finished event
+
 ## [2.0.6] - 2022-12-27
 
 ### Bug Fixes
