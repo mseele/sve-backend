@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.8] - 2023-01-06
+
+### Bug Fixes
+
+- Send event reminder only to enrolled subscribers
+
 ## [2.0.7] - 2022-12-29
 
 ### Bug Fixes
