@@ -355,9 +355,9 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
             ),
         };
 
-        // iterate all event subscribers (Option should never be None)
+        // iterate all enrolled event subscribers (Option should never be None)
         if let Some(subscribers) = &event.subscribers {
-            for subscriber in subscribers {
+            for subscriber in subscribers.iter().filter(|s| s.enrolled) {
                 // render the body for the email...
                 let body = template::render_event_reminder(body, event, subscriber)?;
 
