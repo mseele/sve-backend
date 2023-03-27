@@ -795,6 +795,7 @@ WHERE
     AND b.payed IS NULL
 	AND e.lifecycle_status IN('Review', 'Published', 'Running')
 ORDER BY
+    b.payment_reminder_sent,
     e.name,
     b.created"#,
         event_type as EventType
