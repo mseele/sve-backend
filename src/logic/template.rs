@@ -71,11 +71,7 @@ struct ScheduleChangeTemplateData<'a> {
 }
 
 impl<'a> ScheduleChangeTemplateData<'a> {
-    fn new(
-        booking: &'a EventBooking,
-        event: &'a Event,
-        removed_dates: &Vec<DateTime<Utc>>,
-    ) -> Self {
+    fn new(booking: &'a EventBooking, event: &'a Event, removed_dates: &[DateTime<Utc>]) -> Self {
         Self {
             firstname: booking.first_name.trim(),
             name: event.name.trim(),
@@ -259,7 +255,7 @@ pub(crate) fn render_schedule_change<'a>(
     template: &str,
     booking: &'a EventBooking,
     event: &'a Event,
-    removed_dates: &Vec<DateTime<Utc>>,
+    removed_dates: &[DateTime<Utc>],
 ) -> Result<String> {
     render(
         template,
@@ -588,7 +584,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
 
     #[test]
     fn test_render_participation_confirmation() {
-        let mut event = Event::new(
+        let event = Event::new(
             0,
             Utc::now(),
             None,

@@ -9,8 +9,8 @@ use std::{collections::HashSet, ops::Neg};
 
 pub(crate) fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
     let readers: Vec<Box<dyn CSVReader>> = vec![
-        Box::new(VobaClassicCSVReader::default()),
-        Box::new(VobaRichCSVReader::default()),
+        Box::<VobaClassicCSVReader>::default(),
+        Box::<VobaRichCSVReader>::default(),
     ];
     readers
         .into_iter()

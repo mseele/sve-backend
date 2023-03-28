@@ -436,7 +436,7 @@ async fn update_event(
             removed_dates = Some(
                 current_dates
                     .into_iter()
-                    .filter(|date| !new_dates.contains(&date))
+                    .filter(|date| !new_dates.contains(date))
                     .collect::<Vec<_>>(),
             );
             delete_event_dates(&mut tx, id).await?;
