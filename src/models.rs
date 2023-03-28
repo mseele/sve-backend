@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use lettre::message::header::ContentType;
@@ -712,7 +713,7 @@ impl Email {
                 let mut multi_part = MultiPart::mixed().singlepart(SinglePart::plain(self.content));
                 for attachment in attachments {
                     let filename = attachment.name;
-                    let content = base64::decode(&attachment.data)?;
+                    let content = STANDARD.decode(&attachment.data)?;
                     let content_type = ContentType::parse(&attachment.mime_type)?;
                     multi_part = multi_part
                         .singlepart(Attachment::new(filename).body(content, content_type));

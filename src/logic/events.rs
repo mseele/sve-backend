@@ -9,7 +9,9 @@ use crate::models::{
 };
 use crate::{db, hashids};
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{Date, DateTime, Duration, Locale, NaiveDate, Utc};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
+use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{all::ISO_8859_1, DecoderTrap};
 use lazy_static::lazy_static;
@@ -116,7 +118,8 @@ pub(crate) async fn verify_payments(
     csv: String,
     csv_start_date: Option<NaiveDate>,
 ) -> Result<Vec<VerifyPaymentResult>> {
-    let bytes = base64::decode(&csv)
+    let bytes = STANDARD
+        .decode(&csv)
         .with_context(|| format!("Error decoding the cvs content: {}", &csv))?;
     let csv = match ISO_8859_1.decode(&bytes, DecoderTrap::Strict) {
         Ok(value) => value,
@@ -194,7 +197,7 @@ fn calc_due_in_days(
     let payday = calculate_payday(&booking_date, &first_event_date, custom_days);
 
     // calculate due in days
-    let due_in_days = payday - Utc::today();
+    let due_in_days = payday - Utc::now().date_naive();
 
     Ok(due_in_days.num_days())
 }
@@ -824,7 +827,7 @@ pub(super) fn calculate_payday(
     booking_date: &DateTime<Utc>,
     first_event_date: &DateTime<Utc>,
     custom_days: Option<i64>,
-) -> Date<Utc> {
+) -> NaiveDate {
     // default value is 14 days
     let mut days = 14;
 
@@ -834,10 +837,10 @@ pub(super) fn calculate_payday(
     }
 
     // calculated payday
-    let mut payday = first_event_date.date() - Duration::days(days);
+    let mut payday = first_event_date.date_naive() - Duration::days(days);
 
     // override the payday if it is before the day after the booking date
-    let earliest_paypay = booking_date.date() + Duration::days(1);
+    let earliest_paypay = booking_date.date_naive() + Duration::days(1);
     if payday < earliest_paypay {
         payday = earliest_paypay
     }
@@ -1231,17 +1234,17 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         let start_date = Utc::now() + Duration::weeks(3);
         assert_eq!(
             calculate_payday(&booking_date, &start_date, None),
-            Utc::today() + Duration::weeks(1)
+            Utc::now().date_naive() + Duration::weeks(1)
         );
         assert_eq!(
             calculate_payday(&booking_date, &start_date, Some(7)),
-            Utc::today() + Duration::weeks(2)
+            Utc::now().date_naive() + Duration::weeks(2)
         );
         assert_eq!(
             calculate_payday(&booking_date, &start_date, Some(0)),
-            Utc::today() + Duration::weeks(3)
+            Utc::now().date_naive() + Duration::weeks(3)
         );
-        let tomorrow = Utc::today() + Duration::days(1);
+        let tomorrow = Utc::now().date_naive() + Duration::days(1);
         assert_eq!(
             calculate_payday(&booking_date, &start_date, Some(21)),
             tomorrow
@@ -1255,7 +1258,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         let start_date = Utc::now() + Duration::days(3);
         assert_eq!(
             calculate_payday(&booking_date, &start_date, Some(1)),
-            Utc::today() + Duration::days(2)
+            Utc::now().date_naive() + Duration::days(2)
         );
         assert_eq!(
             calculate_payday(&booking_date, &start_date, Some(2)),
@@ -1291,11 +1294,11 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         let start_date = Utc::now();
         assert_eq!(
             calculate_payday(&booking_date, &start_date, None),
-            Utc::today() - Duration::days(14)
+            Utc::now().date_naive() - Duration::days(14)
         );
         assert_eq!(
             calculate_payday(&booking_date, &start_date, Some(7)),
-            Utc::today() - Duration::days(7)
+            Utc::now().date_naive() - Duration::days(7)
         );
     }
 
