@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.9] - 2023-03-28
+
+### Bug Fixes
+
+- Improve bookings without payment sort order
+
+### Refactor
+
+- Remove deprecated code
+
 ## [2.0.8] - 2023-01-06
 
 ### Bug Fixes
