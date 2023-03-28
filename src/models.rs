@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use base64::STANDARD;
+use base64::engine::general_purpose::STANDARD;
 use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use lettre::message::header::ContentType;
@@ -12,7 +12,7 @@ use std::ops::Deref;
 use std::str::from_utf8;
 use std::str::FromStr;
 
-use crate::{hashids, email};
+use crate::{email, hashids};
 
 base64_serde_type!(Base64Standard, STANDARD);
 

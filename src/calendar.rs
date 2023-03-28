@@ -1,6 +1,6 @@
 use crate::models::Appointment;
 use anyhow::{Context, Result};
-use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, Utc};
+use chrono::{Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Berlin;
 use google_calendar3::{
     api::{Channel, Event, EventDateTime},
@@ -8,7 +8,6 @@ use google_calendar3::{
 };
 use hyper::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
-use std::time::{SystemTime, UNIX_EPOCH};
 use yup_oauth2::ServiceAccountKey;
 
 async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
@@ -35,8 +34,7 @@ async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
 
 pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
     // now + 1 year
-    let expiration =
-        SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() + (1000 * 60 * 60 * 24 * 365);
+    let expiration = Utc::now().timestamp_millis() + (1000 * 60 * 60 * 24 * 365);
 
     let hub = calendar_hub().await?;
 
@@ -53,7 +51,7 @@ pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) 
         id: Some(id.into()),
         type_: Some("web_hook".into()),
         address: Some("https://sve-backend.appspot.com/api/calendar/notifications".into()),
-        expiration: Some(format!("{}", expiration)),
+        expiration: Some(expiration),
         ..Default::default()
     };
     hub.events().watch(request, calendar_id).doit().await?;
@@ -64,13 +62,14 @@ pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) 
 pub(crate) async fn appointments(calendar_id: &str, max_results: i32) -> Result<Vec<Appointment>> {
     let hub = calendar_hub().await?;
 
-    let time_min = Utc::now().with_timezone(&Berlin).to_rfc3339();
+    let local_datetime = Local::now().with_timezone(&Berlin).naive_local();
+    let time_min = Utc.from_local_datetime(&local_datetime).unwrap();
 
     let (_, events) = hub
         .events()
         .list(calendar_id)
         .max_results(max_results)
-        .time_min(&time_min)
+        .time_min(time_min)
         .order_by("startTime") //$NON-NLS-1$
         .single_events(true)
         .doit()
@@ -111,11 +110,8 @@ fn into_appointment(event: Event, sort_index: u32) -> Result<Appointment> {
 
 fn into_date(date: &Option<EventDateTime>, days_to_add: i8) -> Result<Option<NaiveDate>> {
     let option = match date {
-        Some(value) => match &value.date {
-            Some(s) => {
-                let result = NaiveDate::parse_from_str(s, "%Y-%m-%d")?;
-                result.checked_add_signed(Duration::days(days_to_add.into()))
-            }
+        Some(value) => match value.date {
+            Some(date) => date.checked_add_signed(Duration::days(days_to_add.into())),
             None => None,
         },
         None => None,
@@ -125,10 +121,7 @@ fn into_date(date: &Option<EventDateTime>, days_to_add: i8) -> Result<Option<Nai
 
 fn into_date_time(date: Option<EventDateTime>) -> Result<Option<NaiveDateTime>> {
     let option = match date {
-        Some(value) => match value.date_time {
-            Some(s) => Some(DateTime::parse_from_rfc3339(&s)?.naive_local()),
-            None => None,
-        },
+        Some(value) => value.date_time.map(|s| s.naive_local()),
         None => None,
     };
     Ok(option)
