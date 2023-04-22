@@ -313,8 +313,11 @@ pub(crate) enum LifecycleStatus {
     /// No longer deletable - can only be archived by closing the event
     Finished,
 
-    /// Archived and only usable as draft for new events.
+    /// Closed and only usable as draft for new events.
     Closed,
+
+    /// Archived and only there for a complete history.
+    Archived,
 }
 
 impl LifecycleStatus {
@@ -326,6 +329,7 @@ impl LifecycleStatus {
             LifecycleStatus::Running => true,
             LifecycleStatus::Finished => false,
             LifecycleStatus::Closed => false,
+            LifecycleStatus::Archived => false,
         }
     }
 }
@@ -341,6 +345,7 @@ impl FromStr for LifecycleStatus {
             "running" => Ok(Self::Running),
             "finished" => Ok(Self::Finished),
             "closed" => Ok(Self::Closed),
+            "archived" => Ok(Self::Archived),
             other => bail!("Invalid lifecycle status {}", other),
         }
     }

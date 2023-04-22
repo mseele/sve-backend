@@ -81,8 +81,14 @@ WHERE
         }
         query_builder.push(
             r#")
-"#,
+    "#,
         );
+    } else {
+        query_builder.push(
+            r#"
+ AND e.lifecycle_status != "#,
+        );
+        query_builder.push_bind(LifecycleStatus::Archived);
     }
 
     query_builder.push(
@@ -413,11 +419,13 @@ async fn update_event(
 
     // add closed date if lifecycle status should be updated to closed
     // and no closed date is defined
+    let mut event_has_been_closed = false;
     if matches!(
         partial_event.lifecycle_status,
         Some(LifecycleStatus::Closed)
     ) && matches!(partial_event.closed, None)
     {
+        event_has_been_closed = true;
         update_is_needed |= push_bind(&mut separated, "CLOSED", Some(Utc::now()));
     }
 
@@ -442,6 +450,11 @@ async fn update_event(
             delete_event_dates(&mut tx, id).await?;
             save_event_dates(&mut tx, id, new_dates).await?;
         }
+    }
+
+    // archive events if the event has been closed
+    if event_has_been_closed {
+        archive_events(&mut tx).await?;
     }
 
     let event = fetch_event(&mut tx, id, false)
@@ -684,6 +697,43 @@ pub(crate) async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
         .await?;
 
     tx.commit().await?;
+
+    Ok(())
+}
+
+/// archive all duplicate (events with the same name) closed events
+/// to only have one event with the same name in status closed
+async fn archive_events(conn: &mut PgConnection) -> Result<()> {
+    query!(
+        r#"UPDATE
+	events e
+SET
+	lifecycle_status = 'Archived'
+WHERE
+	e."lifecycle_status" = 'Closed'
+	AND e.name IN (
+	SELECT
+		name
+	FROM
+		events en
+	WHERE
+		en."lifecycle_status" = 'Closed'
+	GROUP BY
+		en.name
+	HAVING
+		COUNT(*) > 1
+)
+	AND e.closed < (
+	SELECT
+		MAX(closed)
+	FROM
+		events ec
+	WHERE
+		ec.name = e.name
+)"#
+    )
+    .execute(conn)
+    .await?;
 
     Ok(())
 }

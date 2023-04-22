@@ -92,7 +92,8 @@
                   "Published",
                   "Running",
                   "Finished",
-                  "Closed"
+                  "Closed",
+                  "Archived"
                 ]
               },
               "name": "lifecycle_status"
@@ -110,6 +111,16 @@
       }
     },
     "query": "SELECT e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\" FROM events e WHERE e.id = $1"
+  },
+  "27148a2b946ca947b093f1e8420f47ca49df1071cc42bdfc972fae252ed5fd7d": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "UPDATE\n\tevents e\nSET\n\tlifecycle_status = 'Archived'\nWHERE\n\te.\"lifecycle_status\" = 'Closed'\n\tAND e.name IN (\n\tSELECT\n\t\tname\n\tFROM\n\t\tevents en\n\tWHERE\n\t\ten.\"lifecycle_status\" = 'Closed'\n\tGROUP BY\n\t\ten.name\n\tHAVING\n\t\tCOUNT(*) > 1\n)\n\tAND e.closed < (\n\tSELECT\n\t\tMAX(closed)\n\tFROM\n\t\tevents ec\n\tWHERE\n\t\tec.name = e.name\n)"
   },
   "305c2392d5448c7fe254c0a5ebf5f3f74665a2f68b7eecddb2026c3e70e45a79": {
     "describe": {
@@ -195,7 +206,8 @@
                   "Published",
                   "Running",
                   "Finished",
-                  "Closed"
+                  "Closed",
+                  "Archived"
                 ]
               },
               "name": "lifecycle_status"
@@ -435,7 +447,8 @@
                   "Published",
                   "Running",
                   "Finished",
-                  "Closed"
+                  "Closed",
+                  "Archived"
                 ]
               },
               "name": "lifecycle_status"
@@ -587,7 +600,8 @@
                   "Published",
                   "Running",
                   "Finished",
-                  "Closed"
+                  "Closed",
+                  "Archived"
                 ]
               },
               "name": "lifecycle_status"
@@ -897,7 +911,8 @@
                   "Published",
                   "Running",
                   "Finished",
-                  "Closed"
+                  "Closed",
+                  "Archived"
                 ]
               },
               "name": "lifecycle_status"
