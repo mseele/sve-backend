@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.10] - 2023-04-23
+
+### Features
+
+- Add archived event feature
+
 ## [2.0.9] - 2023-03-28
 
 ### Bug Fixes
