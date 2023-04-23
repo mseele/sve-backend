@@ -21,7 +21,7 @@ pub(crate) async fn renew_calendar_watch() {
     }
 }
 
-/// send a reminder email for each events that starts next week
+/// send a reminder email for all events starting next week
 pub(crate) async fn send_event_reminders(pool: &PgPool) {
     match events::send_event_reminders(pool).await {
         Ok(count) if count > 0 => info!("{} event reminders has been send successfully.", count),
