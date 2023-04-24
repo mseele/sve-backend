@@ -1636,6 +1636,8 @@ WHERE
         event_bookings eb
     WHERE
         eb.event_id = e.id
+        AND eb.enrolled IS TRUE
+        AND eb.canceled IS NULL
         AND eb.payed IS NULL)"#
     )
     .map(|row| row.id.into())
