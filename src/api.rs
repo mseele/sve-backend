@@ -122,6 +122,7 @@ pub(crate) fn config(cfg: &mut web::ServiceConfig) {
             )
             .route("/renew_calendar_watch", web::get().to(renew_calendar_watch))
             .route("/send_event_reminders", web::get().to(send_event_reminders))
+            .route("/close_finished_events", web::get().to(close_finished_events))
             .route(
                 "/send_payment_reminders/{event_type}",
                 web::get().to(send_payment_reminders),
@@ -424,6 +425,11 @@ async fn renew_calendar_watch() -> Result<impl Responder, ResponseError> {
 
 async fn send_event_reminders(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
     tasks::send_event_reminders(&pool).await;
+    Ok(HttpResponse::Ok().finish())
+}
+
+async fn close_finished_events(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+    tasks::close_finished_events(&pool).await;
     Ok(HttpResponse::Ok().finish())
 }
 

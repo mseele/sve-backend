@@ -455,6 +455,46 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
     Ok(booking_ids.len())
 }
 
+/// Check that an event has finished and all attendees have paid. If so,
+/// move the event to status 'Finished', send the attendee confirmation email,
+/// and move the event to status 'Closed'.
+pub(crate) async fn close_finished_running_events(pool: &PgPool) -> Result<usize> {
+    let mut count = 0;
+
+    for event_id in db::get_all_finished_event_ids(pool).await? {
+        // move event into status finsihed
+        let event = update(
+            pool,
+            PartialEvent {
+                id: Some(event_id),
+                lifecycle_status: Some(LifecycleStatus::Finished),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        // send confirmation emails for fitness events
+        if matches!(event.event_type, EventType::Fitness) {
+            send_participation_confirmation(pool, event_id).await?;
+        }
+
+        // move event into status closed
+        update(
+            pool,
+            PartialEvent {
+                id: Some(event_id),
+                lifecycle_status: Some(LifecycleStatus::Closed),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        count += 1;
+    }
+
+    Ok(count)
+}
+
 fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
     if beta {
         LifecycleStatus::Review

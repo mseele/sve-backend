@@ -706,6 +706,24 @@
     },
     "query": "\nSELECT\n\tCOUNT(1)\nFROM\n\tevent_bookings e\nWHERE\n\te.event_id = $1\n\tAND e.subscriber_id = $2\n    AND e.canceled IS NULL\n"
   },
+  "89175aac44b164641f926b07d88ef18cfc1a1866bb09bc6741cf72377e2709f3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT\n    e.id\nFROM\n    events e\nWHERE\n    e.lifecycle_status = 'Running'\n    AND e.custom_date IS NULL\n    AND (\n    SELECT\n        MAX(ed.date)\n    FROM\n        event_dates ed\n    WHERE\n        ed.event_id = e.id) < NOW()\n    AND NOT EXISTS (\n    SELECT\n        1\n    FROM\n        event_bookings eb\n    WHERE\n        eb.event_id = e.id\n        AND eb.payed IS NULL)"
+  },
   "91092a9a0e93550a4397d9475bc61710916273a523de3a51b25e0d6dba6a86a4": {
     "describe": {
       "columns": [],

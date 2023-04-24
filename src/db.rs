@@ -1608,6 +1608,43 @@ pub(crate) async fn mark_as_payment_reminder_sent(
     Ok(())
 }
 
+/// Return the id's of all events in status 'Running'
+/// where all event dates are in the past and every booking
+/// is payed.
+pub(crate) async fn get_all_finished_event_ids(pool: &PgPool) -> Result<Vec<EventId>> {
+    let mut conn = pool.acquire().await?;
+
+    let event_ids: Vec<EventId> = query!(
+        r#"SELECT
+    e.id
+FROM
+    events e
+WHERE
+    e.lifecycle_status = 'Running'
+    AND e.custom_date IS NULL
+    AND (
+    SELECT
+        MAX(ed.date)
+    FROM
+        event_dates ed
+    WHERE
+        ed.event_id = e.id) < NOW()
+    AND NOT EXISTS (
+    SELECT
+        1
+    FROM
+        event_bookings eb
+    WHERE
+        eb.event_id = e.id
+        AND eb.payed IS NULL)"#
+    )
+    .map(|row| row.id.into())
+    .fetch_all(&mut *conn)
+    .await?;
+
+    Ok(event_ids)
+}
+
 fn map_event(row: &PgRow) -> Result<Event> {
     Ok(Event::new(
         row.try_get("id")?,

@@ -30,6 +30,15 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) {
     }
 }
 
+/// Complete all finished events.
+pub(crate) async fn close_finished_events(pool: &PgPool) {
+    match events::close_finished_running_events(pool).await {
+        Ok(count) if count > 0 => info!("{count} events has been closed."),
+        Ok(_) => (),
+        Err(e) => error!("Error while closing finished events: {}", e),
+    }
+}
+
 /// send a reminder email for all bookings which are due with payment
 pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType) -> Result<()> {
     match events::send_payment_reminders(pool, event_type).await {
