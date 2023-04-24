@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.12] - 2023-04-24
+
+### Bug Fixes
+
+- Add canceled and enrolled to finished event id's statement
+
 ## [2.0.11] - 2023-04-24
 
 ### Features
