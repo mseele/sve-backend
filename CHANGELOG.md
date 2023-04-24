@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.11] - 2023-04-24
+
+### Features
+
+- Add task to automatically close finished events
+
 ## [2.0.10] - 2023-04-23
 
 ### Features
