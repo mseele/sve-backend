@@ -11,7 +11,6 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-openssl = { version = "0.10.50", features = ["vendored"] }
 env_logger = "0.10.0"
 log = "0.4.17"
 tracing = "0.1.37"
@@ -31,7 +30,13 @@ google-calendar3 = "5.0.2"
 yup-oauth2 = "8.2.0"
 hyper = "0.14.26"
 hyper-rustls = "0.24.0"
-lettre = { version = "0.10.4", features = ["tokio1-native-tls"] }
+lettre = { version = "0.10.4", default-features = false, features = [
+  "smtp-transport",
+  "pool",
+  "hostname",
+  "builder",
+  "tokio1-rustls-tls",
+] }
 regex = "1.7.3"
 lazy_static = "1.4.0"
 csv = "1.2.1"
