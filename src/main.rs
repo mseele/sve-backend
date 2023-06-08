@@ -28,46 +28,35 @@ mod hashids {
     }
 }
 
-use actix_cors::Cors;
-use actix_web::{dev::Service, web, App, HttpServer};
-use log::error;
+use std::time::Duration;
+use tower::ServiceBuilder;
+use tower_http::{
+    cors::CorsLayer,
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
+};
+use tracing::Level;
 
 pub(crate) const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let pool = db::init_pool().await?;
 
-    HttpServer::new(move || {
-        App::new()
-            // Access-Control-Allow-Origin
-            .wrap(
-                Cors::default()
-                    .send_wildcard()
-                    .allow_any_origin()
-                    .allow_any_method()
-                    .allow_any_header()
-                    .max_age(3600),
+    let app = api::router(pool).layer(
+        ServiceBuilder::new()
+            .layer(
+                TraceLayer::new_for_http()
+                    .on_request(DefaultOnRequest::new().level(Level::INFO))
+                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
             )
-            // Log errors
-            .wrap_fn(|req, srv| {
-                let fut = srv.call(req);
-                async {
-                    let res = fut.await?;
-                    if let Some(error) = res.response().error() {
-                        error!("{:?}", error);
-                    }
-                    Ok(res)
-                }
-            })
-            .app_data(web::Data::new(pool.clone()))
-            .service(web::scope("/api").configure(api::config))
-    })
-    .bind("0.0.0.0:8080")?
-    .run()
-    .await?;
+            .layer(CorsLayer::permissive().max_age(Duration::from_secs(3600))),
+    );
+
+    axum::Server::bind(&"0.0.0.0:8080".parse()?)
+        .serve(app.into_make_service())
+        .await?;
 
     Ok(())
 }

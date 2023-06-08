@@ -36,7 +36,7 @@ pub(crate) async fn event_bookings(pool: &PgPool, event_id: EventId) -> Result<(
         }
     }
 
-    actix_web::rt::spawn(async { export(event, bookings, waiting_list) }).await?
+    tokio::task::spawn_blocking(|| export(event, bookings, waiting_list)).await?
 }
 
 fn export(
@@ -184,7 +184,7 @@ pub(crate) async fn event_participants_list(
     // create a filename and return it with the bytes
     let filename = format!("{}.pdf", event.name.replace(' ', "_").to_lowercase());
 
-    let bytes = actix_web::rt::spawn(async move {
+    let bytes = tokio::task::spawn_blocking(move || {
         create_participant_list(&event.name, &day_and_time, &participants, &dates)
     })
     .await??;
@@ -405,7 +405,7 @@ pub(crate) async fn create_participation_confirmation(
     price: String,
     dates: String,
 ) -> Result<Vec<u8>> {
-    actix_web::rt::spawn(async {
+    tokio::task::spawn_blocking(|| {
         _create_participation_confirmation(
             first_name, last_name, event_name, first_date, last_date, price, dates,
         )

@@ -3,11 +3,14 @@ use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
     NewsSubscription, PartialEvent,
 };
-use actix_web::http::header::{ContentDisposition, ContentType, DispositionParam, DispositionType};
-use actix_web::web::{Data, Json};
-use actix_web::{error, HttpRequest, HttpResponseBuilder};
-use actix_web::{http::header, http::StatusCode};
-use actix_web::{web, HttpResponse, Responder, Result};
+use axum::extract::{self, Path, Query, State};
+use axum::http::{
+    header::{self, HeaderMap},
+    StatusCode,
+};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{delete, get, patch, post};
+use axum::{Json, Router};
 use chrono::NaiveDate;
 use log::error;
 use serde::de;
@@ -61,77 +64,88 @@ impl From<anyhow::Error> for ResponseError {
     }
 }
 
-impl error::ResponseError for ResponseError {
-    fn error_response(&self) -> HttpResponse {
-        HttpResponseBuilder::new(self.status_code())
-            .insert_header(header::ContentType(mime::TEXT_PLAIN_UTF_8))
-            .body("An internal error occurred. Please try again later.")
-    }
-
-    fn status_code(&self) -> StatusCode {
-        StatusCode::INTERNAL_SERVER_ERROR
+impl IntoResponse for ResponseError {
+    fn into_response(self) -> Response {
+        error!("{:?}", self);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            [(header::CONTENT_TYPE, "text/plain")],
+            "An internal error occurred. Please try again later.",
+        ).into_response()
     }
 }
 
-pub(crate) fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/events")
-            .route("", web::get().to(events))
-            .route("/counter", web::get().to(counter))
-            .route("/booking", web::post().to(booking))
-            .route("/prebooking/{hash}", web::get().to(prebooking))
-            .route("/update", web::post().to(update))
-            .route("/{id}", web::delete().to(delete))
-            .route("/booking/{id}", web::patch().to(update_event_booking))
-            .route("/booking/{id}", web::delete().to(cancel_event_booking))
-            .route(
-                "/booking/export/{event_id}",
-                web::get().to(export_event_bookings),
-            )
-            .route(
-                "/booking/participants_list/{event_id}",
-                web::get().to(export_event_participants_list),
-            )
-            .route("/payments/verify", web::post().to(verify_payments))
-            .route(
-                "/payments/unpaid/{event_type}",
-                web::get().to(unpaid_bookings),
-            ),
-    );
-    cfg.service(
-        web::scope("/news")
-            .route("/subscribe", web::post().to(subscribe))
-            .route("/unsubscribe", web::post().to(unsubscribe))
-            .route("/subscribers", web::get().to(subscribers)),
-    );
-    cfg.service(
-        web::scope("/contact")
-            .route("/message", web::post().to(message))
-            .route("/emails", web::post().to(emails)),
-    );
-    cfg.service(
-        web::scope("/calendar")
-            .route("/appointments", web::get().to(appointments))
-            .route("/notifications", web::post().to(notifications)),
-    );
-    cfg.service(
-        web::scope("/tasks")
-            .route(
-                "/check_email_connectivity",
-                web::get().to(check_email_connectivity),
-            )
-            .route("/renew_calendar_watch", web::get().to(renew_calendar_watch))
-            .route("/send_event_reminders", web::get().to(send_event_reminders))
-            .route("/close_finished_events", web::get().to(close_finished_events))
-            .route(
-                "/send_payment_reminders/{event_type}",
-                web::get().to(send_payment_reminders),
-            )
-            .route(
-                "/send_participation_confirmation/{event_id}",
-                web::get().to(send_participation_confirmation),
-            ),
-    );
+pub(crate) fn router(state: PgPool) -> Router {
+    Router::new()
+        .nest(
+            "/api",
+            Router::new()
+                .nest(
+                    "/events",
+                    Router::new()
+                        .route("/", get(events))
+                        .route("/counter", get(counter))
+                        .route("/booking", post(booking))
+                        .route("/prebooking/:hash", get(prebooking))
+                        .route("/update", post(update))
+                        .route("/:id", delete(delete_event))
+                        .nest(
+                            "/booking",
+                            Router::new()
+                                .route(
+                                    "/:id",
+                                    patch(update_event_booking).delete(cancel_event_booking),
+                                )
+                                .route("/export/:event_id", get(export_event_bookings))
+                                .route(
+                                    "/participants_list/:event_id",
+                                    get(export_event_participants_list),
+                                ),
+                        )
+                        .nest(
+                            "/payments",
+                            Router::new()
+                                .route("/verify", post(verify_payments))
+                                .route("/unpaid/:event_type", get(unpaid_bookings)),
+                        ),
+                )
+                .nest(
+                    "/news",
+                    Router::new()
+                        .route("/subscribe", post(subscribe))
+                        .route("/unsubscribe", post(unsubscribe))
+                        .route("/subscribers", get(subscribers)),
+                )
+                .nest(
+                    "/contact",
+                    Router::new()
+                        .route("/message", post(message))
+                        .route("/emails", post(emails)),
+                )
+                .nest(
+                    "/calendar",
+                    Router::new()
+                        .route("/appointments", get(appointments))
+                        .route("/notifications", post(notifications)),
+                )
+                .nest(
+                    "/tasks",
+                    Router::new()
+                        .route("/check_email_connectivity", get(check_email_connectivity))
+                        .route("/renew_calendar_watch", get(renew_calendar_watch))
+                        .route("/send_event_reminders", get(send_event_reminders))
+                        .route("/close_finished_events", get(close_finished_events))
+                        .route(
+                            "/send_payment_reminders/:event_type",
+                            get(send_payment_reminders),
+                        )
+                        .route(
+                            "/send_participation_confirmation/:event_id",
+                            get(send_participation_confirmation),
+                        ),
+                ),
+        )
+        .with_state(state)
 }
 
 // events
@@ -195,9 +209,9 @@ pub(crate) struct UpdateEventBookingQueryParams {
 }
 
 async fn events(
-    pool: Data<PgPool>,
-    mut query: web::Query<EventsQueryParams>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    mut query: Query<EventsQueryParams>,
+) -> Result<impl IntoResponse, ResponseError> {
     let events = events::get_events(
         &pool,
         query.beta.take(),
@@ -209,135 +223,115 @@ async fn events(
 }
 
 async fn counter(
-    pool: Data<PgPool>,
-    query: web::Query<EventCountersQueryParams>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    query: Query<EventCountersQueryParams>,
+) -> Result<impl IntoResponse, ResponseError> {
     let event_counters = events::get_event_counters(&pool, query.beta).await?;
     Ok(Json(event_counters))
 }
 
 async fn booking(
-    pool: Data<PgPool>,
-    Json(booking): Json<EventBooking>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    extract::Json(booking): extract::Json<EventBooking>,
+) -> Result<impl IntoResponse, ResponseError> {
     let response = events::booking(&pool, booking).await;
     Ok(Json(response))
 }
 
 async fn prebooking(
-    pool: Data<PgPool>,
-    path: web::Path<String>,
-) -> Result<impl Responder, ResponseError> {
-    let response = events::prebooking(&pool, path.into_inner()).await;
+    State(pool): State<PgPool>,
+    Path(hash): Path<String>,
+) -> Result<impl IntoResponse, ResponseError> {
+    let response = events::prebooking(&pool, hash).await;
     Ok(Json(response))
 }
 
 async fn update(
-    pool: Data<PgPool>,
-    Json(partial_event): Json<PartialEvent>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    extract::Json(partial_event): extract::Json<PartialEvent>,
+) -> Result<impl IntoResponse, ResponseError> {
     let event = events::update(&pool, partial_event).await?;
     Ok(Json(event))
 }
 
-async fn delete(
-    pool: Data<PgPool>,
-    path: web::Path<EventId>,
-) -> Result<impl Responder, ResponseError> {
-    events::delete(&pool, path.into_inner()).await?;
-    Ok(HttpResponse::Ok().finish())
+async fn delete_event(
+    State(pool): State<PgPool>,
+    Path(path): Path<EventId>,
+) -> Result<impl IntoResponse, ResponseError> {
+    events::delete(&pool, path).await?;
+    Ok(StatusCode::OK)
 }
 
 async fn verify_payments(
-    pool: Data<PgPool>,
-    Json(input): Json<VerifyPaymentInput>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    extract::Json(input): extract::Json<VerifyPaymentInput>,
+) -> Result<impl IntoResponse, ResponseError> {
     Ok(Json(
         events::verify_payments(&pool, input.csv, input.start_date).await?,
     ))
 }
 
 async fn unpaid_bookings(
-    pool: Data<PgPool>,
-    path: web::Path<EventType>,
-) -> Result<impl Responder, ResponseError> {
-    Ok(Json(
-        events::get_unpaid_bookings(&pool, path.into_inner()).await?,
-    ))
+    State(pool): State<PgPool>,
+    Path(event_type): Path<EventType>,
+) -> Result<impl IntoResponse, ResponseError> {
+    Ok(Json(events::get_unpaid_bookings(&pool, event_type).await?))
 }
 
 async fn update_event_booking(
-    pool: Data<PgPool>,
-    path: web::Path<i32>,
-    query: web::Query<UpdateEventBookingQueryParams>,
-) -> Result<impl Responder, ResponseError> {
-    let booking_id = path.into_inner();
+    State(pool): State<PgPool>,
+    Path(booking_id): Path<i32>,
+    query: Query<UpdateEventBookingQueryParams>,
+) -> Result<impl IntoResponse, ResponseError> {
     if let Some(update_payment) = query.update_payment {
         events::update_payment(&pool, booking_id, update_payment).await?;
     }
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 async fn cancel_event_booking(
-    pool: Data<PgPool>,
-    path: web::Path<i32>,
-) -> Result<impl Responder, ResponseError> {
-    let booking_id = path.into_inner();
+    State(pool): State<PgPool>,
+    Path(booking_id): Path<i32>,
+) -> Result<impl IntoResponse, ResponseError> {
     events::cancel_booking(&pool, booking_id).await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 async fn export_event_bookings(
-    pool: Data<PgPool>,
-    path: web::Path<EventId>,
-) -> Result<impl Responder, ResponseError> {
-    let event_id = path.into_inner();
+    State(pool): State<PgPool>,
+    Path(event_id): Path<EventId>,
+) -> Result<impl IntoResponse, ResponseError> {
     let (filename, bytes) = export::event_bookings(&pool, event_id).await?;
-
-    Ok(HttpResponse::Ok()
-        .content_type(ContentType::octet_stream())
-        .insert_header(ContentDisposition {
-            disposition: DispositionType::Attachment,
-            parameters: vec![DispositionParam::Filename(filename)],
-        })
-        .body(bytes))
+    Ok(into_file_response(filename, bytes))
 }
 
 async fn export_event_participants_list(
-    pool: Data<PgPool>,
-    path: web::Path<EventId>,
-) -> Result<impl Responder, ResponseError> {
-    let event_id = path.into_inner();
+    State(pool): State<PgPool>,
+    Path(event_id): Path<EventId>,
+) -> Result<impl IntoResponse, ResponseError> {
     let (filename, bytes) = export::event_participants_list(&pool, event_id).await?;
-
-    Ok(HttpResponse::Ok()
-        .content_type(ContentType(mime::APPLICATION_PDF))
-        .insert_header(ContentDisposition {
-            disposition: DispositionType::Attachment,
-            parameters: vec![DispositionParam::Filename(filename)],
-        })
-        .body(bytes))
+    Ok(into_file_response(filename, bytes))
 }
 
 // news
 
 async fn subscribe(
-    pool: Data<PgPool>,
-    Json(subscription): Json<NewsSubscription>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    extract::Json(subscription): extract::Json<NewsSubscription>,
+) -> Result<impl IntoResponse, ResponseError> {
     news::subscribe(&pool, subscription).await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 async fn unsubscribe(
-    pool: Data<PgPool>,
-    Json(subscription): Json<NewsSubscription>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    extract::Json(subscription): extract::Json<NewsSubscription>,
+) -> Result<impl IntoResponse, ResponseError> {
     news::unsubscribe(&pool, subscription).await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
-async fn subscribers(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+async fn subscribers(State(pool): State<PgPool>) -> Result<impl IntoResponse, ResponseError> {
     let subscriptions = news::get_subscriptions(&pool).await?;
     let result = subscriptions
         .into_iter()
@@ -357,21 +351,23 @@ async fn subscribers(pool: Data<PgPool>) -> Result<impl Responder, ResponseError
         .collect::<Vec<_>>()
         .join("<br/><br/><br/>");
 
-    Ok(HttpResponse::Ok()
-        .content_type(ContentType::html())
-        .body(result))
+    Ok((
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/html")],
+        result,
+    ))
 }
 
 // calendar
 
-async fn appointments() -> Result<impl Responder, ResponseError> {
+async fn appointments() -> Result<impl IntoResponse, ResponseError> {
     let result = calendar::appointments().await?;
     Ok(Json(result))
 }
 
-async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError> {
+async fn notifications(headers: HeaderMap) -> Result<impl IntoResponse, ResponseError> {
     let header_key = "X-Goog-Channel-Id";
-    let channel_id = req.headers().get(header_key);
+    let channel_id = headers.get(header_key);
     if let Some(channel_id) = channel_id {
         match channel_id.to_str() {
             Ok(channel_id) => calendar::notifications(channel_id).await?,
@@ -383,7 +379,7 @@ async fn notifications(req: HttpRequest) -> Result<impl Responder, ResponseError
     } else {
         error!("Header '{}' has not been found in the request", header_key);
     }
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 // contact
@@ -394,57 +390,72 @@ struct EmailsBody {
     event: Option<EventEmail>,
 }
 
-async fn message(Json(message): Json<ContactMessage>) -> Result<impl Responder, ResponseError> {
+async fn message(Json(message): Json<ContactMessage>) -> Result<impl IntoResponse, ResponseError> {
     contact::message(message).await?;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 async fn emails(
-    pool: Data<PgPool>,
-    Json(body): Json<EmailsBody>,
-) -> Result<impl Responder, ResponseError> {
+    State(pool): State<PgPool>,
+    extract::Json(body): extract::Json<EmailsBody>,
+) -> Result<impl IntoResponse, ResponseError> {
     if let Some(emails) = body.emails {
         contact::emails(emails).await?;
     } else if let Some(event) = body.event {
         events::send_event_email(&pool, event).await?;
     }
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 // tasks
 
-async fn check_email_connectivity() -> Result<impl Responder, ResponseError> {
+async fn check_email_connectivity() -> Result<impl IntoResponse, ResponseError> {
     tasks::check_email_connectivity().await;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
-async fn renew_calendar_watch() -> Result<impl Responder, ResponseError> {
+async fn renew_calendar_watch() -> Result<impl IntoResponse, ResponseError> {
     tasks::renew_calendar_watch().await;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
-async fn send_event_reminders(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+async fn send_event_reminders(
+    State(pool): State<PgPool>,
+) -> Result<impl IntoResponse, ResponseError> {
     tasks::send_event_reminders(&pool).await;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
-async fn close_finished_events(pool: Data<PgPool>) -> Result<impl Responder, ResponseError> {
+async fn close_finished_events(
+    State(pool): State<PgPool>,
+) -> Result<impl IntoResponse, ResponseError> {
     tasks::close_finished_events(&pool).await;
-    Ok(HttpResponse::Ok().finish())
+    Ok(StatusCode::OK)
 }
 
 async fn send_payment_reminders(
-    pool: Data<PgPool>,
-    path: web::Path<EventType>,
-) -> Result<impl Responder, ResponseError> {
-    tasks::send_payment_reminders(&pool, path.into_inner()).await?;
-    Ok(HttpResponse::Ok().finish())
+    State(pool): State<PgPool>,
+    Path(event_type): Path<EventType>,
+) -> Result<impl IntoResponse, ResponseError> {
+    tasks::send_payment_reminders(&pool, event_type).await?;
+    Ok(StatusCode::OK)
 }
 
 async fn send_participation_confirmation(
-    pool: Data<PgPool>,
-    path: web::Path<EventId>,
-) -> Result<impl Responder, ResponseError> {
-    tasks::send_participation_confirmation(&pool, path.into_inner()).await?;
-    Ok(HttpResponse::Ok().finish())
+    State(pool): State<PgPool>,
+    Path(event_id): Path<EventId>,
+) -> Result<impl IntoResponse, ResponseError> {
+    tasks::send_participation_confirmation(&pool, event_id).await?;
+    Ok(StatusCode::OK)
+}
+
+fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{filename}\""),
+        )],
+        bytes,
+    )
 }

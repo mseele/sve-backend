@@ -127,7 +127,7 @@ pub(crate) async fn verify_payments(
     };
 
     let payment_records =
-        actix_web::web::block(move || read_payment_records(&csv, csv_start_date)).await??;
+        tokio::task::spawn_blocking(move || read_payment_records(&csv, csv_start_date)).await??;
     let payment_ids = payment_records
         .iter()
         .flat_map(|r| &r.payment_ids)
