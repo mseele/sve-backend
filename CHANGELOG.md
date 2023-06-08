@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.13] - 2023-06-08
+
+### Refactor
+
+- Migrate from actix-web to axum
+
 ## [2.0.12] - 2023-04-24
 
 ### Bug Fixes
