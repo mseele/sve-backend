@@ -1560,7 +1560,11 @@ WHERE
     .fetch_all(&mut *conn)
     .await?;
 
-    let events = fetch_events(&mut conn, event_ids, true).await?;
+    let events = if !event_ids.is_empty() {
+        fetch_events(&mut conn, event_ids, true).await?
+    } else {
+        vec![]
+    };
 
     Ok(events)
 }
