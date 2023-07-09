@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.14] - 2023-07-09
+
+### Bug Fixes
+
+- Correct news subscription subject
+- Avoid fetching empty event list
+
 ## [2.0.13] - 2023-06-08
 
 ### Refactor
