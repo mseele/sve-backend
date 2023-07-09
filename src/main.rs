@@ -36,8 +36,6 @@ use tower_http::{
 };
 use tracing::Level;
 
-pub(crate) const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();

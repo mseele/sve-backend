@@ -10,9 +10,11 @@ use hyper::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
 use yup_oauth2::ServiceAccountKey;
 
+const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
+
 async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
     let secret: ServiceAccountKey =
-        serde_json::from_str(crate::CREDENTIALS).with_context(|| "Error loading credentials")?;
+        serde_json::from_str(CREDENTIALS).with_context(|| "Error loading credentials")?;
 
     let auth = yup_oauth2::ServiceAccountAuthenticator::builder(secret)
         .build()
