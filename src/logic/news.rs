@@ -75,7 +75,7 @@ async fn send_mail(subscription: NewsSubscription) -> Result<()> {
     let regards;
     match primary_news_topic {
         NewsTopic::General => {
-            subject = "[Fitness@SVE] Bestätigung Fitness-News Anmeldung";
+            subject = "[Infos@SVE] Bestätigung Newsletter Anmeldung";
             topic = "News rund um den SVE";
             if let Some(multiple_topics) = multiple_topics {
                 kind = format!(" zu folgenden Themen: {}", multiple_topics);
@@ -91,7 +91,7 @@ async fn send_mail(subscription: NewsSubscription) -> Result<()> {
             regards = "Team Events@SVE";
         }
         NewsTopic::Fitness => {
-            subject = "[Infos@SVE] Bestätigung Newsletter Anmeldung";
+            subject = "[Fitness@SVE] Bestätigung Fitness-News Anmeldung";
             topic = "unseren Fitnesskursen";
             kind = ", sobald neue Kurse online sind".into();
             regards = "Team Fitness@SVE";
