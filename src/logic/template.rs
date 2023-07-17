@@ -72,11 +72,12 @@ struct ScheduleChangeTemplateData<'a> {
 
 impl<'a> ScheduleChangeTemplateData<'a> {
     fn new(booking: &'a EventBooking, event: &'a Event, removed_dates: &[DateTime<Utc>]) -> Self {
+        let now = Utc::now();
         Self {
             firstname: booking.first_name.trim(),
             name: event.name.trim(),
             removed_dates: format_dates(removed_dates),
-            new_dates: format_dates(&event.dates),
+            new_dates: format_and_filter_dates(&event.dates, |d| d > &&now),
         }
     }
 }
@@ -173,8 +174,16 @@ impl HelperDef for PaydayHelper<'_> {
 }
 
 fn format_dates(dates: &[DateTime<Utc>]) -> String {
+    format_and_filter_dates(dates, |_d| true)
+}
+
+fn format_and_filter_dates<P>(dates: &[DateTime<Utc>], predicate: P) -> String
+where
+    P: FnMut(&&DateTime<Utc>) -> bool,
+{
     dates
         .iter()
+        .filter(predicate)
         .map(|d| {
             d.format_localized("- %a., %d. %B %Y, %H:%M Uhr", Locale::de_DE)
                 .to_string()
@@ -638,6 +647,77 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             )
             .unwrap(),
             "Max FitForFun",
+        );
+    }
+
+    #[test]
+    fn test_render_schedule_change() {
+        let date_1 = Utc.with_ymd_and_hms(2022, 3, 7, 19, 00, 00).unwrap();
+        let date_2 = Utc.with_ymd_and_hms(2022, 3, 8, 19, 00, 00).unwrap();
+        let date_3 = Utc.with_ymd_and_hms(2100, 3, 9, 19, 00, 00).unwrap();
+        let date_4 = Utc.with_ymd_and_hms(2100, 3, 10, 19, 00, 00).unwrap();
+        let date_5 = Utc.with_ymd_and_hms(2100, 3, 11, 19, 00, 00).unwrap();
+        let date_6 = Utc.with_ymd_and_hms(2100, 3, 12, 19, 00, 00).unwrap();
+
+        let event = Event::new(
+            0,
+            Utc::now(),
+            None,
+            EventType::Fitness,
+            LifecycleStatus::Draft,
+            String::from("FitForFun"),
+            0,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            vec![date_1, date_2, date_3, date_5, date_6],
+            None,
+            0,
+            0,
+            0,
+            BigDecimal::from_i8(5).unwrap(),
+            BigDecimal::from_i8(10).unwrap(),
+            None,
+            String::from("Turn- & Festhalle Eutingen"),
+            String::from("booking_template"),
+            None,
+            None,
+            None,
+            false,
+        );
+        let booking = EventBooking::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+        );
+
+        assert_eq!(
+            render_schedule_change(
+                r#"{{firstname}} / {{name}}
+<-->
+{{removed_dates}}
+<-->
+{{new_dates}}"#,
+                &booking,
+                &event,
+                &[date_4],
+            )
+            .unwrap(),
+            r#"Max / FitForFun
+<-->
+- Mi., 10. März 2100, 19:00 Uhr
+<-->
+- Di., 09. März 2100, 19:00 Uhr
+- Do., 11. März 2100, 19:00 Uhr
+- Fr., 12. März 2100, 19:00 Uhr"#,
         );
     }
 
