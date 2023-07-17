@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.15] - 2023-07-17
+
+### Bug Fixes
+
+- Skip historic dates in render_schedule_change
+
+### Refactor
+
+- Restrict access to credentials
+
 ## [2.0.14] - 2023-07-09
 
 ### Bug Fixes
