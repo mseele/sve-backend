@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE\n\tevents e\nSET\n\tlifecycle_status = 'Archived'\nWHERE\n\te.\"lifecycle_status\" = 'Closed'\n\tAND e.name IN (\n\tSELECT\n\t\tname\n\tFROM\n\t\tevents en\n\tWHERE\n\t\ten.\"lifecycle_status\" = 'Closed'\n\tGROUP BY\n\t\ten.name\n\tHAVING\n\t\tCOUNT(*) > 1\n)\n\tAND e.closed < (\n\tSELECT\n\t\tMAX(closed)\n\tFROM\n\t\tevents ec\n\tWHERE\n\t\tec.name = e.name\n)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "27148a2b946ca947b093f1e8420f47ca49df1071cc42bdfc972fae252ed5fd7d"
+}

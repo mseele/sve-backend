@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.email, s.general, s.events, s.fitness FROM news_subscribers s",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "general",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "events",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "fitness",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "80f5a6e6bf8c85c7b7965deefaf1147d7632dc416c298010616158d5c4526dc9"
+}

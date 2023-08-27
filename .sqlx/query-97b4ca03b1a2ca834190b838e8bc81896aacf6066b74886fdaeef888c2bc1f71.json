@@ -1,0 +1,98 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n    e.id AS event_id,\n    e.name AS event_name,\n    ed.date as first_event_date,\n    e.booking_template as event_template,\n    b.id,\n    b.created,\n    s.first_name,\n    s.last_name,\n    s.email,\n    CASE WHEN s.member IS TRUE\n        THEN e.price_member\n        ELSE e.price_non_member\n    END as price,\n    b.payment_id,\n    b.payment_reminder_sent\nFROM\n    events e\n    LEFT JOIN (\n        SELECT\n            ied.event_id,\n            MIN(ied.date) as date\n        FROM\n            event_dates ied\n        GROUP BY\n            ied.event_id) ed ON\n        e.id = ed.event_id,\n    event_bookings b,\n    event_subscribers s\nWHERE\n    e.event_type = $1\n    AND e.id = b.event_id\n    AND b.subscriber_id = s.id\n    AND b.enrolled IS TRUE\n    AND b.canceled IS NULL\n    AND b.payed IS NULL\n\tAND e.lifecycle_status IN('Review', 'Published', 'Running')\nORDER BY\n    b.payment_reminder_sent,\n    e.name,\n    b.created",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "first_event_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "event_template",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "first_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "last_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "payment_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "payment_reminder_sent",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "event_type",
+            "kind": {
+              "Enum": [
+                "Fitness",
+                "Events"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      true
+    ]
+  },
+  "hash": "97b4ca03b1a2ca834190b838e8bc81896aacf6066b74886fdaeef888c2bc1f71"
+}

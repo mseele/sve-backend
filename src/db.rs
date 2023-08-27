@@ -433,7 +433,7 @@ async fn update_event(
         query_builder.push("WHERE id = ");
         query_builder.push_bind(id.get_ref());
 
-        query_builder.build().execute(&mut tx).await?;
+        query_builder.build().execute(&mut *tx).await?;
     }
 
     let mut removed_dates = None;
@@ -609,7 +609,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
             row.external_operator,
         )
     })
-    .fetch_one(&mut tx)
+    .fetch_one(&mut *tx)
     .await?;
 
     new_event.dates = save_event_dates(&mut tx, &new_event.id, dates).await?;
@@ -676,7 +676,7 @@ pub(crate) async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
         id.get_ref()
     )
     .map(|row| row.lifecycle_status)
-    .fetch_optional(&mut tx)
+    .fetch_optional(&mut *tx)
     .await?;
 
     let lifecycle_status = lifecycle_status
@@ -693,7 +693,7 @@ pub(crate) async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
     delete_event_dates(&mut tx, &id).await?;
 
     query!(r#"DELETE FROM events e WHERE e.id = $1"#, id.get_ref())
-        .execute(&mut tx)
+        .execute(&mut *tx)
         .await?;
 
     tx.commit().await?;
@@ -895,7 +895,7 @@ WHERE
             iban,
             booking_id,
         )
-        .execute(&mut tx)
+        .execute(&mut *tx)
         .await?;
     }
 
@@ -917,7 +917,7 @@ pub(crate) async fn update_payment(
                 r#"UPDATE event_bookings SET payed = NOW() WHERE id = $1"#,
                 booking_id,
             )
-            .execute(&mut tx)
+            .execute(&mut *tx)
             .await?;
         }
         false => {
@@ -925,7 +925,7 @@ pub(crate) async fn update_payment(
                 r#"UPDATE event_bookings SET payed = NULL WHERE id = $1"#,
                 booking_id,
             )
-            .execute(&mut tx)
+            .execute(&mut *tx)
             .await?;
         }
     }
@@ -1142,7 +1142,7 @@ WHERE
                     None,
                 )
             })
-            .fetch_one(&mut tx)
+            .fetch_one(&mut *tx)
             .await?;
 
             (result, Some(booking))
@@ -1411,7 +1411,7 @@ pub(crate) async fn cancel_event_booking(
         r#"UPDATE event_bookings SET canceled = NOW() WHERE id = $1"#,
         booking_id,
     )
-    .execute(&mut tx)
+    .execute(&mut *tx)
     .await?;
 
     // fetch the canceled booking data
@@ -1447,7 +1447,7 @@ WHERE
             None,
         )
     })
-    .fetch_one(&mut tx)
+    .fetch_one(&mut *tx)
     .await?;
 
     let event_id = canceled_booking.event_id;
@@ -1494,7 +1494,7 @@ v.created"#,
             row.payment_id.unwrap(),
         )
     })
-    .fetch_optional(&mut tx)
+    .fetch_optional(&mut *tx)
     .await?;
 
     // extract and switch enrolled status for waiting list booking - if available
@@ -1504,7 +1504,7 @@ v.created"#,
             r#"UPDATE event_bookings SET enrolled = true WHERE id = $1"#,
             booking_id,
         )
-        .execute(&mut tx)
+        .execute(&mut *tx)
         .await?;
 
         first_waiting_list_booking = Some((booking, payment_id));
@@ -1730,7 +1730,7 @@ pub(crate) async fn subscribe(
             general,
             events,
             fitness
-        ).execute(&mut tx)
+        ).execute(&mut *tx)
         .await?;
     }
 
@@ -1758,7 +1758,7 @@ pub(crate) async fn unsubscribe(pool: &PgPool, subscription: &NewsSubscription) 
                 r#"DELETE FROM news_subscribers WHERE id = $1"#,
                 current_subscription.id
             )
-            .execute(&mut tx)
+            .execute(&mut *tx)
             .await?;
         }
     }

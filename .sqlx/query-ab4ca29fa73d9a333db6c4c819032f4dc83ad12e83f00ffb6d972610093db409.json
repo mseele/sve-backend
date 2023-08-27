@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n    e.lifecycle_status AS \"lifecycle_status: LifecycleStatus\"\nFROM\n    events e\nWHERE\n    e.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lifecycle_status: LifecycleStatus",
+        "type_info": {
+          "Custom": {
+            "name": "lifecycle_status",
+            "kind": {
+              "Enum": [
+                "Draft",
+                "Review",
+                "Published",
+                "Running",
+                "Finished",
+                "Closed",
+                "Archived"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ab4ca29fa73d9a333db6c4c819032f4dc83ad12e83f00ffb6d972610093db409"
+}

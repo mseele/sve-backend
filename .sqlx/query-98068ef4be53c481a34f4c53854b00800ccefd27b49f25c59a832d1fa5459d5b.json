@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n\te.id\nFROM\n\tevents e\nINNER JOIN (\n\tSELECT\n\t\tied.event_id,\n\t\tMIN(ied.date) as date\n\tFROM\n\t\tevent_dates ied\n\tGROUP BY\n\t\tied.event_id) ed ON\n\te.id = ed.event_id\nWHERE\n\te.reminder_sent IS NULL\n\tAND e.lifecycle_status IN('Review', 'Published', 'Running')\n\tAND ed.date >= (CURRENT_DATE + INTERVAL '1' DAY)\n\tAND ed.date <= (CURRENT_DATE + INTERVAL '6' DAY)\n\tAND EXISTS (\n\tSELECT\n\t\t*\n\tFROM\n\t\tevent_bookings eb\n\tWHERE\n\t\te.id = eb.event_id\n\t\tAND eb.enrolled IS TRUE\n\t\tAND eb.canceled IS NULL)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "98068ef4be53c481a34f4c53854b00800ccefd27b49f25c59a832d1fa5459d5b"
+}

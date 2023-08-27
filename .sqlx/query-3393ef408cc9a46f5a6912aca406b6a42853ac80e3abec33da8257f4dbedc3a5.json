@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM event_dates WHERE event_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3393ef408cc9a46f5a6912aca406b6a42853ac80e3abec33da8257f4dbedc3a5"
+}

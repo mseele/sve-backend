@@ -1,0 +1,70 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n    v.id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member,\n    v.payment_id\nFROM\n    v_event_bookings v\nWHERE\n    v.event_id = $1\n    AND v.canceled IS NULL\n    AND v.enrolled IS FALSE\nORDER BY\nv.created",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "first_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "last_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "street",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "city",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "phone",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "member",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "payment_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "774531f3f7b213473469b13e414d2e3ad1e547ef2a13da58821872a8c8d3e908"
+}

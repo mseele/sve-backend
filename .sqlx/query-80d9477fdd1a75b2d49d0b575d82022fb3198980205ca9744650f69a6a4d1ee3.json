@@ -1,0 +1,231 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nINSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)\nRETURNING id, created, closed, event_type AS \"event_type: EventType\", lifecycle_status AS \"lifecycle_status: LifecycleStatus\", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "closed",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "event_type: EventType",
+        "type_info": {
+          "Custom": {
+            "name": "event_type",
+            "kind": {
+              "Enum": [
+                "Fitness",
+                "Events"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "lifecycle_status: LifecycleStatus",
+        "type_info": {
+          "Custom": {
+            "name": "lifecycle_status",
+            "kind": {
+              "Enum": [
+                "Draft",
+                "Review",
+                "Published",
+                "Running",
+                "Finished",
+                "Closed",
+                "Archived"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "sort_index",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 7,
+        "name": "short_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "image",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "light",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "custom_date",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "duration_in_minutes",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 13,
+        "name": "max_subscribers",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 14,
+        "name": "max_waiting_list",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 15,
+        "name": "price_member",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 16,
+        "name": "price_non_member",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 17,
+        "name": "cost_per_date",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 18,
+        "name": "location",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "booking_template",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "payment_account",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "alt_booking_button_text",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "alt_email_address",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "external_operator",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        {
+          "Custom": {
+            "name": "event_type",
+            "kind": {
+              "Enum": [
+                "Fitness",
+                "Events"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "lifecycle_status",
+            "kind": {
+              "Enum": [
+                "Draft",
+                "Review",
+                "Published",
+                "Running",
+                "Finished",
+                "Closed",
+                "Archived"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Int2",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Text",
+        "Int2",
+        "Int2",
+        "Int2",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "80d9477fdd1a75b2d49d0b575d82022fb3198980205ca9744650f69a6a4d1ee3"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE event_bookings SET enrolled = true WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "08bdba04d89a88a8d1fea196318a18ea93f7905d2977860462569a14ec6b340b"
+}

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE news_subscribers SET general = $2, events = $3, fitness = $4 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Bool",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b67221832717c24ee8815db51f53d07e70329dd8afb327ae5329f349abd247d0"
+}
