@@ -423,7 +423,7 @@ async fn update_event(
     if matches!(
         partial_event.lifecycle_status,
         Some(LifecycleStatus::Closed)
-    ) && matches!(partial_event.closed, None)
+    ) && partial_event.closed.is_none()
     {
         event_has_been_closed = true;
         update_is_needed |= push_bind(&mut separated, "CLOSED", Some(Utc::now()));
