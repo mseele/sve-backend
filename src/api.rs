@@ -12,7 +12,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use chrono::NaiveDate;
-use log::error;
+use tracing::error;
 use serde::de;
 use serde::Deserialize;
 use sqlx::PgPool;

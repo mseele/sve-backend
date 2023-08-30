@@ -4,7 +4,7 @@ use crate::{
 };
 use anyhow::Result;
 use lettre::message::SinglePart;
-use log::info;
+use tracing::info;
 use std::collections::HashMap;
 
 pub(crate) async fn message(contact_message: ContactMessage) -> Result<()> {

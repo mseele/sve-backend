@@ -4,7 +4,7 @@ use crate::email;
 use crate::models::EventId;
 use crate::models::EventType;
 use anyhow::Result;
-use log::{error, info};
+use tracing::{error, info};
 use sqlx::PgPool;
 
 pub(crate) async fn check_email_connectivity() {

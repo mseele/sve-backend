@@ -17,7 +17,7 @@ use encoding::{all::ISO_8859_1, DecoderTrap};
 use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, MultiPart, SinglePart};
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 use regex::Regex;
 use sqlx::PgPool;
 use std::collections::hash_map::Entry;
