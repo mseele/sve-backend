@@ -5,7 +5,7 @@ file_name=bootstrap
 
 rm -f $archive_name.zip
 
-cargo build --target=aarch64-unknown-linux-musl --release
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-unknown-linux-musl-gcc cargo build --target=aarch64-unknown-linux-musl --release
 
 cp target/aarch64-unknown-linux-musl/release/sve_backend $file_name
 
