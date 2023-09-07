@@ -5,10 +5,6 @@ on:
     tags:
       - '*'
 
-env:
-  IMAGE: sve_backend
-  REGISTRY_HOSTNAME: eu.gcr.io/sve-backend
-
 jobs:
   setup-build-and-publish:
     name: Setup, Build, and Publish
