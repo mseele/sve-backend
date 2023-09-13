@@ -50,13 +50,11 @@ async fn main() -> Result<(), Error> {
     let pool = db::init_pool().await?;
 
     let app = api::router(pool).layer(
-        ServiceBuilder::new()
-            .layer(
-                TraceLayer::new_for_http()
-                    .on_request(DefaultOnRequest::new().level(Level::INFO))
-                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
-            )
-            .layer(CorsLayer::permissive().max_age(Duration::from_secs(3600))),
+        ServiceBuilder::new().layer(
+            TraceLayer::new_for_http()
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        ),
     );
 
     if cfg!(debug_assertions) {
