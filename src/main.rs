@@ -30,12 +30,9 @@ mod hashids {
 
 use axum::response::IntoResponse;
 use lambda_http::Error;
-use std::{future::Future, pin::Pin, time::Duration};
+use std::{future::Future, pin::Pin};
 use tower::{Layer, ServiceBuilder};
-use tower_http::{
-    cors::CorsLayer,
-    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
-};
+use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tower_service::Service;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
