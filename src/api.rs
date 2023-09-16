@@ -343,7 +343,7 @@ async fn subscribers(State(pool): State<PgPool>) -> Result<impl IntoResponse, Re
                 topic.display_name(),
                 emails.len()
             );
-            vec![
+            [
                 title,
                 &emails.into_iter().collect::<Vec<_>>().join(";"),
                 title,
