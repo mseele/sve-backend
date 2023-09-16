@@ -4,8 +4,8 @@ use crate::{
 };
 use anyhow::Result;
 use lettre::message::SinglePart;
-use tracing::info;
 use std::collections::HashMap;
+use tracing::info;
 
 pub(crate) async fn message(contact_message: ContactMessage) -> Result<()> {
     let email_account = email::get_account_by_type(contact_message.message_type.into())?;

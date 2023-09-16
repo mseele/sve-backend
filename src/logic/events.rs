@@ -17,11 +17,11 @@ use encoding::{all::ISO_8859_1, DecoderTrap};
 use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, MultiPart, SinglePart};
-use tracing::{error, info, warn};
 use regex::Regex;
 use sqlx::PgPool;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use tracing::{error, info, warn};
 
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";

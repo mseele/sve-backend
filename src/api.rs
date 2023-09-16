@@ -12,7 +12,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use chrono::NaiveDate;
-use tracing::error;
 use serde::de;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -20,6 +19,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::str::FromStr;
+use tracing::error;
 use urlencoding::encode;
 
 pub(crate) struct ResponseError {
@@ -72,7 +72,8 @@ impl IntoResponse for ResponseError {
             StatusCode::INTERNAL_SERVER_ERROR,
             [(header::CONTENT_TYPE, "text/plain")],
             "An internal error occurred. Please try again later.",
-        ).into_response()
+        )
+            .into_response()
     }
 }
 
