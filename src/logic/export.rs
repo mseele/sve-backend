@@ -56,7 +56,7 @@ fn export(
         .ok_or_else(|| anyhow!("Workbook did not return some bytes"))?;
 
     // create a filename and return it with the bytes
-    let filename = format!("{}.xlsx", event.name.replace(' ', "_").to_lowercase());
+    let filename = format!("{}.xlsx", event.name.to_lowercase());
 
     Ok((filename, bytes))
 }
@@ -182,7 +182,7 @@ pub(crate) async fn event_participants_list(
     };
 
     // create a filename and return it with the bytes
-    let filename = format!("{}.pdf", event.name.replace(' ', "_").to_lowercase());
+    let filename = format!("{}.pdf", event.name.to_lowercase());
 
     let bytes = tokio::task::spawn_blocking(move || {
         create_participant_list(&event.name, &day_and_time, &participants, &dates)
