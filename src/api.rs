@@ -20,6 +20,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::str::FromStr;
+use urlencoding::encode;
 
 pub(crate) struct ResponseError {
     err: anyhow::Error,
@@ -454,7 +455,7 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
         StatusCode::OK,
         [(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{filename}\""),
+            format!("attachment; filename=\"{}\"", encode(&filename)),
         )],
         bytes,
     )
