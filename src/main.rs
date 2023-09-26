@@ -42,6 +42,8 @@ async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .without_time(/* cloudwatch does that */)
+        .json()
+        .flatten_event(true)
         .init();
 
     let pool = db::init_pool().await?;
