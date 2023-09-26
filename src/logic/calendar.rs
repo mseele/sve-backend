@@ -21,7 +21,14 @@ pub(crate) async fn notifications(channel_id: &str) -> Result<()> {
         channel_id
     );
 
-    let resp = Client::new()
+    let resp = Client::builder()
+        .build(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .https_only()
+                .enable_http2()
+                .build(),
+        )
         .request(
             Request::builder()
                 .method(Method::POST)
