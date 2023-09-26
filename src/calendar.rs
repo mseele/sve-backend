@@ -52,7 +52,7 @@ pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) 
     let request = Channel {
         id: Some(id.into()),
         type_: Some("web_hook".into()),
-        address: Some("https://sve-backend.appspot.com/api/calendar/notifications".into()),
+        address: Some("https://backend2.sv-eutingen.de/api/calendar/notifications".into()),
         expiration: Some(expiration),
         ..Default::default()
     };
