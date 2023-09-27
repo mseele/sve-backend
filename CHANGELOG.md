@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2023-09-27
+
+### Bug Fixes
+
+- Add linker env
+- Remove cors configuration
+- Encode filename in content disposition header
+- Remove ' ' replacement with '_'
+- Remove unnecessary vec! macro
+- Switch to new backend url
+- Enable https for hyper
+- Switch to json log format
+
+### Features
+
+- Integrate lambda_http
+
+### Refactor
+
+- Remove macro
+- Bump printpdf to 0.6.0
+
 ## [2.0.15] - 2023-07-17
 
 ### Bug Fixes
