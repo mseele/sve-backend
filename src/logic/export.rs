@@ -7,7 +7,7 @@ use chrono::Locale;
 use image::codecs::jpeg::JpegDecoder;
 use printpdf::{
     Color, Image, ImageTransform, IndirectFontRef, Line, Mm, PdfDocument, PdfLayerIndex,
-    PdfPageReference, Point, Rgb, Svg, SvgTransform,
+    PdfPageReference, Point, Polygon, PolygonMode, Rgb, Svg, SvgTransform,
 };
 use simple_excel_writer::{row, CellValue, Column, Row, ToCellValue, Workbook};
 use sqlx::PgPool;
@@ -264,7 +264,6 @@ fn create_participant_list_page(
             (Point::new(Mm(20.0), Mm(180.0)), false),
             (Point::new(Mm(277.0), Mm(180.0)), false),
         ],
-        has_stroke: true,
         ..Default::default()
     };
     graphic_layer.set_outline_color(Color::Rgb(Rgb::new(
@@ -273,7 +272,7 @@ fn create_participant_list_page(
         34.0 / 255.0,
         None,
     )));
-    graphic_layer.add_shape(line);
+    graphic_layer.add_line(line);
 
     let svg = Svg::parse(include_str!("../assets/logo.svg"))?;
     svg.add_to_layer(
@@ -292,15 +291,14 @@ fn create_participant_list_page(
     let line_height = 9.0;
 
     // header background
-    let shape = Line {
-        points: vec![
+    let polygon = Polygon {
+        rings: vec![vec![
             (Point::new(Mm(20.0), Mm(y)), false),
             (Point::new(Mm(277.0), Mm(y)), false),
             (Point::new(Mm(277.0), Mm(y - line_height)), false),
             (Point::new(Mm(20.0), Mm(y - line_height)), false),
-        ],
-        is_closed: true,
-        has_fill: true,
+        ]],
+        mode: PolygonMode::Fill,
         ..Default::default()
     };
     graphic_layer.set_fill_color(Color::Rgb(Rgb::new(
@@ -309,7 +307,7 @@ fn create_participant_list_page(
         244.0 / 255.0,
         None,
     )));
-    graphic_layer.add_shape(shape);
+    graphic_layer.add_polygon(polygon);
 
     for l in 0..18 {
         // horizontal line
@@ -318,7 +316,6 @@ fn create_participant_list_page(
                 (Point::new(Mm(20.0), Mm(y)), false),
                 (Point::new(Mm(277.0), Mm(y)), false),
             ],
-            has_stroke: true,
             ..Default::default()
         };
         graphic_layer.set_outline_color(Color::Rgb(Rgb::new(
@@ -327,7 +324,7 @@ fn create_participant_list_page(
             198.0 / 255.0,
             None,
         )));
-        graphic_layer.add_shape(line);
+        graphic_layer.add_line(line);
 
         if l == 0 {
             // header row
@@ -343,7 +340,6 @@ fn create_participant_list_page(
                         (Point::new(Mm(x), Mm(y)), false),
                         (Point::new(Mm(x), Mm(20.0)), false),
                     ],
-                    has_stroke: true,
                     ..Default::default()
                 };
                 graphic_layer.set_outline_color(Color::Rgb(Rgb::new(
@@ -352,7 +348,7 @@ fn create_participant_list_page(
                     198.0 / 255.0,
                     None,
                 )));
-                graphic_layer.add_shape(line);
+                graphic_layer.add_line(line);
 
                 if dates.len() > c {
                     // header text
@@ -459,12 +455,11 @@ fn _create_participation_confirmation(
             (Point::new(Mm(20.0), Mm(240.0)), false),
             (Point::new(Mm(141.0), Mm(240.0)), false),
         ],
-        has_stroke: true,
         ..Default::default()
     };
     let color = Color::Rgb(Rgb::new(162.0 / 255.0, 33.0 / 255.0, 34.0 / 255.0, None));
     current_layer.set_outline_color(color);
-    current_layer.add_shape(line);
+    current_layer.add_line(line);
 
     let svg = Svg::parse(include_str!("../assets/logo.svg"))?;
     svg.add_to_layer(
