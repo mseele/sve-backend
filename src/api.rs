@@ -12,7 +12,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use chrono::NaiveDate;
-use log::error;
 use serde::de;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -20,6 +19,8 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::str::FromStr;
+use tracing::error;
+use urlencoding::encode;
 
 pub(crate) struct ResponseError {
     err: anyhow::Error,
@@ -71,7 +72,8 @@ impl IntoResponse for ResponseError {
             StatusCode::INTERNAL_SERVER_ERROR,
             [(header::CONTENT_TYPE, "text/plain")],
             "An internal error occurred. Please try again later.",
-        ).into_response()
+        )
+            .into_response()
     }
 }
 
@@ -341,7 +343,7 @@ async fn subscribers(State(pool): State<PgPool>) -> Result<impl IntoResponse, Re
                 topic.display_name(),
                 emails.len()
             );
-            vec![
+            [
                 title,
                 &emails.into_iter().collect::<Vec<_>>().join(";"),
                 title,
@@ -454,7 +456,7 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
         StatusCode::OK,
         [(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{filename}\""),
+            format!("attachment; filename=\"{}\"", encode(&filename)),
         )],
         bytes,
     )

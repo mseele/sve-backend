@@ -5,50 +5,54 @@ on:
     tags:
       - '*'
 
-env:
-  IMAGE: sve_backend
-  REGISTRY_HOSTNAME: eu.gcr.io/sve-backend
-
 jobs:
   setup-build-and-publish:
     name: Setup, Build, and Publish
     runs-on: ubuntu-latest
     steps:
 
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout # the code
+        uses: actions/checkout@v4
 
-      # Setup gcloud CLI
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v0'
+      - name: Cache # cargo and targets
+        uses: swatinem/rust-cache@v2
+
+      - name: Install # missing packages
+        run: sudo apt-get update --yes && sudo apt-get install --yes musl-tools
+
+      - name: Setup # the secrets
+        run: |
+          mkdir -p secrets
+          echo ${{ secrets.SVE_CREDENTIALS_ENCODED }} | base64 -d > secrets/credentials.json
+          echo ${{ secrets.SVE_EMAILS_ENCODED }} | base64 -d > secrets/email.json
+          echo ${{ secrets.SVE_DB_ENCODED }} | base64 -d > secrets/database_url.env
+
+      - name: Build # the binary
+        uses: houseabsolute/actions-rust-cross@v0
         with:
-          credentials_json: ${{ secrets.GCLOUD_SERVICE_KEY }}
-      - uses: 'google-github-actions/setup-gcloud@v0'
+          command: "build"
+          target: aarch64-unknown-linux-musl
+          args: "--release --locked"
 
-      # Configure docker to use the gcloud command-line tool as a credential helper
-      - run: |
-          # Set up docker to authenticate
-          # via gcloud command-line tool.
-          gcloud auth configure-docker
+      - name: Test # the binary
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: "test"
+          target: aarch64-unknown-linux-musl
+          args: "--release --locked"
 
-      # Extract secrets into files
-      - run: mkdir -p secrets
-      - run: echo ${{ secrets.SVE_CREDENTIALS_ENCODED }} | base64 -d > secrets/credentials.json
-      - run: echo ${{ secrets.SVE_EMAILS_ENCODED }} | base64 -d > secrets/email.json
-      - run: echo ${{ secrets.SVE_DB_ENCODED }} | base64 -d > secrets/database_url.env
-
-      # Build the Docker image
-      - name: Build
+      - name: Package # the binary
         run: |
-          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
-          echo $TAG
-          docker build -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" .
+          cd target/aarch64-unknown-linux-musl/release
+          mv sve_backend bootstrap
+          7z a lambda.zip bootstrap
+          mv lambda.zip ../../../
 
-      # Push the Docker image to Google Container Registry
-      - name: Publish
-        run: |
-          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
-          echo $TAG
-          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG"
-          docker tag "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" "$REGISTRY_HOSTNAME"/"$IMAGE":latest
-          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":latest
+      - name: Publish # to aws
+        uses: appleboy/lambda-action@v0.1.9
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          function_name: sve-backend
+          zip_file: lambda.zip

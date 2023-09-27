@@ -4,8 +4,8 @@ use crate::email;
 use crate::models::EventId;
 use crate::models::EventType;
 use anyhow::Result;
-use log::{error, info};
 use sqlx::PgPool;
+use tracing::{error, info};
 
 pub(crate) async fn check_email_connectivity() {
     match email::test_connection().await {
@@ -55,10 +55,16 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
 }
 
 /// send participation confirmation after finished event
-pub(crate) async fn send_participation_confirmation(pool: &PgPool, event_id: EventId) -> Result<()> {
+pub(crate) async fn send_participation_confirmation(
+    pool: &PgPool,
+    event_id: EventId,
+) -> Result<()> {
     match events::send_participation_confirmation(pool, event_id).await {
         Ok(count) if count > 0 => {
-            info!("{} participation confirmations has been send successfully.", count);
+            info!(
+                "{} participation confirmations has been send successfully.",
+                count
+            );
             Ok(())
         }
         Ok(_) => Ok(()),
