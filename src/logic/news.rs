@@ -31,7 +31,7 @@ pub(crate) async fn get_subscriptions(
         for topic in subscription.topics {
             result
                 .entry(topic)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(subscription.email.clone());
         }
     }

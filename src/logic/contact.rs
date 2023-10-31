@@ -50,10 +50,7 @@ pub(crate) async fn emails(emails: Vec<Email>) -> Result<()> {
     let mut grouped_emails: HashMap<EmailType, Vec<Email>> = HashMap::new();
     for email in emails {
         let email_type = email.message_type.into();
-        grouped_emails
-            .entry(email_type)
-            .or_insert_with(Vec::new)
-            .push(email);
+        grouped_emails.entry(email_type).or_default().push(email);
     }
     for (email_type, emails) in grouped_emails {
         let from = email::get_account_by_type(email_type)?;
