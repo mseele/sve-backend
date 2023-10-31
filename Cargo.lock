@@ -1557,6 +1557,7 @@ dependencies = [
  "socket2 0.5.5",
  "tokio",
  "tokio-rustls",
+ "tracing",
  "url 2.4.1",
  "webpki-roots 0.25.2",
 ]

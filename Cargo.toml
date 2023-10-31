@@ -43,7 +43,8 @@ lettre = { version = "0.11.1", default-features = false, features = [
   "pool",
   "hostname",
   "builder",
-  "tokio1-rustls-tls"
+  "tokio1-rustls-tls",
+  "tracing",
 ] }
 regex = "1.7.3"
 lazy_static = "1.4.0"
