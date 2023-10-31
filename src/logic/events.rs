@@ -939,7 +939,7 @@ pub(crate) async fn send_participation_confirmation(
     // send an email per participant
     let email_account = event.get_associated_email_account()?;
     let subject = format!("{} Teilnahmebestätigung", event.subject_prefix());
-    let mut count = 0;
+    let mut messages = Vec::new();
     for subscriber in subscribers {
         if subscriber.enrolled {
             let price = event.price(subscriber.member).to_euro();
@@ -970,10 +970,13 @@ pub(crate) async fn send_participation_confirmation(
                         ),
                 )?;
 
-            email::send_message(&email_account, message).await?;
-
-            count += 1;
+            messages.push(message)
         }
+    }
+
+    let count = messages.len();
+    if count > 0 {
+        email::send_messages(&email_account, messages).await?;
     }
 
     Ok(count)
