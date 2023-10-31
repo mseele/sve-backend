@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2023-10-31
+
+### Refactor
+
+- Send messages in bulk
+
 ## [2.1.0] - 2023-09-27
 
 ### Bug Fixes
