@@ -6,7 +6,7 @@ use google_calendar3::{
     api::{Channel, Event, EventDateTime},
     CalendarHub,
 };
-use hyper::client::HttpConnector;
+use hyper_legacy::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
 use yup_oauth2::ServiceAccountKey;
 
@@ -21,7 +21,7 @@ async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
         .await?;
 
     let hub = CalendarHub::new(
-        hyper::Client::builder().build(
+        hyper_legacy::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
                 .with_native_roots()
                 .https_only()

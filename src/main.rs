@@ -29,6 +29,7 @@ mod hashids {
 }
 
 use axum::response::IntoResponse;
+use http_body_util::BodyExt;
 use lambda_http::Error;
 use std::{future::Future, pin::Pin};
 use tower::{Layer, ServiceBuilder};
@@ -57,9 +58,9 @@ async fn main() -> Result<(), Error> {
     );
 
     if cfg!(debug_assertions) {
-        Ok(axum::Server::bind(&"0.0.0.0:8080".parse()?)
-            .serve(app.into_make_service())
-            .await?)
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8080));
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        Ok(axum::serve(listener, app.into_make_service()).await?)
     } else {
         let app = ServiceBuilder::new().layer(LambdaLayer).service(app);
 
@@ -115,7 +116,7 @@ where
         let fut = async move {
             let resp = fut.await?;
             let (parts, body) = resp.into_response().into_parts();
-            let bytes = hyper::body::to_bytes(body).await?;
+            let bytes = body.collect().await?.to_bytes();
             let bytes: &[u8] = &bytes;
             let resp: hyper::Response<lambda_http::Body> = match std::str::from_utf8(bytes) {
                 Ok(s) => hyper::Response::from_parts(parts, s.into()),

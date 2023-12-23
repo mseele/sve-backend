@@ -1,6 +1,6 @@
 use crate::{calendar, models::Appointment};
 use anyhow::Result;
-use hyper::{Body, Client, Method, Request, StatusCode};
+use hyper_legacy::{Body, Client, Method, Request, StatusCode};
 use tracing::{info, warn};
 
 const RE_DEPLOY_HOOK: &str = "https://api.netlify.com/build_hooks/5ede8485bae5450298c17bc4";
