@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2023-12-23
+
+### Refactor
+
+- Upgrade to axum 0.7 and hyper 1.0
+- Switch to or_default fn
+
 ## [2.1.1] - 2023-10-31
 
 ### Refactor
