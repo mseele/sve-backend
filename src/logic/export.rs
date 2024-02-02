@@ -7,7 +7,7 @@ use chrono::Locale;
 use image::codecs::jpeg::JpegDecoder;
 use printpdf::{
     Color, Image, ImageTransform, IndirectFontRef, Line, Mm, PdfDocument, PdfLayerIndex,
-    PdfPageReference, Point, Polygon, PolygonMode, Rgb, Svg, SvgTransform,
+    PdfPageReference, Point, Polygon, Rgb, Svg, SvgTransform,
 };
 use simple_excel_writer::{row, CellValue, Column, Row, ToCellValue, Workbook};
 use sqlx::PgPool;
@@ -298,7 +298,6 @@ fn create_participant_list_page(
             (Point::new(Mm(277.0), Mm(y - line_height)), false),
             (Point::new(Mm(20.0), Mm(y - line_height)), false),
         ]],
-        mode: PolygonMode::Fill,
         ..Default::default()
     };
     graphic_layer.set_fill_color(Color::Rgb(Rgb::new(
