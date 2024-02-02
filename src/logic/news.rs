@@ -56,7 +56,7 @@ async fn send_mail(subscription: NewsSubscription) -> Result<()> {
     let primary_news_topic;
     let multiple_topics;
     if subscription.topics.len() == 1 {
-        primary_news_topic = *subscription.topics.get(0).unwrap();
+        primary_news_topic = *subscription.topics.first().unwrap();
         multiple_topics = None
     } else {
         primary_news_topic = NewsTopic::General;
