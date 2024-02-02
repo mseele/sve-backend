@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Locale, Utc};
 use handlebars::{
-    Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderError,
+    Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderErrorReason,
 };
 use serde::Serialize;
 
@@ -155,12 +155,9 @@ impl HelperDef for PaydayHelper<'_> {
     ) -> HelperResult {
         if let Some(first_date) = self.first_event_date {
             let custom_day = match h.param(0) {
-                Some(param) => Some(
-                    param
-                        .value()
-                        .as_i64()
-                        .ok_or_else(|| RenderError::new("payday extension is no integer"))?,
-                ),
+                Some(param) => Some(param.value().as_i64().ok_or_else(|| {
+                    RenderErrorReason::Other("payday extension is no integer".into())
+                })?),
                 None => None,
             };
 

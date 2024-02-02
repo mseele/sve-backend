@@ -61,7 +61,7 @@ sqlx = { version = "0.7.1", features = [
 ] }
 itertools = "0.12.0"
 harsh = "0.2.2"
-handlebars = "4.3.6"
+handlebars = "5.1.0"
 simple_excel_writer = { version = "0.2.0", features = ["chrono"] }
 printpdf = { version = "0.7.0", features = ["svg", "embedded_images"] }
 image = "0.24.6"
