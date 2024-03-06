@@ -2,11 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### Features
+
+- Split subscribers into chunks
+
 ## [2.2.0] - 2023-12-23
 
 ### Refactor
 
-- Upgrade to axum 0.7 and hyper 1.0
 - Switch to or_default fn
 
 ## [2.1.1] - 2023-10-31
@@ -267,6 +272,11 @@ All notable changes to this project will be documented in this file.
 
 ## [1.3.2] - 2022-05-28
 
+### Features
+
+- Add db migrations for events
+- Add db migrations for news
+
 ### Refactor
 
 - Migrate news subscriptions from firestore to psql
@@ -277,11 +287,6 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Avoid missing email adresses
-
-### Features
-
-- Add db migrations for events
-- Add db migrations for news
 
 ## [1.3.0] - 2022-05-04
 
@@ -499,28 +504,28 @@ All notable changes to this project will be documented in this file.
 - Fix eclipse factorypath
 - Move tools into separate repository
 - Increase gae version
-- Bump google-cloud-firestore from 1.35.1 to 1.35.2
 - Bump google-cloud-logging-logback
 - Bump commons-text from 1.8 to 1.9
+- Bump google-cloud-firestore from 1.35.1 to 1.35.2
 - Increase gae version
 - Increase version
-- Bump google-api-services-calendar
-- Bump jettyVersion from 9.4.30.v20200611 to 9.4.31.v20200723
 - Fix factorypath
 - Bump com.diffplug.eclipse.apt from 3.23.0 to 3.24.0
+- Bump jettyVersion from 9.4.30.v20200611 to 9.4.31.v20200723
+- Bump google-api-services-calendar
 - Switch from npm to yarn
 - Bump google-cloud-logging-logback
 - Bump google-cloud-firestore from 1.35.2 to 2.0.0
 - Bump google-api-services-sheets
 - Bump com.github.ben-manes.versions from 0.29.0 to 0.33.0
-- Bump com.diffplug.eclipse.apt from 3.24.0 to 3.25.0
-- Bump appengine-gradle-plugin from 2.3.0 to 2.4.1
-- Bump google-api-services-calendar
 - Bump jerseyVersion from 2.31 to 2.32
 - Bump google-api-services-sheets
-- Bump jettyVersion from 9.4.31.v20200723 to 9.4.32.v20200930
-- Bump com.github.johnrengelman.shadow from 6.0.0 to 6.1.0
+- Bump com.diffplug.eclipse.apt from 3.24.0 to 3.25.0
 - Bump google-auth-library-oauth2-http from 0.21.1 to 0.22.0
+- Bump com.github.johnrengelman.shadow from 6.0.0 to 6.1.0
+- Bump jettyVersion from 9.4.31.v20200723 to 9.4.32.v20200930
+- Bump appengine-gradle-plugin from 2.3.0 to 2.4.1
+- Bump google-api-services-calendar
 - Bump google-cloud-firestore from 2.0.0 to 2.1.0
 - Fix factorypath
 
