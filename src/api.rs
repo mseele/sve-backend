@@ -343,12 +343,11 @@ async fn subscribers(State(pool): State<PgPool>) -> Result<impl IntoResponse, Re
                 topic.display_name(),
                 emails.len()
             );
-            [
-                title,
-                &emails.into_iter().collect::<Vec<_>>().join(";"),
-                title,
-            ]
-            .join("<br/>")
+            let mut chunks = vec![];
+            for chunk in emails.into_iter().collect::<Vec<_>>().chunks(300) {
+                chunks.push(chunk.join(";"));
+            }
+            [title, &chunks.join("<br/><br/>"), title].join("<br/>")
         })
         .collect::<Vec<_>>()
         .join("<br/><br/><br/>");
