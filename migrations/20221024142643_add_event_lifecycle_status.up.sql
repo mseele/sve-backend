@@ -1,1 +1,1 @@
--- Dropping a enum type is not supported right now
+ALTER TYPE lifecycle_status ADD VALUE 'Running' AFTER 'Published';

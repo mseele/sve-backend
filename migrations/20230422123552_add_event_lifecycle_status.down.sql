@@ -1,1 +1,1 @@
-ALTER TYPE lifecycle_status ADD VALUE 'Archived' AFTER 'Closed';
+-- Dropping a enum type is not supported right now
