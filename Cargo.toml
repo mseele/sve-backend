@@ -35,7 +35,7 @@ chrono = { version = "0.4.24", default-features = false, features = [
   "serde",
   "unstable-locales",
 ] }
-chrono-tz = "0.8.2"
+chrono-tz = "0.9.0"
 google-calendar3 = "5.0.2"
 yup-oauth2 = "8.2.0"
 hyper-legacy = { package = "hyper", version = "0.14.28" }
@@ -66,7 +66,7 @@ simple_excel_writer = { version = "0.2.0", features = ["chrono"] }
 printpdf = { version = "0.7.0", features = ["svg", "embedded_images"] }
 image = "0.24.6"
 cfg = "0.8.0"
-lambda_http = { version = "0.10.0", default-features = false, features = [
+lambda_http = { version = "0.11.1", default-features = false, features = [
   "apigw_http",
 ] }
 tower-service = "0.3.2"
