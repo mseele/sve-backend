@@ -154,7 +154,8 @@ pub(crate) async fn get_unpaid_bookings(
         if let Some(first_event_date) = first_event_date {
             let booking_date;
             if let Some(payment_reminder_sent) = booking.payment_reminder_sent {
-                booking_date = payment_reminder_sent + Duration::days(3);
+                booking_date = payment_reminder_sent
+                    + Duration::try_days(3).with_context(|| "Cannot create duration of 3 days.")?;
             } else {
                 booking_date = booking_insert_date;
             }
@@ -194,7 +195,7 @@ fn calc_due_in_days(
     }
 
     // get the payday for the event
-    let payday = calculate_payday(&booking_date, &first_event_date, custom_days);
+    let payday = calculate_payday(&booking_date, &first_event_date, custom_days)?;
 
     // calculate due in days
     let due_in_days = payday - Utc::now().date_naive();
@@ -867,7 +868,7 @@ pub(super) fn calculate_payday(
     booking_date: &DateTime<Utc>,
     first_event_date: &DateTime<Utc>,
     custom_days: Option<i64>,
-) -> NaiveDate {
+) -> Result<NaiveDate> {
     // default value is 14 days
     let mut days = 14;
 
@@ -877,15 +878,18 @@ pub(super) fn calculate_payday(
     }
 
     // calculated payday
-    let mut payday = first_event_date.date_naive() - Duration::days(days);
+    let mut payday = first_event_date.date_naive()
+        - Duration::try_days(days)
+            .with_context(|| format!("Cannot create duration of {days} days."))?;
 
     // override the payday if it is before the day after the booking date
-    let earliest_paypay = booking_date.date_naive() + Duration::days(1);
+    let earliest_paypay = booking_date.date_naive()
+        + Duration::try_days(1).with_context(|| "Cannot create duration of 1 day.")?;
     if payday < earliest_paypay {
         payday = earliest_paypay
     }
 
-    payday
+    Ok(payday)
 }
 
 /// send participation confirmation after finished event
@@ -1274,74 +1278,80 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         let booking_date = Utc::now();
 
         // event starts in 3 weeks
-        let start_date = Utc::now() + Duration::weeks(3);
+        let start_date = Utc::now() + Duration::try_weeks(3).unwrap();
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, None),
-            Utc::now().date_naive() + Duration::weeks(1)
+            calculate_payday(&booking_date, &start_date, None).unwrap(),
+            Utc::now().date_naive() + Duration::try_weeks(1).unwrap()
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(7)),
-            Utc::now().date_naive() + Duration::weeks(2)
+            calculate_payday(&booking_date, &start_date, Some(7)).unwrap(),
+            Utc::now().date_naive() + Duration::try_weeks(2).unwrap()
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(0)),
-            Utc::now().date_naive() + Duration::weeks(3)
+            calculate_payday(&booking_date, &start_date, Some(0)).unwrap(),
+            Utc::now().date_naive() + Duration::try_weeks(3).unwrap()
         );
-        let tomorrow = Utc::now().date_naive() + Duration::days(1);
+        let tomorrow = Utc::now().date_naive() + Duration::try_days(1).unwrap();
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(21)),
+            calculate_payday(&booking_date, &start_date, Some(21)).unwrap(),
             tomorrow
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(28)),
+            calculate_payday(&booking_date, &start_date, Some(28)).unwrap(),
             tomorrow
         );
 
         // event starts in 3 days
-        let start_date = Utc::now() + Duration::days(3);
+        let start_date = Utc::now() + Duration::try_days(3).unwrap();
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(1)),
-            Utc::now().date_naive() + Duration::days(2)
+            calculate_payday(&booking_date, &start_date, Some(1)).unwrap(),
+            Utc::now().date_naive() + Duration::try_days(2).unwrap()
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(2)),
+            calculate_payday(&booking_date, &start_date, Some(2)).unwrap(),
             tomorrow
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(3)),
+            calculate_payday(&booking_date, &start_date, Some(3)).unwrap(),
             tomorrow
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(14)),
+            calculate_payday(&booking_date, &start_date, Some(14)).unwrap(),
             tomorrow
         );
 
         // event starts today
         let start_date = Utc::now();
-        assert_eq!(calculate_payday(&booking_date, &start_date, None), tomorrow);
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(7)),
+            calculate_payday(&booking_date, &start_date, None).unwrap(),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)).unwrap(),
             tomorrow
         );
 
         // event started yesterday
-        let start_date = Utc::now() - Duration::days(1);
-        assert_eq!(calculate_payday(&booking_date, &start_date, None), tomorrow);
+        let start_date = Utc::now() - Duration::try_days(1).unwrap();
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(7)),
+            calculate_payday(&booking_date, &start_date, None).unwrap(),
+            tomorrow
+        );
+        assert_eq!(
+            calculate_payday(&booking_date, &start_date, Some(7)).unwrap(),
             tomorrow
         );
 
         // negative paydays (because the bookings are in the past)
-        let booking_date = Utc::now() - Duration::days(31);
+        let booking_date = Utc::now() - Duration::try_days(31).unwrap();
         let start_date = Utc::now();
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, None),
-            Utc::now().date_naive() - Duration::days(14)
+            calculate_payday(&booking_date, &start_date, None).unwrap(),
+            Utc::now().date_naive() - Duration::try_days(14).unwrap()
         );
         assert_eq!(
-            calculate_payday(&booking_date, &start_date, Some(7)),
-            Utc::now().date_naive() - Duration::days(7)
+            calculate_payday(&booking_date, &start_date, Some(7)).unwrap(),
+            Utc::now().date_naive() - Duration::try_days(7).unwrap()
         );
     }
 
@@ -1349,21 +1359,21 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
     fn test_calc_due_in_days() {
         // without custom days
         let booking_date = Utc::now();
-        let start_date = Utc::now() + Duration::days(28);
+        let start_date = Utc::now() + Duration::try_days(28).unwrap();
         assert_eq!(
             calc_due_in_days(booking_date, start_date, String::from("")).unwrap(),
             14
         );
 
         let booking_date = Utc::now();
-        let start_date = Utc::now() + Duration::days(14);
+        let start_date = Utc::now() + Duration::try_days(14).unwrap();
         assert_eq!(
             calc_due_in_days(booking_date, start_date, String::from("")).unwrap(),
             1
         );
 
-        let booking_date = Utc::now() - Duration::days(4);
-        let start_date = Utc::now() + Duration::days(7);
+        let booking_date = Utc::now() - Duration::try_days(4).unwrap();
+        let start_date = Utc::now() + Duration::try_days(7).unwrap();
         assert_eq!(
             calc_due_in_days(booking_date, start_date, String::from("{{payday}}")).unwrap(),
             -3
@@ -1371,13 +1381,13 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 
         // with custom days
         let booking_date = Utc::now();
-        let start_date = Utc::now() + Duration::days(7);
+        let start_date = Utc::now() + Duration::try_days(7).unwrap();
         assert_eq!(
             calc_due_in_days(booking_date, start_date, String::from("{{payday 7}}")).unwrap(),
             1
         );
-        let booking_date = Utc::now() - Duration::days(31);
-        let start_date = Utc::now() + Duration::days(7);
+        let booking_date = Utc::now() - Duration::try_days(31).unwrap();
+        let start_date = Utc::now() + Duration::try_days(7).unwrap();
         assert_eq!(
             calc_due_in_days(booking_date, start_date, String::from("{{payday 1}}")).unwrap(),
             6

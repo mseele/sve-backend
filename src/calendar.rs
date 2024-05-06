@@ -113,7 +113,10 @@ fn into_appointment(event: Event, sort_index: u32) -> Result<Appointment> {
 fn into_date(date: &Option<EventDateTime>, days_to_add: i8) -> Result<Option<NaiveDate>> {
     let option = match date {
         Some(value) => match value.date {
-            Some(date) => date.checked_add_signed(Duration::days(days_to_add.into())),
+            Some(date) => date.checked_add_signed(
+                Duration::try_days(days_to_add.into())
+                    .with_context(|| format!("Cannot create duration of {days_to_add} days."))?,
+            ),
             None => None,
         },
         None => None,

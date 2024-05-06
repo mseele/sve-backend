@@ -161,7 +161,8 @@ impl HelperDef for PaydayHelper<'_> {
                 None => None,
             };
 
-            let payday = events::calculate_payday(&Utc::now(), first_date, custom_day);
+            let payday = events::calculate_payday(&Utc::now(), first_date, custom_day)
+                .expect("Payday calculation failed.");
 
             out.write(&payday.format_localized("%d. %B", Locale::de_DE).to_string())?;
         }
@@ -380,7 +381,7 @@ IBAN: DE16 6429 1010 0034 4696 05",
 - Fr., 11. März 2022, 19:00 Uhr
 - Sa., 12. März 2022, 19:00 Uhr
 - So., 13. März 2022, 19:00 Uhr",
-                format_payday(Utc::now() + Duration::days(1))
+                format_payday(Utc::now() + Duration::try_days(1).unwrap())
             ),
         );
         assert_eq!(
@@ -411,7 +412,7 @@ Verwendungszweck: 22-1012
 - Fr., 11. März 2022, 19:00 Uhr
 - Sa., 12. März 2022, 19:00 Uhr
 - So., 13. März 2022, 19:00 Uhr",
-                format_payday(Utc::now() + Duration::days(1))
+                format_payday(Utc::now() + Duration::try_days(1).unwrap())
             )
         );
 
@@ -447,20 +448,20 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         );
 
         // event starts in 3 weeks
-        let event = new_event(vec![Utc::now() + Duration::weeks(3)]);
+        let event = new_event(vec![Utc::now() + Duration::try_weeks(3).unwrap()]);
         assert_eq!(
             render_booking("{{payday}}", &booking_member, &event, None, None, None).unwrap(),
-            format_payday(Utc::now() + Duration::weeks(1))
+            format_payday(Utc::now() + Duration::try_weeks(1).unwrap())
         );
         assert_eq!(
             render_booking("{{payday 7}}", &booking_member, &event, None, None, None).unwrap(),
-            format_payday(Utc::now() + Duration::weeks(2))
+            format_payday(Utc::now() + Duration::try_weeks(2).unwrap())
         );
         assert_eq!(
             render_booking("{{payday 0}}", &booking_member, &event, None, None, None).unwrap(),
-            format_payday(Utc::now() + Duration::weeks(3))
+            format_payday(Utc::now() + Duration::try_weeks(3).unwrap())
         );
-        let tomorrow = (Utc::now() + Duration::days(1))
+        let tomorrow = (Utc::now() + Duration::try_days(1).unwrap())
             .format_localized("%d. %B", Locale::de_DE)
             .to_string();
         assert_eq!(
@@ -473,10 +474,10 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         );
 
         // event starts in 3 days
-        let event = new_event(vec![Utc::now() + Duration::days(3)]);
+        let event = new_event(vec![Utc::now() + Duration::try_days(3).unwrap()]);
         assert_eq!(
             render_booking("{{payday 1}}", &booking_member, &event, None, None, None).unwrap(),
-            format_payday(Utc::now() + Duration::days(2))
+            format_payday(Utc::now() + Duration::try_days(2).unwrap())
         );
         assert_eq!(
             render_booking("{{payday 2}}", &booking_member, &event, None, None, None).unwrap(),
@@ -503,7 +504,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
         );
 
         // event started yesterday
-        let event = new_event(vec![Utc::now() - Duration::days(1)]);
+        let event = new_event(vec![Utc::now() - Duration::try_days(1).unwrap()]);
         assert_eq!(
             render_booking("{{payday}}", &booking_member, &event, None, None, None).unwrap(),
             tomorrow
