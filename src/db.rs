@@ -431,7 +431,7 @@ async fn update_event(
     }
 
     if update_is_needed {
-        query_builder.push("WHERE id = ");
+        query_builder.push(" WHERE id = ");
         query_builder.push_bind(id.get_ref());
 
         query_builder.build().execute(&mut *tx).await?;
