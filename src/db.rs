@@ -1308,7 +1308,7 @@ VALUES($1, $2, $3, $4, $5, $6)"#,
         .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
     let event_counters = fetch_event_counters(&mut *conn, event.lifecycle_status).await?;
 
-    if let true = enrolled {
+    if enrolled {
         Ok(BookingResult::Booked(event, event_counters, payment_id))
     } else {
         Ok(BookingResult::WaitingList(
