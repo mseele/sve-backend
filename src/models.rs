@@ -860,7 +860,6 @@ pub(crate) trait ToEuro {
 
 pub(crate) trait FromEuro {
     fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError>;
-    fn from_euro_with_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError>;
 }
 
 impl ToEuro for BigDecimal {
@@ -874,22 +873,11 @@ impl FromEuro for String {
     fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
         BigDecimal::from_str(&self.replace('.', "").replace(',', "."))
     }
-
-    fn from_euro_with_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
-        self.trim_end_matches('€')
-            .trim_end_matches(char::is_whitespace)
-            .from_euro_without_symbol()
-    }
 }
 
 impl FromEuro for &str {
     fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
         self.to_string().from_euro_without_symbol()
-    }
-    fn from_euro_with_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
-        self.trim_end_matches('€')
-            .trim_end_matches(char::is_whitespace)
-            .from_euro_without_symbol()
     }
 }
 
