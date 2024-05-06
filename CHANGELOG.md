@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [2.2.4] - 2024-05-06
+
+### Bug Fixes
+
+- Remove unused code
+- Simplify if statement
+
+### Refactor
+
+- Remove deprecated code
 
 ## [2.2.3] - 2024-05-06
 
