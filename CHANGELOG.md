@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [2.2.3] - 2024-05-06
+
+### Bug Fixes
+
+- Add space before WHERE block
+
 ## [2.2.2] - 2024-05-06
 
 ### Bug Fixes
