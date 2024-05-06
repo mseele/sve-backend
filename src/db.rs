@@ -1620,9 +1620,7 @@ pub(crate) async fn get_all_finished_event_ids(pool: &PgPool) -> Result<Vec<Even
     let mut conn = pool.acquire().await?;
 
     // TODO: debugging
-    let result = query!("SELECT NOW()")
-        .fetch_all(&mut *conn)
-        .await?;
+    let result = query!("SELECT NOW()").fetch_all(&mut *conn).await?;
     debug!(?result, "result of select now()");
 
     let event_ids: Vec<EventId> = query!(
