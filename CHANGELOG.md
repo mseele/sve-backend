@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+## [2.2.2] - 2024-05-06
+
+### Bug Fixes
+
+- Correct migrations
+
+## [2.2.1] - 2024-03-06
+
 ### Features
 
 - Split subscribers into chunks
