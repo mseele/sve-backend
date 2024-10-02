@@ -3,7 +3,7 @@ use anyhow::Result;
 use hyper_legacy::{Body, Client, Method, Request, StatusCode};
 use tracing::{info, warn};
 
-const RE_DEPLOY_HOOK: &str = "https://api.netlify.com/build_hooks/5ede8485bae5450298c17bc4";
+const RE_DEPLOY_HOOK: &str = "https://api.netlify.com/build_hooks/66fd9717537e8d6941f92c34";
 
 const GENERAL_ID: &str = "info@sv-eutingen.de";
 
