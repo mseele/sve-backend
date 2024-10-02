@@ -698,7 +698,7 @@ fn create_prebooking_link(
         EventType::Fitness => "fitness",
         EventType::Events => "events",
     });
-    url.push_str("/buchung?code=");
+    url.push_str("?code=");
 
     // create the code
     url.push_str(&hashids::encode(&[
@@ -1000,14 +1000,14 @@ mod tests {
         assert_eq!(
             create_prebooking_link(EventType::Fitness, 1.into(), 0).unwrap(),
             format!(
-                "https://www.sv-eutingen.de/fitness/buchung?code={}",
+                "https://www.sv-eutingen.de/fitness?code={}",
                 hashids::encode(&[1, 0])
             )
         );
         assert_eq!(
             create_prebooking_link(EventType::Events, 2.into(), 1).unwrap(),
             format!(
-                "https://www.sv-eutingen.de/events/buchung?code={}",
+                "https://www.sv-eutingen.de/events?code={}",
                 hashids::encode(&[2, 1])
             )
         );
