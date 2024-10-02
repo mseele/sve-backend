@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.5] - 2024-10-02
+
+### Bug Fixes
+
+- Use new reploy hook
+
+### Refactor
+
+- Switch to new prebooking url
+
 ## [2.2.4] - 2024-05-06
 
 ### Bug Fixes
