@@ -1,0 +1,27 @@
+Hallo {{firstname}},
+
+herzlich willkommen beim SV Eutingen 1947 e.V.! Wir freuen uns sehr, Dich als neues Mitglied in unserem Verein zu begrüßen.
+
+Du bist nun ein Teil unserer über 500-köpfigen SVE-Gemeinschaft und trägst einen Beitrag zu unserem gemeinsamen Anliegen bei: gesellschaftliche Teilhabe durch Sport und Begegnung zu ermöglichen.
+
+Deinen Mitgliedsantrag haben wir erhalten und bearbeiten ihn umgehend. Sollten wir noch Rückfragen haben, werden wir uns direkt bei Dir melden.
+
+Wenn Du Fragen hast oder Dich in einem Bereich unseres Vereins einbringen willst, steht Dir unser Team jederzeit gerne zur Verfügung. Schreibe dafür einfach eine Mail an info@sv-eutingen.de und wir leiten alles in die Wege.
+
+{{#if newsletter}}
+Wir haben dich wie gewünscht auch für unseren Newsletter angemeldet.
+Ab sofort erhältst Du automatisch eine Mail, sobald es Neuigkeiten gibt. Aber keine Sorge: wir fassen die wichtigsten Infos nur wenige Male im Jahr zusammen. Über unsere Social Media-Kanäle kannst Du täglich verfolgen, was wir tun.
+
+Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich hier wieder abmelden:
+https://www.sv-eutingen.de/newsletter"
+{{/if}}
+
+Wir wünschen Dir viel Freude und eine tolle Zeit beim SVE!
+
+Herzliche Grüße
+SV Eutingen 1947 e.V.
+
+--
+Marktstr. 84
+72184 Eutingen im Gäu
+#mehralseinverein

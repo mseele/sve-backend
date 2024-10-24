@@ -1,10 +1,10 @@
-use crate::models::FromEuro;
+use crate::models::{FromEuro, MembershipApplication};
 use anyhow::{anyhow, bail, Result};
 use bigdecimal::BigDecimal;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use lazy_static::lazy_static;
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, ops::Neg};
 
 pub(crate) fn read_payment_records(csv: &str) -> Result<Vec<PaymentRecord>> {
@@ -255,9 +255,118 @@ where
     NaiveDate::parse_from_str(&string, "%d.%m.%Y").map_err(serde::de::Error::custom)
 }
 
+pub(crate) fn write_membership_application(
+    membership_application: MembershipApplication,
+) -> Result<String> {
+    let mut buffer = Vec::new();
+    {
+        let mut wtr = csv::WriterBuilder::new()
+            .delimiter(b';')
+            .from_writer(&mut buffer);
+        let record: MembershipApplicationRecord = membership_application.into();
+        wtr.serialize(record)?;
+        wtr.flush()?;
+    }
+    Ok(String::from_utf8(buffer)?)
+}
+
+#[derive(Debug, Serialize)]
+struct MembershipApplicationRecord {
+    #[serde(rename = "Anrede")]
+    salutation: String,
+
+    #[serde(rename = "Vorname")]
+    first_name: String,
+
+    #[serde(rename = "Nachname")]
+    last_name: String,
+
+    #[serde(rename = "Straße")]
+    street: String,
+
+    #[serde(rename = "PLZ")]
+    zipcode: String,
+
+    #[serde(rename = "Ort")]
+    city: String,
+
+    #[serde(rename = "Land")]
+    country: String,
+
+    #[serde(rename = "Geschlecht")]
+    gender: String,
+
+    #[serde(rename = "Geburtsdatum")]
+    birthday: String,
+
+    #[serde(rename = "Eintrittsdatum")]
+    start_date: String,
+
+    #[serde(rename = "Zahlungsart")]
+    payment_method: String,
+
+    #[serde(rename = "IBAN")]
+    iban: String,
+
+    #[serde(rename = "Kontoinhaber")]
+    account_owner: String,
+
+    #[serde(rename = "Status")]
+    status: String,
+
+    #[serde(rename = "KommE-Mail_P1")]
+    email: String,
+
+    #[serde(rename = "KommTelefon_P1")]
+    phone: String,
+
+    #[serde(rename = "Abteilung_1")]
+    department: String,
+
+    #[serde(rename = "Abteilungseintritt_1")]
+    department_entry: String,
+
+    #[serde(rename = "Beitragsbezeichnung_1_2")]
+    membership_type: String,
+}
+
+impl From<MembershipApplication> for MembershipApplicationRecord {
+    fn from(value: MembershipApplication) -> Self {
+        // entry date should be always 01.01.YYYY
+        let department_entry = if value.start_date.day() == 1 && value.start_date.month() == 1 {
+            value.start_date
+        } else {
+            NaiveDate::from_ymd_opt(value.start_date.year() + 1, 1, 1).unwrap_or(value.start_date)
+        };
+        MembershipApplicationRecord {
+            salutation: value.salutation,
+            first_name: value.first_name,
+            last_name: value.last_name,
+            street: value.street,
+            zipcode: value.zipcode,
+            city: value.city,
+            country: "Deutschland".into(),
+            gender: value.gender,
+            birthday: value.birthday,
+            start_date: value.start_date.format("%d.%m.%Y").to_string(),
+            payment_method: "Lastschrift".into(),
+            iban: value.iban,
+            account_owner: value.account_owner,
+            status: "Aktiv".into(),
+            email: value.email,
+            phone: value.phone,
+            department: value.membership_type.get_department().into(),
+            department_entry: department_entry.format("%d.%m.%Y").to_string(),
+            membership_type: value.membership_type.get_label().into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+
+    use crate::models::MembershipType;
 
     use super::*;
     use bigdecimal::FromPrimitive;
@@ -442,5 +551,62 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
 ";
         assert!(VobaClassicCSVReader::default().read(csv).is_err());
+    }
+
+    #[test]
+    fn test_write_membership_application() {
+        let application = MembershipApplication {
+            salutation: "Herr".into(),
+            first_name: "Max".into(),
+            last_name: "Mustermann".into(),
+            street: "Musterstraße 10".into(),
+            zipcode: "12345".into(),
+            city: "Musterstadt".into(),
+            email: "max.mustermann@example.com".into(),
+            phone: "0123456789".into(),
+            gender: "männlich".into(),
+            birthday: "01.01.1970".into(),
+            start_date: NaiveDate::from_ymd_opt(2022, 9, 6).unwrap(),
+            iban: "DE92500105174132432988".into(),
+            account_owner: "Max Mustermann".into(),
+            membership_type: MembershipType::AdultPremium,
+            family_members: None,
+            newsletter: false,
+        };
+
+        let csv = write_membership_application(application).unwrap();
+        assert_eq!(
+            csv,
+            r#"Anrede;Vorname;Nachname;Straße;PLZ;Ort;Land;Geschlecht;Geburtsdatum;Eintrittsdatum;Zahlungsart;IBAN;Kontoinhaber;Status;KommE-Mail_P1;KommTelefon_P1;Abteilung_1;Abteilungseintritt_1;Beitragsbezeichnung_1_2
+Herr;Max;Mustermann;Musterstraße 10;12345;Musterstadt;Deutschland;männlich;01.01.1970;06.09.2022;Lastschrift;DE92500105174132432988;Max Mustermann;Aktiv;max.mustermann@example.com;0123456789;Hauptverein;01.01.2023;Premiummitglied Erwachsener
+"#
+        );
+
+        let application = MembershipApplication {
+            salutation: "Herr".into(),
+            first_name: "Max".into(),
+            last_name: "Mustermann".into(),
+            street: "Musterstraße 10".into(),
+            zipcode: "12345".into(),
+            city: "Musterstadt".into(),
+            email: "max.mustermann@example.com".into(),
+            phone: "0123456789".into(),
+            gender: "männlich".into(),
+            birthday: "01.01.1970".into(),
+            start_date: NaiveDate::from_ymd_opt(2022, 1, 1).unwrap(),
+            iban: "DE92500105174132432988".into(),
+            account_owner: "Max Mustermann".into(),
+            membership_type: MembershipType::AdultPremium,
+            family_members: None,
+            newsletter: false,
+        };
+
+        let csv = write_membership_application(application).unwrap();
+        assert_eq!(
+            csv,
+            r#"Anrede;Vorname;Nachname;Straße;PLZ;Ort;Land;Geschlecht;Geburtsdatum;Eintrittsdatum;Zahlungsart;IBAN;Kontoinhaber;Status;KommE-Mail_P1;KommTelefon_P1;Abteilung_1;Abteilungseintritt_1;Beitragsbezeichnung_1_2
+Herr;Max;Mustermann;Musterstraße 10;12345;Musterstadt;Deutschland;männlich;01.01.1970;01.01.2022;Lastschrift;DE92500105174132432988;Max Mustermann;Aktiv;max.mustermann@example.com;0123456789;Hauptverein;01.01.2022;Premiummitglied Erwachsener
+"#
+        );
     }
 }

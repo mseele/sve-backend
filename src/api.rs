@@ -1,7 +1,7 @@
-use crate::logic::{calendar, contact, events, export, news, tasks};
+use crate::logic::{calendar, contact, events, export, membership, news, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
-    NewsSubscription, PartialEvent,
+    MembershipApplication, NewsSubscription, PartialEvent,
 };
 use axum::extract::{self, Path, Query, State};
 use axum::http::{
@@ -129,6 +129,10 @@ pub(crate) fn router(state: PgPool) -> Router {
                     Router::new()
                         .route("/appointments", get(appointments))
                         .route("/notifications", post(notifications)),
+                )
+                .nest(
+                    "/membership",
+                    Router::new().route("/application", post(membership_application)),
                 )
                 .nest(
                     "/tasks",
@@ -405,6 +409,16 @@ async fn emails(
     } else if let Some(event) = body.event {
         events::send_event_email(&pool, event).await?;
     }
+    Ok(StatusCode::OK)
+}
+
+// membership
+
+async fn membership_application(
+    State(pool): State<PgPool>,
+    extract::Json(application): extract::Json<MembershipApplication>,
+) -> Result<impl IntoResponse, ResponseError> {
+    membership::application(&pool, application).await?;
     Ok(StatusCode::OK)
 }
 

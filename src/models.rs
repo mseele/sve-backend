@@ -631,7 +631,6 @@ impl Appointment {
 pub(crate) struct EmailAccount {
     #[serde(rename = "type")]
     pub(crate) email_type: EmailType,
-    pub(crate) name: String,
     pub(crate) address: String,
     #[serde(with = "Base64Standard")]
     password: Vec<u8>,
@@ -668,6 +667,7 @@ pub(crate) enum EmailType {
     Info,
     Kunstrasen,
     Jugendturnier,
+    Mitglieder,
 }
 
 #[derive(Deserialize, Debug)]
@@ -878,6 +878,70 @@ impl FromEuro for String {
 impl FromEuro for &str {
     fn from_euro_without_symbol(&self) -> Result<BigDecimal, ParseBigDecimalError> {
         self.to_string().from_euro_without_symbol()
+    }
+}
+
+#[derive(Deserialize)]
+pub(crate) struct MembershipApplication {
+    pub(crate) salutation: String,
+    pub(crate) first_name: String,
+    pub(crate) last_name: String,
+    pub(crate) street: String,
+    pub(crate) zipcode: String,
+    pub(crate) city: String,
+    pub(crate) email: String,
+    pub(crate) phone: String,
+    pub(crate) gender: String,
+    pub(crate) birthday: String,
+    #[serde(skip, default = "default_start_date")]
+    pub(crate) start_date: NaiveDate,
+    pub(crate) iban: String,
+    pub(crate) account_owner: String,
+    pub(crate) membership_type: MembershipType,
+    pub(crate) family_members: Option<Vec<MembershipFamilyMember>>,
+    pub(crate) newsletter: bool,
+}
+
+fn default_start_date() -> NaiveDate {
+    Utc::now().date_naive()
+}
+
+#[derive(Deserialize)]
+pub(crate) struct MembershipFamilyMember {
+    pub(crate) first_name: String,
+    pub(crate) last_name: String,
+    pub(crate) birthday: String,
+}
+
+#[derive(Deserialize)]
+pub(crate) enum MembershipType {
+    Fitness,
+    Family,
+    AdultActive,
+    AdultSuporting,
+    AdultPremium,
+    Youth,
+    Free,
+}
+
+impl MembershipType {
+    pub(crate) fn get_label(&self) -> &'static str {
+        match self {
+            MembershipType::Fitness => "Sparte Fitness",
+            MembershipType::Family => "Familienbeitrag beliebige Kinder",
+            MembershipType::AdultActive => "Aktiver Erwachsener",
+            MembershipType::AdultSuporting => "Fördermitglied Erwachsener",
+            MembershipType::AdultPremium => "Premiummitglied Erwachsener",
+            MembershipType::Youth => "Kind, Jugendliche(r)",
+            MembershipType::Free => "Beitragsfrei",
+        }
+    }
+
+    pub(crate) fn get_department(&self) -> &'static str {
+        match self {
+            MembershipType::Fitness => "Fitness",
+            _ => "Hauptverein",
+        }
     }
 }
 

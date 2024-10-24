@@ -1,13 +1,13 @@
+use super::events;
+use crate::models::{
+    Event, EventBooking, EventSubscription, MembershipApplication, ToEuro, UnpaidEventBooking,
+};
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Locale, Utc};
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderErrorReason,
 };
 use serde::Serialize;
-
-use crate::models::{Event, EventBooking, EventSubscription, ToEuro, UnpaidEventBooking};
-
-use super::events;
 
 #[derive(Serialize)]
 struct BookingTemplateData<'a> {
@@ -128,6 +128,21 @@ impl<'a> ParticipationConfirmationData<'a> {
             firstname: subscription.first_name.trim(),
             name: event.name.trim(),
         })
+    }
+}
+
+#[derive(Serialize)]
+struct MembershipApplicationTemplateData<'a> {
+    firstname: &'a str,
+    newsletter: &'a bool,
+}
+
+impl<'a> MembershipApplicationTemplateData<'a> {
+    fn new(membership_application: &'a MembershipApplication) -> Self {
+        Self {
+            firstname: membership_application.first_name.trim(),
+            newsletter: &membership_application.newsletter,
+        }
     }
 }
 
@@ -267,6 +282,17 @@ pub(crate) fn render_schedule_change<'a>(
     render(
         template,
         ScheduleChangeTemplateData::new(booking, event, removed_dates),
+        None,
+    )
+}
+
+pub(crate) fn render_membership_application<'a>(
+    template: &str,
+    membership_application: &'a MembershipApplication,
+) -> Result<String> {
+    render(
+        template,
+        MembershipApplicationTemplateData::new(membership_application),
         None,
     )
 }
