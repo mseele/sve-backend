@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2024-10-24
+
+### Features
+
+- Implement membership application backend
+
+### Refactor
+
+- Improve function name
+
 ## [2.2.5] - 2024-10-02
 
 ### Bug Fixes
