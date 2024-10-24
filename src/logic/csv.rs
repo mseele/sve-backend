@@ -7,7 +7,7 @@ use regex::Regex;
 use serde::Deserialize;
 use std::{collections::HashSet, ops::Neg};
 
-pub(crate) fn read(csv: &str) -> Result<Vec<PaymentRecord>> {
+pub(crate) fn read_payment_records(csv: &str) -> Result<Vec<PaymentRecord>> {
     let readers: Vec<Box<dyn CSVReader>> = vec![
         Box::<VobaClassicCSVReader>::default(),
         Box::<VobaRichCSVReader>::default(),

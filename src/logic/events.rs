@@ -715,7 +715,7 @@ fn read_payment_records(
 ) -> Result<Vec<PaymentRecord>> {
     let mut records = Vec::new();
 
-    for record in super::csv::read(csv)? {
+    for record in super::csv::read_payment_records(csv)? {
         // skip all records that are older than the start date
         if let Some(start_date) = csv_start_date {
             if record.date < start_date {
