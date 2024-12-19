@@ -36,7 +36,7 @@ chrono = { version = "0.4.24", default-features = false, features = [
   "unstable-locales",
 ] }
 chrono-tz = "0.9.0"
-google-calendar3 = "5.0.2"
+google-calendar3 = "6.0.0+20240523"
 yup-oauth2 = "8.2.0"
 hyper-legacy = { package = "hyper", version = "0.14.28" }
 hyper-rustls = "0.24.0"

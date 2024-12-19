@@ -4,11 +4,14 @@ use chrono::{Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Berlin;
 use google_calendar3::{
     api::{Channel, Event, EventDateTime},
+    hyper_rustls,
+    hyper_rustls::HttpsConnector,
+    hyper_util,
+    hyper_util::client::legacy::connect::HttpConnector,
+    yup_oauth2,
+    yup_oauth2::ServiceAccountKey,
     CalendarHub,
 };
-use hyper_legacy::client::HttpConnector;
-use hyper_rustls::HttpsConnector;
-use yup_oauth2::ServiceAccountKey;
 
 const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
 
@@ -20,18 +23,17 @@ async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
         .build()
         .await?;
 
-    let hub = CalendarHub::new(
-        hyper_legacy::Client::builder().build(
+    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .build(
             hyper_rustls::HttpsConnectorBuilder::new()
                 .with_native_roots()
+                .unwrap()
                 .https_only()
                 .enable_http2()
                 .build(),
-        ),
-        auth,
-    );
+        );
 
-    Ok(hub)
+    Ok(CalendarHub::new(client, auth))
 }
 
 pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
