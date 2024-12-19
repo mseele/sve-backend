@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.1] - 2024-12-19
+
+### Refactor
+
+- Switch from hyper (legacy) to reqwest
+
 ## [2.3.0] - 2024-10-24
 
 ### Features
