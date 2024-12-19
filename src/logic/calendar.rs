@@ -1,6 +1,7 @@
 use crate::{calendar, models::Appointment};
 use anyhow::Result;
-use hyper_legacy::{Body, Client, Method, Request, StatusCode};
+use hyper::StatusCode;
+use reqwest::Client;
 use tracing::{info, warn};
 
 const RE_DEPLOY_HOOK: &str = "https://api.netlify.com/build_hooks/66fd9717537e8d6941f92c34";
@@ -21,21 +22,7 @@ pub(crate) async fn notifications(channel_id: &str) -> Result<()> {
         channel_id
     );
 
-    let resp = Client::builder()
-        .build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http2()
-                .build(),
-        )
-        .request(
-            Request::builder()
-                .method(Method::POST)
-                .uri(RE_DEPLOY_HOOK)
-                .body(Body::empty())?,
-        )
-        .await?;
+    let resp = Client::new().post(RE_DEPLOY_HOOK).send().await?;
 
     if resp.status() == StatusCode::OK {
         info!("Re-Deploy triggered successfully");
