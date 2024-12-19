@@ -164,7 +164,7 @@ where
 {
     struct StringVecVisitor;
 
-    impl<'de> de::Visitor<'de> for StringVecVisitor {
+    impl de::Visitor<'_> for StringVecVisitor {
         type Value = Option<Vec<LifecycleStatus>>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

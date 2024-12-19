@@ -397,7 +397,7 @@ impl EventBooking {
         self.member.unwrap_or(false)
     }
 
-    pub(crate) fn price<'a>(&'a self, event: &'a Event) -> &BigDecimal {
+    pub(crate) fn price<'a>(&'a self, event: &'a Event) -> &'a BigDecimal {
         event.price(self.is_member())
     }
 }

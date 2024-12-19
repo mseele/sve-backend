@@ -286,9 +286,9 @@ pub(crate) fn render_schedule_change<'a>(
     )
 }
 
-pub(crate) fn render_membership_application<'a>(
+pub(crate) fn render_membership_application(
     template: &str,
-    membership_application: &'a MembershipApplication,
+    membership_application: &MembershipApplication,
 ) -> Result<String> {
     render(
         template,
