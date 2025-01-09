@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.2] - 2025-01-09
+
+### Refactor
+
+- Bump dependencies
+
 ## [2.3.1] - 2024-12-19
 
 ### Refactor
