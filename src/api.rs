@@ -88,19 +88,19 @@ pub(crate) fn router(state: PgPool) -> Router {
                         .route("/", get(events))
                         .route("/counter", get(counter))
                         .route("/booking", post(booking))
-                        .route("/prebooking/:hash", get(prebooking))
+                        .route("/prebooking/{hash}", get(prebooking))
                         .route("/update", post(update))
-                        .route("/:id", delete(delete_event))
+                        .route("/{id}", delete(delete_event))
                         .nest(
                             "/booking",
                             Router::new()
                                 .route(
-                                    "/:id",
+                                    "/{id}",
                                     patch(update_event_booking).delete(cancel_event_booking),
                                 )
-                                .route("/export/:event_id", get(export_event_bookings))
+                                .route("/export/{event_id}", get(export_event_bookings))
                                 .route(
-                                    "/participants_list/:event_id",
+                                    "/participants_list/{event_id}",
                                     get(export_event_participants_list),
                                 ),
                         )
@@ -108,7 +108,7 @@ pub(crate) fn router(state: PgPool) -> Router {
                             "/payments",
                             Router::new()
                                 .route("/verify", post(verify_payments))
-                                .route("/unpaid/:event_type", get(unpaid_bookings)),
+                                .route("/unpaid/{event_type}", get(unpaid_bookings)),
                         ),
                 )
                 .nest(
@@ -142,11 +142,11 @@ pub(crate) fn router(state: PgPool) -> Router {
                         .route("/send_event_reminders", get(send_event_reminders))
                         .route("/close_finished_events", get(close_finished_events))
                         .route(
-                            "/send_payment_reminders/:event_type",
+                            "/send_payment_reminders/{event_type}",
                             get(send_payment_reminders),
                         )
                         .route(
-                            "/send_participation_confirmation/:event_id",
+                            "/send_participation_confirmation/{event_id}",
                             get(send_participation_confirmation),
                         ),
                 ),
