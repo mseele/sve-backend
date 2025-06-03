@@ -1,5 +1,5 @@
 use crate::models::{FromEuro, MembershipApplication};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use bigdecimal::BigDecimal;
 use chrono::{Datelike, NaiveDate};
 use lazy_static::lazy_static;
@@ -407,7 +407,9 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                     date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
                     payee: String::from("Test GmbH"),
                     payee_iban: String::from("DE92500105174132432988"),
-                    purpose: String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
+                    purpose: String::from(
+                        "Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"
+                    ),
                     volumne: BigDecimal::from_str("-24.15").unwrap(),
                     payment_ids: HashSet::new(),
                 },
@@ -487,7 +489,9 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
                     date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
                     payee: String::from("Test GmbH"),
                     payee_iban: String::from("DE92500105174132432988"),
-                    purpose: String::from("Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"),
+                    purpose: String::from(
+                        "Überweisung Rechnung Nr. 20219862 Kunde 106155 TAN: Auftrag nicht TAN-pflichtig, da Kleinbetragszahlung IBAN: DE92500105174132432988 BIC: GENODES1VBH"
+                    ),
                     volumne: BigDecimal::from_str("-24.15").unwrap(),
                     payment_ids: HashSet::new(),
                 },

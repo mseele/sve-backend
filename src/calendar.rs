@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use chrono::{Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Berlin;
 use google_calendar3::{
+    CalendarHub,
     api::{Channel, Event, EventDateTime},
     hyper_rustls,
     hyper_rustls::HttpsConnector,
@@ -10,7 +11,6 @@ use google_calendar3::{
     hyper_util::client::legacy::connect::HttpConnector,
     yup_oauth2,
     yup_oauth2::ServiceAccountKey,
-    CalendarHub,
 };
 
 const CREDENTIALS: &str = include_str!("../secrets/credentials.json");

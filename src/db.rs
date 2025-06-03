@@ -2,14 +2,15 @@ use crate::models::{
     Event, EventBooking, EventCounter, EventId, EventSubscription, EventType, LifecycleStatus,
     NewsSubscription, NewsTopic, PartialEvent, UnpaidEventBooking, VerifyPaymentBookingRecord,
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use sqlx::{
+    FromRow, PgConnection, PgPool, Postgres, QueryBuilder, Row,
     postgres::{PgPoolOptions, PgRow},
     query, query_as,
     query_builder::Separated,
-    query_scalar, FromRow, PgConnection, PgPool, Postgres, QueryBuilder, Row,
+    query_scalar,
 };
 use std::{
     collections::{HashMap, HashSet},

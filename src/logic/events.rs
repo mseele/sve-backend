@@ -8,12 +8,12 @@ use crate::models::{
     VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
-use anyhow::{anyhow, bail, Context, Result};
-use base64::engine::general_purpose::STANDARD;
+use anyhow::{Context, Result, anyhow, bail};
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
-use encoding::{all::ISO_8859_1, DecoderTrap};
+use encoding::{DecoderTrap, all::ISO_8859_1};
 use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, MultiPart, SinglePart};
@@ -518,7 +518,9 @@ async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingRespo
                 "Event ({}) booking failed because a duplicate booking has been detected.",
                 booking.event_id
             );
-            BookingResponse::failure("Wir haben schon eine Buchung mit diesen Anmeldedaten erkannt. Bitte verwende für weitere Buchungen andere Anmeldedaten.")
+            BookingResponse::failure(
+                "Wir haben schon eine Buchung mit diesen Anmeldedaten erkannt. Bitte verwende für weitere Buchungen andere Anmeldedaten.",
+            )
         }
         BookingResult::NotBookable => {
             error!(

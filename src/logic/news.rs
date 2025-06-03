@@ -1,8 +1,8 @@
 use crate::models::{NewsSubscription, NewsTopic};
 use crate::{db, email};
 use anyhow::Result;
-use lettre::message::header::{self, ContentType};
 use lettre::message::SinglePart;
+use lettre::message::header::{self, ContentType};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 

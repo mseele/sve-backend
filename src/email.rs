@@ -1,5 +1,5 @@
 use crate::models::{EmailAccount, EmailType};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use lettre::{AsyncTransport, Message};
 
 const EMAIL_DATA: &str = include_str!("../secrets/email.json");

@@ -2,7 +2,7 @@ use super::events;
 use crate::models::{
     Event, EventBooking, EventSubscription, MembershipApplication, ToEuro, UnpaidEventBooking,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Locale, Utc};
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderErrorReason,

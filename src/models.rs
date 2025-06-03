@@ -1,6 +1,6 @@
-use anyhow::{bail, Context, Result};
-use base64::engine::general_purpose::STANDARD;
+use anyhow::{Context, Result, bail};
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use lettre::message::header::ContentType;
@@ -10,8 +10,8 @@ use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display};
 use std::ops::Deref;
-use std::str::from_utf8;
 use std::str::FromStr;
+use std::str::from_utf8;
 
 use crate::{email, hashids};
 

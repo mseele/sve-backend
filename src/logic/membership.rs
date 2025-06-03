@@ -9,11 +9,11 @@ use crate::{email, models::MembershipApplication};
 use anyhow::Context;
 use anyhow::Result;
 use iban::Iban;
-use lettre::message::header::ContentType;
+use lettre::Message;
 use lettre::message::Attachment;
 use lettre::message::MultiPart;
 use lettre::message::SinglePart;
-use lettre::Message;
+use lettre::message::header::ContentType;
 use sqlx::PgPool;
 
 pub(crate) async fn application(

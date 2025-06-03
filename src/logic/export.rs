@@ -2,14 +2,14 @@ use crate::{
     db,
     models::{Event, EventId, EventSubscription, ToEuro},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::Locale;
 use image::codecs::jpeg::JpegDecoder;
 use printpdf::{
     Color, Image, ImageTransform, IndirectFontRef, Line, Mm, PdfDocument, PdfLayerIndex,
     PdfPageReference, Point, Polygon, Rgb, Svg, SvgTransform,
 };
-use simple_excel_writer::{row, CellValue, Column, Row, ToCellValue, Workbook};
+use simple_excel_writer::{CellValue, Column, Row, ToCellValue, Workbook, row};
 use sqlx::PgPool;
 use std::io::Cursor;
 
