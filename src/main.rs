@@ -28,12 +28,15 @@ mod hashids {
     }
 }
 
-use axum::response::IntoResponse;
+use axum::{http::HeaderValue, response::IntoResponse};
 use http_body_util::BodyExt;
 use lambda_http::Error;
 use std::{future::Future, pin::Pin};
 use tower::{Layer, ServiceBuilder};
-use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
+};
 use tower_service::Service;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
@@ -60,7 +63,20 @@ async fn main() -> Result<(), Error> {
     if cfg!(debug_assertions) {
         let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 8080));
         let listener = tokio::net::TcpListener::bind(&addr).await?;
-        Ok(axum::serve(listener, app.into_make_service()).await?)
+        Ok(axum::serve(
+            listener,
+            app.layer(
+                CorsLayer::new()
+                    .allow_origin([
+                        "http://localhost:4321".parse::<HeaderValue>().unwrap(),
+                        "http://localhost:5173".parse::<HeaderValue>().unwrap(),
+                    ])
+                    .allow_methods(Any)
+                    .allow_headers(Any),
+            )
+            .into_make_service(),
+        )
+        .await?)
     } else {
         let app = ServiceBuilder::new().layer(LambdaLayer).service(app);
 
