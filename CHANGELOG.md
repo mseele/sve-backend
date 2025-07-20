@@ -2,17 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.3.3] - 2025-06-03
+## [2.4.0] - 2025-07-20
 
-### Refactor
+### Features
 
-- Bump dependencies
-
-## [2.3.2] - 2025-01-09
-
-### Refactor
-
-- Bump dependencies
+- Add cors for local development
+- Add support for custom fields
 
 ## [2.3.1] - 2024-12-19
 
