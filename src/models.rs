@@ -110,6 +110,7 @@ pub(crate) struct Event {
     pub(crate) alt_booking_button_text: Option<String>,
     pub(crate) alt_email_address: Option<String>,
     pub(crate) external_operator: bool,
+    pub(crate) custom_fields: Vec<EventCustomField>,
     pub(crate) subscribers: Option<Vec<EventSubscription>>,
 }
 
@@ -141,6 +142,7 @@ impl Event {
         alt_booking_button_text: Option<String>,
         alt_email_address: Option<String>,
         external_operator: bool,
+        custom_fields: Vec<EventCustomField>,
     ) -> Self {
         Self {
             id: id.into(),
@@ -168,6 +170,7 @@ impl Event {
             alt_booking_button_text,
             alt_email_address,
             external_operator,
+            custom_fields,
             subscribers: None,
         }
     }
@@ -219,6 +222,7 @@ pub(crate) struct PartialEvent {
     pub(crate) alt_booking_button_text: Option<String>,
     pub(crate) alt_email_address: Option<String>,
     pub(crate) external_operator: Option<bool>,
+    pub(crate) custom_fields: Option<Vec<EventCustomField>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
@@ -351,6 +355,41 @@ impl FromStr for LifecycleStatus {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
+#[sqlx(type_name = "event_cf_type")]
+pub(crate) enum EventCustomFieldType {
+    Text,
+    Number,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct EventCustomField {
+    pub(crate) id: i32,
+    pub(crate) name: String,
+    #[serde(rename = "type")]
+    pub(crate) cf_type: EventCustomFieldType,
+    pub(crate) min_value: Option<i32>,
+    pub(crate) max_value: Option<i32>,
+}
+
+impl EventCustomField {
+    pub(crate) fn new(
+        id: i32,
+        name: String,
+        cf_type: EventCustomFieldType,
+        min_value: Option<i32>,
+        max_value: Option<i32>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            cf_type,
+            min_value,
+            max_value,
+        }
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub(crate) struct EventBooking {
     pub(crate) event_id: EventId,
@@ -363,6 +402,7 @@ pub(crate) struct EventBooking {
     pub(crate) member: Option<bool>,
     pub(crate) updates: Option<bool>,
     pub(crate) comments: Option<String>,
+    pub(crate) custom_values: Vec<String>,
 }
 
 impl EventBooking {
@@ -378,6 +418,7 @@ impl EventBooking {
         member: Option<bool>,
         updates: Option<bool>,
         comments: Option<String>,
+        custom_values: Vec<String>,
     ) -> Self {
         Self {
             event_id: event_id.into(),
@@ -390,6 +431,7 @@ impl EventBooking {
             member,
             updates,
             comments,
+            custom_values,
         }
     }
 
@@ -476,6 +518,7 @@ pub(crate) struct EventSubscription {
     pub(crate) payment_id: String,
     pub(crate) payed: bool,
     pub(crate) comment: Option<String>,
+    pub(crate) custom_values: Vec<String>,
 }
 
 impl EventSubscription {
@@ -494,6 +537,7 @@ impl EventSubscription {
         payment_id: String,
         payed: bool,
         comment: Option<String>,
+        custom_values: Vec<String>,
     ) -> Self {
         Self {
             id,
@@ -509,6 +553,7 @@ impl EventSubscription {
             payment_id,
             payed,
             comment,
+            custom_values,
         }
     }
 }
@@ -964,6 +1009,7 @@ mod tests {
             Some(true),
             None,
             None,
+            Vec::new(),
         );
         let no_member = EventBooking::new(
             0,
@@ -976,6 +1022,7 @@ mod tests {
             None,
             None,
             None,
+            Vec::new(),
         );
 
         let event = new_event("59.0", "69");
@@ -1022,6 +1069,7 @@ mod tests {
             None,
             None,
             false,
+            Vec::new(),
         )
     }
 }

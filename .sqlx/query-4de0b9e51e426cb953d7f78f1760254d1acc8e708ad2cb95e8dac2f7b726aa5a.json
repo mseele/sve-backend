@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT\n\tecf.id,\n\tecf.name,\n\tecf.type AS \"cf_type: EventCustomFieldType\",\n\tecf.min_value,\n\tecf.max_value\nFROM\n\tevents e\nLEFT JOIN event_custom_fields ecf ON\n\tecf.id = any(array[e.custom_field_1,\n\te.custom_field_2,\n\te.custom_field_3,\n\te.custom_field_4])\nWHERE\n\te.id = $1\n    AND ecf.id IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "cf_type: EventCustomFieldType",
+        "type_info": {
+          "Custom": {
+            "name": "event_cf_type",
+            "kind": {
+              "Enum": [
+                "Text",
+                "Number"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "min_value",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "max_value",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4de0b9e51e426cb953d7f78f1760254d1acc8e708ad2cb95e8dac2f7b726aa5a"
+}

@@ -3,9 +3,9 @@ use super::{export, template};
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
-    BookingResponse, Email, Event, EventBooking, EventCounter, EventEmail, EventId, EventType,
-    LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro, UnpaidEventBooking,
-    VerifyPaymentBookingRecord, VerifyPaymentResult,
+    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventEmail,
+    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
+    UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
 use anyhow::{Context, Result, anyhow, bail};
@@ -45,6 +45,13 @@ pub(crate) async fn get_events(
         subscribers.unwrap_or(false),
     )
     .await
+}
+
+pub(crate) async fn get_all_custom_fields(
+    pool: &sqlx::Pool<sqlx::Postgres>,
+) -> Result<Vec<EventCustomField>> {
+    let custom_fields = db::get_all_custom_fields(pool).await?;
+    Ok(custom_fields)
 }
 
 pub(crate) async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<EventCounter>> {

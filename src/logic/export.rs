@@ -9,7 +9,7 @@ use printpdf::{
     Color, Image, ImageTransform, IndirectFontRef, Line, Mm, PdfDocument, PdfLayerIndex,
     PdfPageReference, Point, Polygon, Rgb, Svg, SvgTransform,
 };
-use simple_excel_writer::{CellValue, Column, Row, ToCellValue, Workbook, row};
+use simple_excel_writer::{CellValue, Column, Row, ToCellValue, Workbook};
 use sqlx::PgPool;
 use std::io::Cursor;
 
@@ -81,41 +81,55 @@ fn create_sheet(
     sheet.add_column(Column { width: 10.0 });
     sheet.add_column(Column { width: 10.0 });
     sheet.add_column(Column { width: 6.5 });
+
+    let mut custom_fields = Vec::new();
+    for custom_field in event.custom_fields.iter() {
+        sheet.add_column(Column { width: 20.0 });
+        custom_fields.push(custom_field.name.clone());
+    }
+
     sheet.add_column(Column { width: 100.0 });
 
     workbook.write_sheet(&mut sheet, |sheet_writer| {
-        sheet_writer.append_row(row![
-            "Id",
-            "Buchungsdatum",
-            "Vorname",
-            "Nachname",
-            "Straße",
-            "PLZ",
-            "Email",
-            "Telefon",
-            "Mitglied",
-            "Betrag",
-            "Buchungsnr",
-            "Bezahlt",
-            "Kommentar"
-        ])?;
+        let mut row = Row::new();
+        row.add_cell("Id");
+        row.add_cell("Buchungsdatum");
+        row.add_cell("Vorname");
+        row.add_cell("Nachname");
+        row.add_cell("Straße");
+        row.add_cell("PLZ");
+        row.add_cell("Email");
+        row.add_cell("Telefon");
+        row.add_cell("Mitglied");
+        row.add_cell("Betrag");
+        row.add_cell("Buchungsnr");
+        row.add_cell("Bezahlt");
+        for custom_field in custom_fields.iter() {
+            row.add_cell(custom_field.to_owned());
+        }
+        row.add_cell("Kommentar");
+
+        sheet_writer.append_row(row)?;
 
         for value in subscribers {
-            sheet_writer.append_row(row![
-                value.id.to_string(),
-                value.created.naive_utc(),
-                value.first_name,
-                value.last_name,
-                value.street,
-                value.city,
-                value.email,
-                opt(value.phone),
-                bool(value.member),
-                event.price(value.member).to_euro(),
-                value.payment_id,
-                bool(value.payed),
-                opt(value.comment)
-            ])?;
+            let mut row = Row::new();
+            row.add_cell(value.id.to_string());
+            row.add_cell(value.created.naive_utc());
+            row.add_cell(value.first_name);
+            row.add_cell(value.last_name);
+            row.add_cell(value.street);
+            row.add_cell(value.city);
+            row.add_cell(value.email);
+            row.add_cell(opt(value.phone));
+            row.add_cell(bool(value.member));
+            row.add_cell(event.price(value.member).to_euro());
+            row.add_cell(value.payment_id);
+            row.add_cell(bool(value.payed));
+            for (index, _) in custom_fields.iter().enumerate() {
+                row.add_cell(opt(value.custom_values.get(index).cloned()));
+            }
+            row.add_cell(opt(value.comment));
+            sheet_writer.append_row(row)?;
         }
 
         Ok(())

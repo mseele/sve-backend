@@ -333,6 +333,7 @@ mod tests {
             Some(true),
             None,
             None,
+            Vec::new(),
         );
         let booking_non_member = EventBooking::new(
             1,
@@ -345,6 +346,7 @@ mod tests {
             None,
             None,
             None,
+            Vec::new(),
         );
         let event = Event::new(
             0,
@@ -383,6 +385,7 @@ IBAN: DE16 6429 1010 0034 4696 05",
             None,
             None,
             false,
+            Vec::new(),
         );
 
         assert_eq!(
@@ -572,6 +575,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             None,
             false,
+            Vec::new(),
         );
         let event_subscription = EventSubscription::new(
             0,
@@ -587,6 +591,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             String::from("123"),
             true,
             None,
+            Vec::new(),
         );
 
         assert_eq!(
@@ -646,6 +651,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             None,
             false,
+            Vec::new(),
         );
         let event_subscription = EventSubscription::new(
             0,
@@ -661,6 +667,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             String::from("123"),
             true,
             None,
+            Vec::new(),
         );
 
         assert_eq!(
@@ -709,6 +716,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             None,
             false,
+            Vec::new(),
         );
         let booking = EventBooking::new(
             0,
@@ -721,6 +729,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             Some(true),
             None,
             None,
+            Vec::new(),
         );
 
         assert_eq!(
@@ -778,6 +787,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             None,
             false,
+            Vec::new(),
         )
     }
 }

@@ -86,6 +86,7 @@ pub(crate) fn router(state: PgPool) -> Router {
                     "/events",
                     Router::new()
                         .route("/", get(events))
+                        .route("/custom_fields", get(custom_fields))
                         .route("/counter", get(counter))
                         .route("/booking", post(booking))
                         .route("/prebooking/{hash}", get(prebooking))
@@ -226,6 +227,11 @@ async fn events(
     )
     .await?;
     Ok(Json(events))
+}
+
+async fn custom_fields(State(pool): State<PgPool>) -> Result<impl IntoResponse, ResponseError> {
+    let custom_fields = events::get_all_custom_fields(&pool).await?;
+    Ok(Json(custom_fields))
 }
 
 async fn counter(

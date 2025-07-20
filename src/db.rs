@@ -1,6 +1,7 @@
 use crate::models::{
-    Event, EventBooking, EventCounter, EventId, EventSubscription, EventType, LifecycleStatus,
-    NewsSubscription, NewsTopic, PartialEvent, UnpaidEventBooking, VerifyPaymentBookingRecord,
+    Event, EventBooking, EventCounter, EventCustomField, EventCustomFieldType, EventId,
+    EventSubscription, EventType, LifecycleStatus, NewsSubscription, NewsTopic, PartialEvent,
+    UnpaidEventBooking, VerifyPaymentBookingRecord,
 };
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Utc};
@@ -134,6 +135,7 @@ ORDER BY
 
     if !events.is_empty() {
         insert_event_dates(&mut conn, &mut events).await?;
+        insert_event_custom_fields(&mut conn, &mut events).await?;
         if subscribers {
             insert_event_subscribers(&mut conn, &mut events).await?;
         }
@@ -213,6 +215,7 @@ WHERE
 
     if !events.is_empty() {
         insert_event_dates(conn, &mut events).await?;
+        insert_event_custom_fields(conn, &mut events).await?;
         if subscribers {
             insert_event_subscribers(conn, &mut events).await?;
         }
@@ -259,6 +262,66 @@ ORDER BY
     Ok(())
 }
 
+async fn insert_event_custom_fields<'a>(
+    conn: &mut PgConnection,
+    events: &'a mut [Event],
+) -> Result<()> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        r#"
+SELECT
+    e.id AS event_id,
+	ecf.id,
+	ecf.name,
+	ecf.type,
+	ecf.min_value,
+	ecf.max_value
+FROM
+	events e
+LEFT JOIN event_custom_fields ecf ON
+	ecf.id = ANY(ARRAY[e.custom_field_1,
+	e.custom_field_2,
+	e.custom_field_3,
+	e.custom_field_4])
+WHERE
+    e.id IN ("#,
+    );
+    let mut separated = query_builder.separated(", ");
+    for event in events.iter() {
+        separated.push_bind(event.id.get_ref());
+    }
+    separated.push_unseparated(
+        r#")
+	AND ecf.id IS NOT NULL
+ORDER BY
+    e.id"#,
+    );
+
+    let mut result = HashMap::new();
+    for row in query_builder.build().fetch_all(conn).await? {
+        let id: i32 = row.try_get("event_id")?;
+        result
+            .entry(id)
+            .or_insert_with(Vec::new)
+            .push(EventCustomField::new(
+                row.try_get("id")?,
+                row.try_get("name")?,
+                row.try_get("type")?,
+                row.try_get("min_value")?,
+                row.try_get("max_value")?,
+            ));
+    }
+
+    for event in events.iter_mut() {
+        if let Some(custom_fields) = result.remove(event.id.get_ref()) {
+            event.custom_fields = custom_fields;
+        } else {
+            event.custom_fields = Default::default();
+        }
+    }
+
+    Ok(())
+}
+
 async fn insert_event_subscribers<'a>(
     conn: &mut PgConnection,
     events: &'a mut [Event],
@@ -279,9 +342,13 @@ SELECT
     v.member,
     v.payment_id,
     v.payed IS NOT NULL AS payed,
-    v.comment
+    v.comment,
+    v.custom_value_1,
+    v.custom_value_2,
+    v.custom_value_3,
+    v.custom_value_4
 FROM
-     v_event_bookings v
+    v_event_bookings v
 WHERE
     v.event_id IN ("#,
     );
@@ -318,6 +385,15 @@ ORDER BY
                 row.try_get("payment_id")?,
                 row.try_get("payed")?,
                 row.try_get("comment")?,
+                vec![
+                    row.try_get::<Option<String>, _>("custom_value_1")?,
+                    row.try_get::<Option<String>, _>("custom_value_2")?,
+                    row.try_get::<Option<String>, _>("custom_value_3")?,
+                    row.try_get::<Option<String>, _>("custom_value_4")?,
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
             ));
     }
 
@@ -417,6 +493,38 @@ async fn update_event(
         &mut separated,
         "EXTERNAL_OPERATOR",
         partial_event.external_operator,
+    );
+    update_is_needed |= push_bind(
+        &mut separated,
+        "CUSTOM_FIELD_1",
+        partial_event
+            .custom_fields
+            .as_ref()
+            .map(|fields| fields.first().map(|value| value.id)),
+    );
+    update_is_needed |= push_bind(
+        &mut separated,
+        "CUSTOM_FIELD_2",
+        partial_event
+            .custom_fields
+            .as_ref()
+            .map(|fields| fields.get(1).map(|value| value.id)),
+    );
+    update_is_needed |= push_bind(
+        &mut separated,
+        "CUSTOM_FIELD_3",
+        partial_event
+            .custom_fields
+            .as_ref()
+            .map(|fields| fields.get(2).map(|value| value.id)),
+    );
+    update_is_needed |= push_bind(
+        &mut separated,
+        "CUSTOM_FIELD_4",
+        partial_event
+            .custom_fields
+            .as_ref()
+            .map(|fields| fields.get(3).map(|value| value.id)),
     );
 
     // add closed date if lifecycle status should be updated to closed
@@ -551,13 +659,23 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
     let external_operator = partial_event
         .external_operator
         .ok_or_else(|| anyhow!("Attribute 'external_operator' is missing"))?;
+    let (custom_field_1, custom_field_2, custom_field_3, custom_field_4) =
+        match partial_event.custom_fields {
+            Some(custom_fields) => (
+                custom_fields.first().map(|value| value.id),
+                custom_fields.get(1).map(|value| value.id),
+                custom_fields.get(2).map(|value| value.id),
+                custom_fields.get(3).map(|value| value.id),
+            ),
+            None => (None, None, None, None),
+        };
 
     let mut tx = pool.begin().await?;
 
     let mut new_event: Event = query!(
         r#"
-INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator, custom_field_1, custom_field_2, custom_field_3, custom_field_4)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
         closed,
         event_type as EventType,
@@ -580,7 +698,11 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
         payment_account,
         alt_booking_button_text,
         alt_email_address,
-        external_operator
+        external_operator,
+        custom_field_1,
+        custom_field_2,
+        custom_field_3,
+        custom_field_4,
     )
     .map(|row| {
         Event::new(
@@ -609,12 +731,14 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
             row.alt_booking_button_text,
             row.alt_email_address,
             row.external_operator,
+            Vec::new(),
         )
     })
     .fetch_one(&mut *tx)
     .await?;
 
     new_event.dates = save_event_dates(&mut tx, &new_event.id, dates).await?;
+    new_event.custom_fields = get_event_custom_fields(&mut tx, &new_event.id).await?;
 
     tx.commit().await?;
 
@@ -668,6 +792,37 @@ async fn save_event_dates(
     .await?;
 
     Ok(dates)
+}
+
+async fn get_event_custom_fields(
+    conn: &mut PgConnection,
+    event_id: &EventId,
+) -> Result<Vec<EventCustomField>> {
+    let custom_fields = query!(
+        r#"
+SELECT
+	ecf.id,
+	ecf.name,
+	ecf.type AS "cf_type: EventCustomFieldType",
+	ecf.min_value,
+	ecf.max_value
+FROM
+	events e
+LEFT JOIN event_custom_fields ecf ON
+	ecf.id = any(array[e.custom_field_1,
+	e.custom_field_2,
+	e.custom_field_3,
+	e.custom_field_4])
+WHERE
+	e.id = $1
+    AND ecf.id IS NOT NULL"#,
+        event_id.get_ref()
+    )
+    .map(|row| EventCustomField::new(row.id, row.name, row.cf_type, row.min_value, row.max_value))
+    .fetch_all(conn)
+    .await?;
+
+    Ok(custom_fields)
 }
 
 pub(crate) async fn delete_event(pool: &PgPool, id: EventId) -> Result<()> {
@@ -937,6 +1092,28 @@ pub(crate) async fn update_payment(
     Ok(())
 }
 
+pub(crate) async fn get_all_custom_fields(
+    pool: &sqlx::Pool<Postgres>,
+) -> Result<Vec<EventCustomField>> {
+    let result = query!(
+        r#"
+SELECT
+    id,
+    name,
+    type AS "cf_type: EventCustomFieldType",
+    min_value,
+    max_value
+FROM
+    event_custom_fields
+"#
+    )
+    .map(|row| EventCustomField::new(row.id, row.name, row.cf_type, row.min_value, row.max_value))
+    .fetch_all(pool)
+    .await?;
+
+    Ok(result)
+}
+
 pub(crate) async fn get_event_counters(
     pool: &PgPool,
     lifecycle_status: LifecycleStatus,
@@ -965,7 +1142,11 @@ SELECT
     v.email,
     v.phone,
     v.member,
-    v.payment_id
+    v.payment_id,
+    v.custom_value_1,
+    v.custom_value_2,
+    v.custom_value_3,
+    v.custom_value_4
 FROM
     v_event_bookings v
 WHERE
@@ -1005,6 +1186,15 @@ ORDER BY
                 row.try_get("member")?,
                 None,
                 None,
+                vec![
+                    row.try_get::<Option<String>, _>("custom_value_1")?,
+                    row.try_get::<Option<String>, _>("custom_value_2")?,
+                    row.try_get::<Option<String>, _>("custom_value_3")?,
+                    row.try_get::<Option<String>, _>("custom_value_4")?,
+                ]
+                .into_iter()
+                .flatten() // Only keep Some(value) and unwrap them
+                .collect(),
             ),
             row.try_get("subscriber_id")?,
             row.try_get("payment_id")?,
@@ -1111,6 +1301,7 @@ pub(crate) async fn pre_book_event(
                 enrolled,
                 true,
                 &None,
+                &vec![],
             )
             .await?;
 
@@ -1142,6 +1333,7 @@ WHERE
                     Some(row.member),
                     None,
                     None,
+                    Vec::new(),
                 )
             })
             .fetch_one(&mut *tx)
@@ -1234,6 +1426,7 @@ async fn process_booking(
         enrolled,
         pre_booking,
         &booking.comments,
+        &booking.custom_values,
     )
     .await?;
 
@@ -1247,6 +1440,7 @@ async fn insert_booking(
     enrolled: bool,
     pre_booking: bool,
     comments: &Option<String>,
+    custom_values: &[String],
 ) -> Result<BookingResult> {
     // check for duplicate booking
     if let EventSubscriberId::Existing(id) = subscriber_id {
@@ -1292,14 +1486,18 @@ WHERE
     query!(
         r#"
 INSERT INTO public.event_bookings
-(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id)
-VALUES($1, $2, $3, $4, $5, $6)"#,
+(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id, custom_value_1, custom_value_2, custom_value_3, custom_value_4)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
         event_id.get_ref(),
         enrolled,
         pre_booking,
         subscriber_id.get_id(),
         comment,
-        payment_id
+        payment_id,
+        custom_values.first(),
+        custom_values.get(1),
+        custom_values.get(2),
+        custom_values.get(3),
     )
     .execute(&mut *conn)
     .await?;
@@ -1447,6 +1645,7 @@ WHERE
             row.member,
             None,
             None,
+            Vec::new(),
         )
     })
     .fetch_one(&mut *tx)
@@ -1492,6 +1691,7 @@ v.created"#,
                 row.member,
                 None,
                 None,
+                Vec::new(),
             ),
             row.payment_id.unwrap(),
         )
@@ -1684,6 +1884,7 @@ fn map_event(row: &PgRow) -> Result<Event> {
         row.try_get("alt_booking_button_text")?,
         row.try_get("alt_email_address")?,
         row.try_get("external_operator")?,
+        Vec::new(),
     ))
 }
 
