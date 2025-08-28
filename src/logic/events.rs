@@ -752,9 +752,7 @@ fn compare_payment_records_with_bookings(
         .collect::<HashMap<_, _>>();
 
     for payment_record in payment_records {
-        // TODO: add support for payment record with multiple payment ids
-
-        if payment_record.payment_ids.is_empty() || payment_record.payment_ids.len() > 1 {
+        if payment_record.payment_ids.is_empty() {
             non_matching_payment_records.push(format!(
                 "{} / {} / {} / {}",
                 payment_record.payee,
@@ -764,57 +762,84 @@ fn compare_payment_records_with_bookings(
             ));
             continue;
         }
-        let payment_id = payment_record.payment_ids.iter().next().ok_or_else(|| {
-            anyhow!("Payment record is missing payment ids. Never should be here.")
-        })?;
 
-        let booking = bookings.remove(&payment_id);
-        if let Some(booking) = booking {
-            if booking.payed.is_some() {
-                payment_bookings_with_errors
-                    .entry(payment_id)
-                    .or_insert_with(Vec::new)
-                    .push("Doppelt bezahlt: Buchung ist schon als bezahlt markiert".into());
+        // Try to match each payment_id individually
+        let mut matched_bookings = Vec::new();
+        let mut missing_ids = Vec::new();
+        for payment_id in &payment_record.payment_ids {
+            if let Some(booking) = bookings.remove(payment_id) {
+                matched_bookings.push((payment_id, booking));
+            } else {
+                missing_ids.push(payment_id.to_owned());
             }
+        }
 
-            if booking.enrolled && booking.canceled.is_some() {
-                payment_bookings_with_errors
-                    .entry(payment_id)
-                    .or_insert_with(Vec::new)
-                    .push("Falsch bezahlt: Buchung ist als storniert markiert".into());
-            }
-
-            if !booking.enrolled {
-                payment_bookings_with_errors
-                    .entry(payment_id)
-                    .or_insert_with(Vec::new)
-                    .push("Falsch bezahlt: Buchung ist von auf der Warteliste".into());
-            }
-
-            let record_volumne = payment_record.volumne.to_euro();
-            let booking_price = booking.price.to_euro();
-            if !record_volumne.eq(&booking_price) {
-                payment_bookings_with_errors
-                    .entry(payment_id)
-                    .or_insert_with(Vec::new)
-                    .push(format!(
-                        "Betrag falsch: erwartet {booking_price} != überwiesen {record_volumne}"
-                    ));
-            }
-
-            if !payment_bookings_with_errors.contains_key(&booking.payment_id) {
-                verified_payment_bookings.push(booking);
-                verified_ibans.insert(booking.booking_id, payment_record.payee_iban.clone());
-            }
-        } else {
+        // Report missing IDs, but do not skip processing matched ones
+        if !missing_ids.is_empty() {
             non_matching_payment_records.push(format!(
-                "{} / {} / {} / {}",
+                "Nicht erkannte Buchung(en): {} / {} / {} / {} / fehlende ID(s): {}",
                 payment_record.payee,
                 payment_record.payee_iban,
                 payment_record.purpose,
-                payment_record.volumne.to_euro()
+                payment_record.volumne.to_euro(),
+                missing_ids.join(", ")
             ));
-            break;
+        }
+
+        // Check for errors in individual bookings and collect valid ones
+        let mut error_ids = HashSet::new();
+        let mut error_total = false;
+        for (payment_id, booking) in &matched_bookings {
+            if booking.payed.is_some() {
+                payment_bookings_with_errors
+                    .entry(payment_id.to_owned())
+                    .or_insert_with(Vec::new)
+                    .push("Doppelt bezahlt: Buchung ist schon als bezahlt markiert".into());
+                error_ids.insert(payment_id.to_owned());
+            }
+            if booking.enrolled && booking.canceled.is_some() {
+                payment_bookings_with_errors
+                    .entry(payment_id.to_owned())
+                    .or_insert_with(Vec::new)
+                    .push("Falsch bezahlt: Buchung ist als storniert markiert".into());
+                error_ids.insert(payment_id.to_owned());
+            }
+            if !booking.enrolled {
+                payment_bookings_with_errors
+                    .entry(payment_id.to_owned())
+                    .or_insert_with(Vec::new)
+                    .push("Falsch bezahlt: Buchung ist von auf der Warteliste".into());
+                error_ids.insert(payment_id.to_owned());
+            }
+        }
+
+        // Check if sum of booking prices matches payment_record.volumne
+        let total_booking_price = matched_bookings
+            .iter()
+            .map(|(_, b)| b.price.clone())
+            .fold(bigdecimal::BigDecimal::from(0), |acc, x| acc + x);
+        let record_volumne = payment_record.volumne.clone();
+        if total_booking_price.clone() != record_volumne.clone() {
+            for (payment_id, _) in &matched_bookings {
+                payment_bookings_with_errors
+                    .entry(payment_id.to_owned())
+                    .or_insert_with(Vec::new)
+                    .push(format!(
+                        "Betrag falsch: erwartet {} != überwiesen {}",
+                        total_booking_price.to_euro(),
+                        record_volumne.to_euro()
+                    ));
+                error_ids.insert(payment_id.to_owned());
+            }
+            error_total = true;
+        }
+
+        // Mark only correct bookings as verified
+        for (payment_id, booking) in matched_bookings {
+            if !error_ids.contains(payment_id) && !error_total {
+                verified_payment_bookings.push(booking);
+                verified_ibans.insert(booking.booking_id, payment_record.payee_iban.clone());
+            }
         }
     }
     verified_payment_bookings.sort_unstable_by(|a, b| a.payment_id.cmp(&b.payment_id));
@@ -1201,6 +1226,10 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 10.03.2022;10.03.2022;54 Überweisungsgutschr.;931;Erika Mustermann;0;DE91500105176171781279;10517962;SOLADES1FDS;Erika 22-1425 Mustermann;;EUR;33,50;H
 10.03.2022;10.03.2022;78 Euro-Überweisung;931;Lieschen Müller;0;DE21500105179625862911;10517962;GENODES1VBH;Lieschen Müller 22-1456;;EUR;27,00;H
 11.03.2022;11.03.2022;90 Euro-Überweisung;931;Otto Normalverbraucher;0;DE21500105179625862911;10517962;GENODES1VBH;Otto Normalverbraucher, Test-Kurs,22-1467;;EUR;45,90;H
+11.03.2022;11.03.2022;Überweisung;801;Familie Schmidt;0;DE12345678901234567890;12345678;BANKXYZ;22-2001,22-2002;;EUR;54,00;H
+11.03.2022;11.03.2022;Überweisung;801;Familie Müller;0;DE09876543210987654321;87654321;BANKABC;22-3001,22-3002;;EUR;40,00;H
+11.03.2022;11.03.2022;Überweisung;801;Familie Klein;0;DE11223344556677889900;11223344;BANKDEF;22-4001,22-4002;;EUR;27,00;H
+11.03.2022;11.03.2022;Überweisung;801;Familie Doppel;0;DE44556677889900112233;44556677;BANKGHI;22-5001,22-5001;;EUR;27,00;H
 ;;;;;;;;;;;;;
 01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
@@ -1246,16 +1275,104 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
                 true,
                 None,
             ),
+            VerifyPaymentBookingRecord::new(
+                10,
+                "Test-Kurs".into(),
+                "Anna Schmidt".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-2001".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                11,
+                "Test-Kurs".into(),
+                "Ben Schmidt".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-2002".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                12,
+                "Test-Kurs".into(),
+                "Clara Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-3001".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                13,
+                "Test-Kurs".into(),
+                "David Müller".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-3002".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                14,
+                "Test-Kurs".into(),
+                "Eva Klein".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-4001".into(),
+                None,
+                true,
+                None,
+            ),
+            VerifyPaymentBookingRecord::new(
+                15,
+                "Test-Kurs".into(),
+                "Felix Doppel".into(),
+                BigDecimal::from_i8(27).unwrap(),
+                "22-5001".into(),
+                None,
+                true,
+                None,
+            ),
         ];
 
         assert_eq!(
             compare_csv_with_bookings(csv, NaiveDate::from_ymd_opt(2022, 3, 11), &mut bookings),
             (
-                HashMap::from([(4, "DE21500105179625862911".into())]),
+                HashMap::from([
+                    (4, "DE21500105179625862911".into()),
+                    (10, "DE12345678901234567890".into()),
+                    (11, "DE12345678901234567890".into()),
+                    (14, "DE11223344556677889900".into()),
+                    (15, "DE44556677889900112233".into()),
+                ]),
                 vec![
-                    VerifyPaymentResult::new("1 bezahlte Buchung".into(), vec!["22-1467".into()]),
-                    VerifyPaymentResult::new("0 Buchungen mit Problemen".into(), vec![]),
-                    VerifyPaymentResult::new("0 nicht erkannte Buchungen".into(), vec![])
+                    VerifyPaymentResult::new(
+                        "5 bezahlte Buchungen".into(),
+                        vec![
+                            "22-1467".into(),
+                            "22-2001".into(),
+                            "22-2002".into(),
+                            "22-4001".into(),
+                            "22-5001".into()
+                        ]
+                    ),
+                    VerifyPaymentResult::new(
+                        "2 Buchungen mit Problemen".into(),
+                        vec![
+                            "22-3001 / Betrag falsch: erwartet 54,00 € != überwiesen 40,00 €"
+                                .into(),
+                            "22-3002 / Betrag falsch: erwartet 54,00 € != überwiesen 40,00 €"
+                                .into()
+                        ]
+                    ),
+                    VerifyPaymentResult::new(
+                        "1 nicht erkannte Buchung".into(),
+                        vec![
+                            "Nicht erkannte Buchung(en): Familie Klein / DE11223344556677889900 / 22-4001,22-4002 / 27,00 € / fehlende ID(s): 22-4002".into()
+                        ]
+                    )
                 ]
             )
         );
