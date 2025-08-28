@@ -19,10 +19,10 @@ pub(crate) async fn message(contact_message: ContactMessage) -> Result<()> {
         contact_message.name.trim(),
         email
     );
-    if let Some(phone) = contact_message.phone {
-        if !phone.trim().is_empty() {
-            body.push_str(&format!("Telefon: {}\n", phone.trim()))
-        }
+    if let Some(phone) = contact_message.phone
+        && !phone.trim().is_empty()
+    {
+        body.push_str(&format!("Telefon: {}\n", phone.trim()))
     }
     body.push_str(&format!(
         "\nNachricht: {}\n",

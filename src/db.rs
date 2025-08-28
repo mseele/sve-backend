@@ -224,7 +224,7 @@ WHERE
     Ok(events)
 }
 
-async fn insert_event_dates<'a>(conn: &mut PgConnection, events: &'a mut [Event]) -> Result<()> {
+async fn insert_event_dates(conn: &mut PgConnection, events: &mut [Event]) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
@@ -262,10 +262,7 @@ ORDER BY
     Ok(())
 }
 
-async fn insert_event_custom_fields<'a>(
-    conn: &mut PgConnection,
-    events: &'a mut [Event],
-) -> Result<()> {
+async fn insert_event_custom_fields(conn: &mut PgConnection, events: &mut [Event]) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
@@ -322,10 +319,7 @@ ORDER BY
     Ok(())
 }
 
-async fn insert_event_subscribers<'a>(
-    conn: &mut PgConnection,
-    events: &'a mut [Event],
-) -> Result<()> {
+async fn insert_event_subscribers(conn: &mut PgConnection, events: &mut [Event]) -> Result<()> {
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"
 SELECT
@@ -1301,7 +1295,7 @@ pub(crate) async fn pre_book_event(
                 enrolled,
                 true,
                 &None,
-                &vec![],
+                &[],
             )
             .await?;
 
@@ -1462,10 +1456,10 @@ WHERE
         .fetch_one(&mut *conn)
         .await?;
 
-        if let Some(v) = count {
-            if v > 0 {
-                return Ok(BookingResult::DuplicateBooking);
-            }
+        if let Some(v) = count
+            && v > 0
+        {
+            return Ok(BookingResult::DuplicateBooking);
         }
     }
 

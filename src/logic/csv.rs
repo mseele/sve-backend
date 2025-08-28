@@ -130,7 +130,7 @@ impl CSVReader for VobaRichCSVReader {
         })?;
         let mut reader = csv::ReaderBuilder::new()
             .delimiter(b';')
-            .from_reader(csv[start..(start + end)].as_bytes());
+            .from_reader(&csv.as_bytes()[start..(start + end)]);
 
         let mut result = Vec::new();
         for record in reader.deserialize() {
@@ -201,7 +201,7 @@ where
     D: serde::Deserializer<'de>,
 {
     String::deserialize(deserializer)?
-        .from_euro_without_symbol()
+        .parse_euro_without_symbol()
         .map_err(serde::de::Error::custom)
 }
 
