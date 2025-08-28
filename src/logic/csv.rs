@@ -74,28 +74,12 @@ struct VobaRichPaymentRecord {
         deserialize_with = "deserialize_date_with_german_format"
     )]
     date: NaiveDate,
-    #[serde(rename = "Valuta")]
-    _valuta: String,
-    #[serde(rename = "Textschlüssel")]
-    _textkey: String,
-    #[serde(rename = "Primanota")]
-    _primanota: String,
     #[serde(rename = "Zahlungsempfänger")]
     payee: String,
-    #[serde(rename = "ZahlungsempfängerKto")]
-    _payee_account: String,
     #[serde(rename = "ZahlungsempfängerIBAN")]
     payee_iban: String,
-    #[serde(rename = "ZahlungsempfängerBLZ")]
-    _payee_blz: String,
-    #[serde(rename = "ZahlungsempfängerBIC")]
-    _payee_bic: String,
     #[serde(rename = "Vorgang/Verwendungszweck")]
     purpose: String,
-    #[serde(rename = "Kundenreferenz")]
-    _customer_reference: String,
-    #[serde(rename = "Währung")]
-    _currency: String,
     #[serde(rename = "Umsatz", deserialize_with = "deserialize_float_with_comma")]
     volumne: BigDecimal,
     #[serde(rename = "Soll/Haben")]
@@ -164,45 +148,19 @@ struct VobaClassicCSVReader {}
 
 #[derive(Deserialize)]
 struct VobaClassicPaymentRecord {
-    #[serde(rename = "Bezeichnung Auftragskonto")]
-    _description_order_account: String,
-    #[serde(rename = "IBAN Auftragskonto")]
-    _description_order_iban: String,
-    #[serde(rename = "BIC Auftragskonto")]
-    _description_order_bic: String,
-    #[serde(rename = "Bankname Auftragskonto")]
-    _description_order_bank_name: String,
     #[serde(
         rename = "Buchungstag",
         deserialize_with = "deserialize_date_with_german_format"
     )]
     date: NaiveDate,
-    #[serde(rename = "Valutadatum")]
-    _valuta: String,
     #[serde(rename = "Name Zahlungsbeteiligter")]
     payee: String,
     #[serde(rename = "IBAN Zahlungsbeteiligter")]
     payee_iban: String,
-    #[serde(rename = "BIC (SWIFT-Code) Zahlungsbeteiligter")]
-    _payee_bic: String,
-    #[serde(rename = "Buchungstext")]
-    _textkey: String,
     #[serde(rename = "Verwendungszweck")]
     purpose: String,
     #[serde(rename = "Betrag", deserialize_with = "deserialize_float_with_comma")]
     volumne: BigDecimal,
-    #[serde(rename = "Waehrung")]
-    _currency: String,
-    #[serde(rename = "Saldo nach Buchung")]
-    _saldo_after_record: String,
-    #[serde(rename = "Bemerkung")]
-    _description: String,
-    #[serde(rename = "Steuerrelevant")]
-    _tax_relevant: String,
-    #[serde(rename = "Glaeubiger ID")]
-    _creditor_id: String,
-    #[serde(rename = "Mandatsreferenz")]
-    _mandate_reference: String,
 }
 
 impl From<VobaClassicPaymentRecord> for PaymentRecord {
