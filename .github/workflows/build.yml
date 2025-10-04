@@ -18,14 +18,9 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Install # missing packages
-        run: sudo apt-get update --yes && sudo apt-get install --yes musl-tools
-
-      - name: Setup # the secrets
         run: |
-          mkdir -p secrets
-          echo ${{ secrets.SVE_CREDENTIALS_ENCODED }} | base64 -d > secrets/credentials.json
-          echo ${{ secrets.SVE_EMAILS_ENCODED }} | base64 -d > secrets/email.json
-          echo ${{ secrets.SVE_DB_ENCODED }} | base64 -d > secrets/database_url.env
+          sudo apt-get update --yes
+          sudo apt-get install --yes musl-tools upx-ucl
 
       - name: Build # the binary
         uses: houseabsolute/actions-rust-cross@v0
@@ -45,7 +40,8 @@ jobs:
         run: |
           cd target/aarch64-unknown-linux-musl/release
           mv sve_backend bootstrap
-          7z a lambda.zip bootstrap
+          upx --best --lzma bootstrap  # Additional compression
+          7z a -mx9 lambda.zip bootstrap  # Maximum compression
           mv lambda.zip ../../../
 
       - name: Publish # to aws
