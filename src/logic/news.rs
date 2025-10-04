@@ -98,7 +98,7 @@ async fn send_mail(subscription: NewsSubscription) -> Result<()> {
         }
     };
 
-    let email_account = email::get_account_by_type(primary_news_topic.into())?;
+    let email_account = email::get_account_by_type(primary_news_topic.into()).await?;
     let message = email_account
         .new_message()?
         .header(header::MIME_VERSION_1_0)

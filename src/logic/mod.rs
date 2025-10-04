@@ -5,5 +5,6 @@ pub(crate) mod events;
 pub(crate) mod export;
 pub(crate) mod membership;
 pub(crate) mod news;
+pub(crate) mod secrets;
 pub(crate) mod tasks;
 pub(crate) mod template;

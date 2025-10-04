@@ -186,10 +186,10 @@ impl Event {
         self.event_type.subject_prefix()
     }
 
-    pub(crate) fn get_associated_email_account(&self) -> Result<EmailAccount> {
+    pub(crate) async fn get_associated_email_account(&self) -> Result<EmailAccount> {
         match &self.alt_email_address {
-            Some(email_address) => email::get_account_by_address(email_address),
-            None => email::get_account_by_type(self.event_type.into()),
+            Some(email_address) => email::get_account_by_address(email_address).await,
+            None => email::get_account_by_type(self.event_type.into()).await,
         }
     }
 }

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tracing::info;
 
 pub(crate) async fn message(contact_message: ContactMessage) -> Result<()> {
-    let email_account = email::get_account_by_type(contact_message.message_type.into())?;
+    let email_account = email::get_account_by_type(contact_message.message_type.into()).await?;
 
     let email = contact_message.email.trim();
     let mut body = format!(
@@ -53,7 +53,7 @@ pub(crate) async fn emails(emails: Vec<Email>) -> Result<()> {
         grouped_emails.entry(email_type).or_default().push(email);
     }
     for (email_type, emails) in grouped_emails {
-        let from = email::get_account_by_type(email_type)?;
+        let from = email::get_account_by_type(email_type).await?;
         let messages = emails
             .into_iter()
             .map(|email| email.into_message(&from))

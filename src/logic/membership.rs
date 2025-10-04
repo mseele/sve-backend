@@ -39,7 +39,7 @@ pub(crate) async fn application(
     }
 
     // send emails
-    let email_account = email::get_account_by_type(EmailType::Mitglieder)?;
+    let email_account = email::get_account_by_type(EmailType::Mitglieder).await?;
     let messages = vec![
         create_welcome_email(&email_account, &membership_application)?,
         create_internal_email(&email_account, membership_application, bank_account)?,

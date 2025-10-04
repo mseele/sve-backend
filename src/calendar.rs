@@ -1,4 +1,4 @@
-use crate::models::Appointment;
+use crate::{logic::secrets, models::Appointment};
 use anyhow::{Context, Result};
 use chrono::{Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Berlin;
@@ -13,11 +13,9 @@ use google_calendar3::{
     yup_oauth2::ServiceAccountKey,
 };
 
-const CREDENTIALS: &str = include_str!("../secrets/credentials.json");
-
 async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
-    let secret: ServiceAccountKey =
-        serde_json::from_str(CREDENTIALS).with_context(|| "Error loading credentials")?;
+    let secret: ServiceAccountKey = serde_json::from_str(&secrets::get("GOOGLE_CREDS").await?)
+        .with_context(|| "Error loading credentials")?;
 
     let auth = yup_oauth2::ServiceAccountAuthenticator::builder(secret)
         .build()

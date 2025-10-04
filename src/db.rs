@@ -1,7 +1,10 @@
-use crate::models::{
-    Event, EventBooking, EventCounter, EventCustomField, EventCustomFieldType, EventId,
-    EventSubscription, EventType, LifecycleStatus, NewsSubscription, NewsTopic, PartialEvent,
-    UnpaidEventBooking, VerifyPaymentBookingRecord,
+use crate::{
+    logic::secrets,
+    models::{
+        Event, EventBooking, EventCounter, EventCustomField, EventCustomFieldType, EventId,
+        EventSubscription, EventType, LifecycleStatus, NewsSubscription, NewsTopic, PartialEvent,
+        UnpaidEventBooking, VerifyPaymentBookingRecord,
+    },
 };
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Utc};
@@ -19,13 +22,11 @@ use std::{
 };
 use tracing::debug;
 
-const DATABASE_URL: &str = include_str!("../secrets/database_url.env");
-
 pub(crate) async fn init_pool() -> Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(3)
         .idle_timeout(Some(Duration::from_secs(5 * 60)))
-        .connect(DATABASE_URL)
+        .connect(&secrets::get("DATABASE_URL").await?)
         .await?;
     Ok(pool)
 }

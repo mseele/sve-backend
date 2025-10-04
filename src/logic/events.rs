@@ -97,7 +97,7 @@ pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result
             EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
         };
 
-        let email_account = event.get_associated_email_account()?;
+        let email_account = event.get_associated_email_account().await?;
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
@@ -222,7 +222,7 @@ pub(crate) async fn cancel_booking(pool: &PgPool, booking_id: i32) -> Result<()>
     let (event, canceled_booking, waiting_list_booking) =
         db::cancel_event_booking(pool, booking_id).await?;
 
-    let email_account = event.get_associated_email_account()?;
+    let email_account = event.get_associated_email_account().await?;
     let mut messages = Vec::new();
 
     // create cancellation confirmation email
@@ -295,7 +295,7 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
 
-    let email_account = event.get_associated_email_account()?;
+    let email_account = event.get_associated_email_account().await?;
     let message_type: MessageType = event.event_type.into();
     let mut messages = Vec::new();
 
@@ -350,7 +350,7 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
     // process each event
     for event in &events {
         // prepare for message generation
-        let email_account = event.get_associated_email_account()?;
+        let email_account = event.get_associated_email_account().await?;
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
@@ -408,7 +408,7 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
         .collect::<Vec<_>>();
 
     // prepare for message generation
-    let email_account = email::get_account_by_type(event_type.into())?;
+    let email_account = email::get_account_by_type(event_type.into()).await?;
     let message_type: MessageType = event_type.into();
     let mut messages = Vec::new();
 
@@ -648,7 +648,7 @@ async fn send_booking_mail(
     booked: bool,
     payment_id: String,
 ) -> Result<()> {
-    let email_account = event.get_associated_email_account()?;
+    let email_account = event.get_associated_email_account().await?;
     let subject;
     let template: &str;
     let opt_payment_id;
@@ -975,7 +975,7 @@ pub(crate) async fn send_participation_confirmation(
     let dates = format!("{dates_len} x {} Minuten", event.duration_in_minutes);
 
     // send an email per participant
-    let email_account = event.get_associated_email_account()?;
+    let email_account = event.get_associated_email_account().await?;
     let subject = format!("{} Teilnahmebestätigung", event.subject_prefix());
     let mut messages = Vec::new();
     for subscriber in subscribers {
