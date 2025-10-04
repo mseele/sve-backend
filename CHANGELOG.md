@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.4.1]
+## [2.5.0]
+
+### Features
+
+- Add support for payment records with multiple payment id's
+- Integrate AWS Secrets Manager for secret management
+
+### Refactor
+
+- Cleanup clippy warnings
+
+## [2.4.1] - 2025-08-28
 
 ### Bug Fixes
 
