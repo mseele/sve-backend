@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.5.0]
+## [2.5.1] - 2025-10-23
+
+### Bug Fixes
+
+- Select the default crypto provider
+
+## [2.5.0] - 2025-10-04
 
 ### Features
 
