@@ -26,8 +26,11 @@ sed -i '' "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.
 # Generate changelog
 git cliff --tag $NEW_VERSION > CHANGELOG.md
 
+# Update Cargo.lock by running cargo check
+cargo check --quiet
+
 # Stage changes
-git add Cargo.toml CHANGELOG.md
+git add Cargo.toml Cargo.lock CHANGELOG.md
 
 # Commit changes
 git commit -m "chore: release version $NEW_VERSION"
