@@ -52,6 +52,10 @@ async fn main() -> Result<(), Error> {
         .flatten_event(true)
         .init();
 
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     let pool = db::init_pool().await?;
 
     let app = api::router(pool).layer(
