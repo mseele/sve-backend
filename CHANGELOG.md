@@ -2,11 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.5.1] - 2025-10-23
+## [2.5.2] - 2025-11-04
 
 ### Bug Fixes
 
 - Select the default crypto provider
+- Include Cargo.lock in release commit
+
+### Features
+
+- Add booking date for unpaid event bookings
 
 ## [2.5.0] - 2025-10-04
 
