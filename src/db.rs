@@ -1008,6 +1008,7 @@ ORDER BY
                 row.event_id.into(),
                 row.event_name,
                 row.id,
+                row.created,
                 row.first_name,
                 row.last_name,
                 row.email,
