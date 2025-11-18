@@ -58,7 +58,7 @@ async fn main() -> Result<(), Error> {
 
     let pool = db::init_pool().await?;
 
-    let app = api::router(pool).layer(
+    let app = api::router(pool).await?.layer(
         ServiceBuilder::new().layer(
             TraceLayer::new_for_http()
                 .on_request(DefaultOnRequest::new().level(Level::INFO))

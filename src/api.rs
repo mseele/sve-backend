@@ -3,25 +3,32 @@ use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
     MembershipApplication, NewsSubscription, PartialEvent,
 };
+use anyhow::Result;
+use axum::body::Body;
 use axum::extract::{self, FromRequestParts, Path, Query, State};
 use axum::http::{
-    StatusCode,
+    Request, StatusCode,
     header::{self, HeaderMap},
     request::Parts,
 };
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use chrono::NaiveDate;
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use lambda_http::request::RequestContext;
-use serde::Deserialize;
+use reqwest::Client;
 use serde::de;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
 use tracing::{debug, error};
 use urlencoding::encode;
 
@@ -114,8 +121,22 @@ where
     }
 }
 
-pub(crate) fn router(state: PgPool) -> Router {
-    Router::new()
+pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
+    let mut jwks_cache = JwksCache::new();
+    jwks_cache.keys = fetch_jwks("https://www.googleapis.com/oauth2/v3/certs").await?;
+    let jwks = Arc::new(RwLock::new(jwks_cache));
+
+    let state = AppState {
+        pg_pool,
+        jwks,
+        allowed_emails: vec![
+            "fitness@sv-eutingen.de".to_string(),
+            "events@sv-eutingen.de".to_string(),
+        ],
+        allowed_domain: "sv-eutingen.de".to_string(),
+    };
+
+    Ok(Router::new()
         .nest(
             "/api",
             Router::new()
@@ -127,8 +148,11 @@ pub(crate) fn router(state: PgPool) -> Router {
                         .route("/counter", get(counter))
                         .route("/booking", post(booking))
                         .route("/prebooking/{hash}", get(prebooking))
+                        /* TODO: remove when tools is migrated */
                         .route("/update", post(update))
+                        /* TODO: remove when tools is migrated */
                         .route("/{id}", delete(delete_event))
+                        /* TODO: remove when tools is migrated */
                         .nest(
                             "/booking",
                             Router::new()
@@ -142,6 +166,7 @@ pub(crate) fn router(state: PgPool) -> Router {
                                     get(export_event_participants_list),
                                 ),
                         )
+                        /* TODO: remove when tools is migrated */
                         .nest(
                             "/payments",
                             Router::new()
@@ -187,9 +212,188 @@ pub(crate) fn router(state: PgPool) -> Router {
                             "/send_participation_confirmation/{event_id}",
                             get(send_participation_confirmation),
                         ),
+                )
+                .nest(
+                    "/admin",
+                    Router::new()
+                        .nest(
+                            "/events",
+                            Router::new()
+                                .route("/update", post(update))
+                                .route("/{id}", delete(delete_event))
+                                .nest(
+                                    "/booking",
+                                    Router::new()
+                                        .route(
+                                            "/{id}",
+                                            patch(update_event_booking)
+                                                .delete(cancel_event_booking),
+                                        )
+                                        .route("/export/{event_id}", get(export_event_bookings))
+                                        .route(
+                                            "/participants_list/{event_id}",
+                                            get(export_event_participants_list),
+                                        ),
+                                )
+                                .nest(
+                                    "/payments",
+                                    Router::new()
+                                        .route("/verify", post(verify_payments))
+                                        .route("/unpaid/{event_type}", get(unpaid_bookings)),
+                                ),
+                        )
+                        .layer(axum::middleware::from_fn_with_state(
+                            state.clone(),
+                            auth_middleware_fn,
+                        )),
                 ),
         )
-        .with_state(state)
+        .with_state(state))
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Claims {
+    email: String,
+    hd: Option<String>, // Hosted domain (Google Workspace domain)
+    exp: usize,
+}
+
+#[derive(Clone)]
+struct AppState {
+    pg_pool: PgPool,
+    jwks: Arc<RwLock<JwksCache>>,
+    allowed_emails: Vec<String>,
+    allowed_domain: String,
+}
+
+#[derive(Clone)]
+struct JwksCache {
+    keys: HashMap<String, Arc<DecodingKey>>,
+    last_updated: std::time::Instant,
+    ttl: std::time::Duration,
+}
+
+impl JwksCache {
+    fn new() -> Self {
+        Self {
+            keys: HashMap::new(),
+            last_updated: std::time::Instant::now(),
+            ttl: std::time::Duration::from_secs(24 * 3600), // 24 hours
+        }
+    }
+
+    fn is_expired(&self) -> bool {
+        self.last_updated.elapsed() > self.ttl
+    }
+}
+
+async fn auth_middleware_fn(
+    State(state): State<AppState>,
+    req: Request<Body>,
+    next: Next,
+) -> Response {
+    let auth_header = match req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+    {
+        Some(h) => h,
+        None => return (StatusCode::UNAUTHORIZED, "Missing Authorization header").into_response(),
+    };
+
+    let token = match auth_header.strip_prefix("Bearer ") {
+        Some(t) => t,
+        None => return (StatusCode::UNAUTHORIZED, "Invalid Authorization header").into_response(),
+    };
+
+    let header = match decode_header(token) {
+        Ok(h) => h,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Invalid JWT header").into_response(),
+    };
+
+    let kid = match header.kid {
+        Some(k) => k,
+        None => return (StatusCode::UNAUTHORIZED, "Missing kid in JWT").into_response(),
+    };
+
+    let decoding_key = {
+        let needs_refresh = {
+            let jwks_cache = state.jwks.read().unwrap();
+            jwks_cache.is_expired() || !jwks_cache.keys.contains_key(&kid)
+        };
+        if needs_refresh {
+            tracing::info!("Refreshing JWKS cache (expired or missing kid: {})", kid);
+            match fetch_jwks("https://www.googleapis.com/oauth2/v3/certs").await {
+                Ok(new_keys) => {
+                    let mut jwks_cache = state.jwks.write().unwrap();
+                    jwks_cache.keys = new_keys;
+                    jwks_cache.last_updated = std::time::Instant::now();
+                }
+                Err(e) => {
+                    tracing::error!("Failed to refresh JWKS: {:?}", e);
+                    return (StatusCode::INTERNAL_SERVER_ERROR, "JWKS refresh failed")
+                        .into_response();
+                }
+            }
+        }
+        let jwks_cache = state.jwks.read().unwrap();
+        match jwks_cache.keys.get(&kid).cloned() {
+            Some(k) => k,
+            None => return (StatusCode::UNAUTHORIZED, "Unknown JWT key").into_response(),
+        }
+    };
+
+    let mut validation = Validation::new(Algorithm::RS256);
+    // Since we trust Google's signature verification,
+    // the audience check is redundant here.
+    validation.validate_aud = false;
+    let token_data = match decode::<Claims>(token, &*decoding_key, &validation) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("JWT decode error: {:?}", e);
+            return (StatusCode::UNAUTHORIZED, "Invalid JWT").into_response();
+        }
+    };
+
+    let claims = token_data.claims;
+
+    // Restrict access to specific emails or domain
+    if !state.allowed_emails.contains(&claims.email)
+        && claims.hd.as_deref() != Some(&state.allowed_domain)
+    {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    }
+
+    next.run(req).await
+}
+
+async fn fetch_jwks(jwks_url: &str) -> Result<HashMap<String, Arc<DecodingKey>>> {
+    let client = Client::new();
+    let res = client
+        .get(jwks_url)
+        .send()
+        .await?
+        .json::<HashMap<String, Vec<Jwk>>>()
+        .await?;
+
+    let mut keys = HashMap::new();
+    if let Some(jwks_keys) = res.get("keys") {
+        for key in jwks_keys {
+            if let (Some(kid), Some(n), Some(e)) = (&key.kid, &key.n, &key.e) {
+                let decoding_key = DecodingKey::from_rsa_components(n, e).unwrap();
+                keys.insert(kid.clone(), Arc::new(decoding_key));
+            }
+        }
+    }
+
+    Ok(keys)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Jwk {
+    kid: Option<String>,
+    n: Option<String>,
+    e: Option<String>,
 }
 
 // events
@@ -253,11 +457,11 @@ pub(crate) struct UpdateEventBookingQueryParams {
 }
 
 async fn events(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     mut query: Query<EventsQueryParams>,
 ) -> Result<impl IntoResponse, ResponseError> {
     let events = events::get_events(
-        &pool,
+        &state.pg_pool,
         query.beta.take(),
         query.status.take(),
         query.subscribers.take(),
@@ -266,128 +470,130 @@ async fn events(
     Ok(Json(events))
 }
 
-async fn custom_fields(State(pool): State<PgPool>) -> Result<impl IntoResponse, ResponseError> {
-    let custom_fields = events::get_all_custom_fields(&pool).await?;
+async fn custom_fields(State(state): State<AppState>) -> Result<impl IntoResponse, ResponseError> {
+    let custom_fields = events::get_all_custom_fields(&state.pg_pool).await?;
     Ok(Json(custom_fields))
 }
 
 async fn counter(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     query: Query<EventCountersQueryParams>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let event_counters = events::get_event_counters(&pool, query.beta).await?;
+    let event_counters = events::get_event_counters(&state.pg_pool, query.beta).await?;
     Ok(Json(event_counters))
 }
 
 async fn booking(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     extract::Json(booking): extract::Json<EventBooking>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&booking.token, ip).await?;
-    let response = events::booking(&pool, booking).await;
+    let response = events::booking(&state.pg_pool, booking).await;
     Ok(Json(response))
 }
 
 async fn prebooking(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(hash): Path<String>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let response = events::prebooking(&pool, hash).await;
+    let response = events::prebooking(&state.pg_pool, hash).await;
     Ok(Json(response))
 }
 
 async fn update(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     extract::Json(partial_event): extract::Json<PartialEvent>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let event = events::update(&pool, partial_event).await?;
+    let event = events::update(&state.pg_pool, partial_event).await?;
     Ok(Json(event))
 }
 
 async fn delete_event(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(path): Path<EventId>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    events::delete(&pool, path).await?;
+    events::delete(&state.pg_pool, path).await?;
     Ok(StatusCode::OK)
 }
 
 async fn verify_payments(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     extract::Json(input): extract::Json<VerifyPaymentInput>,
 ) -> Result<impl IntoResponse, ResponseError> {
     Ok(Json(
-        events::verify_payments(&pool, input.csv, input.start_date).await?,
+        events::verify_payments(&state.pg_pool, input.csv, input.start_date).await?,
     ))
 }
 
 async fn unpaid_bookings(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(event_type): Path<EventType>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    Ok(Json(events::get_unpaid_bookings(&pool, event_type).await?))
+    Ok(Json(
+        events::get_unpaid_bookings(&state.pg_pool, event_type).await?,
+    ))
 }
 
 async fn update_event_booking(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(booking_id): Path<i32>,
     query: Query<UpdateEventBookingQueryParams>,
 ) -> Result<impl IntoResponse, ResponseError> {
     if let Some(update_payment) = query.update_payment {
-        events::update_payment(&pool, booking_id, update_payment).await?;
+        events::update_payment(&state.pg_pool, booking_id, update_payment).await?;
     }
     Ok(StatusCode::OK)
 }
 
 async fn cancel_event_booking(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(booking_id): Path<i32>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    events::cancel_booking(&pool, booking_id).await?;
+    events::cancel_booking(&state.pg_pool, booking_id).await?;
     Ok(StatusCode::OK)
 }
 
 async fn export_event_bookings(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(event_id): Path<EventId>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let (filename, bytes) = export::event_bookings(&pool, event_id).await?;
+    let (filename, bytes) = export::event_bookings(&state.pg_pool, event_id).await?;
     Ok(into_file_response(filename, bytes))
 }
 
 async fn export_event_participants_list(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(event_id): Path<EventId>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let (filename, bytes) = export::event_participants_list(&pool, event_id).await?;
+    let (filename, bytes) = export::event_participants_list(&state.pg_pool, event_id).await?;
     Ok(into_file_response(filename, bytes))
 }
 
 // news
 
 async fn subscribe(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&subscription.token, ip).await?;
-    news::subscribe(&pool, subscription).await?;
+    news::subscribe(&state.pg_pool, subscription).await?;
     Ok(StatusCode::OK)
 }
 
 async fn unsubscribe(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&subscription.token, ip).await?;
-    news::unsubscribe(&pool, subscription).await?;
+    news::unsubscribe(&state.pg_pool, subscription).await?;
     Ok(StatusCode::OK)
 }
 
-async fn subscribers(State(pool): State<PgPool>) -> Result<impl IntoResponse, ResponseError> {
-    let subscriptions = news::get_subscriptions(&pool).await?;
+async fn subscribers(State(state): State<AppState>) -> Result<impl IntoResponse, ResponseError> {
+    let subscriptions = news::get_subscriptions(&state.pg_pool).await?;
     let result = subscriptions
         .into_iter()
         .map(|(topic, emails)| {
@@ -454,13 +660,13 @@ async fn message(
 }
 
 async fn emails(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     extract::Json(body): extract::Json<EmailsBody>,
 ) -> Result<impl IntoResponse, ResponseError> {
     if let Some(emails) = body.emails {
         contact::emails(emails).await?;
     } else if let Some(event) = body.event {
-        events::send_event_email(&pool, event).await?;
+        events::send_event_email(&state.pg_pool, event).await?;
     }
     Ok(StatusCode::OK)
 }
@@ -468,12 +674,12 @@ async fn emails(
 // membership
 
 async fn membership_application(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     extract::Json(application): extract::Json<MembershipApplication>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&application.token, ip).await?;
-    membership::application(&pool, application).await?;
+    membership::application(&state.pg_pool, application).await?;
     Ok(StatusCode::OK)
 }
 
@@ -490,32 +696,32 @@ async fn renew_calendar_watch() -> Result<impl IntoResponse, ResponseError> {
 }
 
 async fn send_event_reminders(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_event_reminders(&pool).await;
+    tasks::send_event_reminders(&state.pg_pool).await;
     Ok(StatusCode::OK)
 }
 
 async fn close_finished_events(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::close_finished_events(&pool).await;
+    tasks::close_finished_events(&state.pg_pool).await;
     Ok(StatusCode::OK)
 }
 
 async fn send_payment_reminders(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(event_type): Path<EventType>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_payment_reminders(&pool, event_type).await?;
+    tasks::send_payment_reminders(&state.pg_pool, event_type).await?;
     Ok(StatusCode::OK)
 }
 
 async fn send_participation_confirmation(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(event_id): Path<EventId>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_participation_confirmation(&pool, event_id).await?;
+    tasks::send_participation_confirmation(&state.pg_pool, event_id).await?;
     Ok(StatusCode::OK)
 }
 
