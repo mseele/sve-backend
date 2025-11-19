@@ -1,4 +1,4 @@
-use crate::logic::{calendar, contact, events, export, membership, news, tasks};
+use crate::logic::{calendar, contact, events, export, membership, news, secrets, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
     MembershipApplication, NewsSubscription, PartialEvent,
@@ -246,6 +246,7 @@ async fn booking(
     State(pool): State<PgPool>,
     extract::Json(booking): extract::Json<EventBooking>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    validate_captcha(&booking.token).await?;
     let response = events::booking(&pool, booking).await;
     Ok(Json(response))
 }
@@ -331,6 +332,7 @@ async fn subscribe(
     State(pool): State<PgPool>,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    validate_captcha(&subscription.token).await?;
     news::subscribe(&pool, subscription).await?;
     Ok(StatusCode::OK)
 }
@@ -339,6 +341,7 @@ async fn unsubscribe(
     State(pool): State<PgPool>,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    validate_captcha(&subscription.token).await?;
     news::unsubscribe(&pool, subscription).await?;
     Ok(StatusCode::OK)
 }
@@ -402,6 +405,7 @@ struct EmailsBody {
 }
 
 async fn message(Json(message): Json<ContactMessage>) -> Result<impl IntoResponse, ResponseError> {
+    validate_captcha(&message.token).await?;
     contact::message(message).await?;
     Ok(StatusCode::OK)
 }
@@ -424,6 +428,7 @@ async fn membership_application(
     State(pool): State<PgPool>,
     extract::Json(application): extract::Json<MembershipApplication>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    validate_captcha(&application.token).await?;
     membership::application(&pool, application).await?;
     Ok(StatusCode::OK)
 }
@@ -479,4 +484,37 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
         )],
         bytes,
     )
+}
+
+/// Validates the provided captcha token using the hCaptcha service.
+/// Returns Ok(()) if the captcha is valid, or a ResponseError if validation fails.
+async fn validate_captcha(token: &Option<String>) -> Result<(), ResponseError> {
+    let token = token.as_ref().ok_or_else(|| ResponseError {
+        err: anyhow::anyhow!("No captcha token provided"),
+    })?;
+
+    let secret = &secrets::get("CAPTCHA_SECRET").await?;
+
+    let captcha = hcaptcha::Captcha::new(token.as_str()).map_err(|e| ResponseError {
+        err: anyhow::anyhow!("Failed to create captcha: {:?}", e),
+    })?;
+
+    let request = hcaptcha::Request::new(&secret, captcha).map_err(|e| ResponseError {
+        err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
+    })?;
+
+    let response = hcaptcha::Client::new()
+        .verify(request)
+        .await
+        .map_err(|e| ResponseError {
+            err: anyhow::anyhow!("Captcha verification failed: {:?}", e),
+        })?;
+
+    if response.success() {
+        Ok(())
+    } else {
+        Err(ResponseError {
+            err: anyhow::anyhow!("Captcha invalid: {:?}", response.error_codes()),
+        })
+    }
 }

@@ -403,6 +403,7 @@ pub(crate) struct EventBooking {
     pub(crate) updates: Option<bool>,
     pub(crate) comments: Option<String>,
     pub(crate) custom_values: Vec<String>,
+    pub(crate) token: Option<String>,
 }
 
 impl EventBooking {
@@ -432,6 +433,7 @@ impl EventBooking {
             updates,
             comments,
             custom_values,
+            token: None,
         }
     }
 
@@ -574,11 +576,16 @@ pub(crate) struct NewsSubscription {
     pub(crate) email: String,
     #[serde(rename = "types")]
     pub(crate) topics: Vec<NewsTopic>,
+    pub(crate) token: Option<String>,
 }
 
 impl NewsSubscription {
     pub(crate) fn new(email: String, topics: Vec<NewsTopic>) -> NewsSubscription {
-        NewsSubscription { email, topics }
+        NewsSubscription {
+            email,
+            topics,
+            token: None,
+        }
     }
 }
 
@@ -724,6 +731,7 @@ pub(crate) struct ContactMessage {
     pub(crate) email: String,
     pub(crate) phone: Option<String>,
     pub(crate) message: String,
+    pub(crate) token: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -948,6 +956,7 @@ pub(crate) struct MembershipApplication {
     pub(crate) membership_type: MembershipType,
     pub(crate) family_members: Option<Vec<MembershipFamilyMember>>,
     pub(crate) newsletter: bool,
+    pub(crate) token: Option<String>,
 }
 
 fn default_start_date() -> NaiveDate {
