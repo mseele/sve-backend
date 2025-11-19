@@ -534,6 +534,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
             membership_type: MembershipType::AdultPremium,
             family_members: None,
             newsletter: false,
+            token: None,
         };
 
         let csv = write_membership_application(application).unwrap();
@@ -561,6 +562,7 @@ Herr;Max;Mustermann;Musterstraße 10;12345;Musterstadt;Deutschland;männlich;01.
             membership_type: MembershipType::AdultPremium,
             family_members: None,
             newsletter: false,
+            token: None,
         };
 
         let csv = write_membership_application(application).unwrap();
