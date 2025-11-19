@@ -73,10 +73,10 @@ urlencoding = "2.1.3"
 iban_validate = "5.0.1"
 fints-institute-db = "1.4.0"
 dotenvy = "0.15.7"
-aws-config = "1.8.8"
-aws-sdk-secretsmanager = "1.90.0"
+aws-config = "1.8.10"
+aws-sdk-secretsmanager = "1.92.0"
 once_cell = "1.21.3"
-rustls = "0.23.34"
+rustls = "0.23.35"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
