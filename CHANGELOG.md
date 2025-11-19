@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.0] - 2025-11-19
+
+### Features
+
+- Integrate hcaptcha
+- Add support for custom status codes and message in ResponseError
+
 ## [2.5.2] - 2025-11-04
 
 ### Bug Fixes
