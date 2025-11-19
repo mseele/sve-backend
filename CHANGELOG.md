@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.1] - 2025-11-19
+
+### Bug Fixes
+
+- Add missing token fields
+
 ## [2.6.0] - 2025-11-19
 
 ### Features
