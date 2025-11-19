@@ -19,9 +19,9 @@ tracing-subscriber = { version = "0.3.20", default-features = false, features = 
 ] }
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
 mini-moka = "0.10.3"
-axum =  "0.8.6"
+axum =  "0.8.7"
 http-body-util = "0.1.3"
-hyper = "1.7.0"
+hyper = "1.8.1"
 tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["trace", "cors"] }
 anyhow = { version = "1.0.100", features = ["backtrace"] }
@@ -64,8 +64,8 @@ handlebars = "6.3.2"
 simple_excel_writer = { version = "0.2.0", features = ["chrono"] }
 printpdf = { version = "0.7.0", features = ["svg", "embedded_images"] }
 image = "0.24.9"
-cfg = "0.10.0"
-lambda_http = { version = "0.17.0", default-features = false, features = [
+cfg = "0.10.1"
+lambda_http = { version = "1.0.1", default-features = false, features = [
   "apigw_http",
 ] }
 tower-service = "0.3.3"
@@ -74,7 +74,7 @@ iban_validate = "5.0.1"
 fints-institute-db = "1.4.0"
 dotenvy = "0.15.7"
 aws-config = "1.8.10"
-aws-sdk-secretsmanager = "1.92.0"
+aws-sdk-secretsmanager = "1.93.0"
 once_cell = "1.21.3"
 rustls = "0.23.35"
 hcaptcha = { version = "3.0.33", default-features = false }

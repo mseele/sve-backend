@@ -130,6 +130,7 @@ where
             lambda_http::Body::Empty => axum::body::Body::default(),
             lambda_http::Body::Text(t) => t.into(),
             lambda_http::Body::Binary(v) => v.into(),
+            _ => axum::body::Body::default(),
         };
 
         let request = axum::http::Request::from_parts(parts, body);
