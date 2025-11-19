@@ -3,23 +3,26 @@ use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
     MembershipApplication, NewsSubscription, PartialEvent,
 };
-use axum::extract::{self, Path, Query, State};
+use axum::extract::{self, FromRequestParts, Path, Query, State};
 use axum::http::{
     StatusCode,
     header::{self, HeaderMap},
+    request::Parts,
 };
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use chrono::NaiveDate;
+use lambda_http::request::RequestContext;
 use serde::Deserialize;
 use serde::de;
 use sqlx::PgPool;
 use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
+use std::net::IpAddr;
 use std::str::FromStr;
-use tracing::error;
+use tracing::{debug, error};
 use urlencoding::encode;
 
 pub(crate) struct ResponseError {
@@ -81,6 +84,33 @@ impl IntoResponse for ResponseError {
                 )
             })
             .into_response()
+    }
+}
+
+pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
+
+impl<S> FromRequestParts<S> for ClientIp
+where
+    S: Send + Sync,
+{
+    type Rejection = ResponseError;
+
+    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
+        if let Some(ctx) = parts.extensions.get::<RequestContext>() {
+            let source_ip = match ctx {
+                RequestContext::ApiGatewayV2(ctx) => ctx.http.source_ip.as_deref(),
+                _ => None,
+            };
+
+            if let Some(ip_str) = source_ip {
+                if let Ok(ip) = ip_str.parse::<IpAddr>() {
+                    debug!("Extracted client IP: {}", ip);
+                    return Ok(ClientIp(Some(ip)));
+                }
+            }
+        }
+
+        Ok(ClientIp(None))
     }
 }
 
@@ -251,9 +281,10 @@ async fn counter(
 
 async fn booking(
     State(pool): State<PgPool>,
+    ClientIp(ip): ClientIp,
     extract::Json(booking): extract::Json<EventBooking>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&booking.token).await?;
+    validate_captcha(&booking.token, ip).await?;
     let response = events::booking(&pool, booking).await;
     Ok(Json(response))
 }
@@ -337,18 +368,20 @@ async fn export_event_participants_list(
 
 async fn subscribe(
     State(pool): State<PgPool>,
+    ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&subscription.token).await?;
+    validate_captcha(&subscription.token, ip).await?;
     news::subscribe(&pool, subscription).await?;
     Ok(StatusCode::OK)
 }
 
 async fn unsubscribe(
     State(pool): State<PgPool>,
+    ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&subscription.token).await?;
+    validate_captcha(&subscription.token, ip).await?;
     news::unsubscribe(&pool, subscription).await?;
     Ok(StatusCode::OK)
 }
@@ -411,8 +444,11 @@ struct EmailsBody {
     event: Option<EventEmail>,
 }
 
-async fn message(Json(message): Json<ContactMessage>) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&message.token).await?;
+async fn message(
+    ClientIp(ip): ClientIp,
+    Json(message): Json<ContactMessage>,
+) -> Result<impl IntoResponse, ResponseError> {
+    validate_captcha(&message.token, ip).await?;
     contact::message(message).await?;
     Ok(StatusCode::OK)
 }
@@ -433,9 +469,10 @@ async fn emails(
 
 async fn membership_application(
     State(pool): State<PgPool>,
+    ClientIp(ip): ClientIp,
     extract::Json(application): extract::Json<MembershipApplication>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&application.token).await?;
+    validate_captcha(&application.token, ip).await?;
     membership::application(&pool, application).await?;
     Ok(StatusCode::OK)
 }
@@ -495,7 +532,10 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
 
 /// Validates the provided captcha token using the hCaptcha service.
 /// Returns Ok(()) if the captcha is valid, or a ResponseError if validation fails.
-async fn validate_captcha(token: &Option<String>) -> Result<(), ResponseError> {
+async fn validate_captcha(
+    token: &Option<String>,
+    client_ip: Option<IpAddr>,
+) -> Result<(), ResponseError> {
     let token = token.as_ref().ok_or_else(|| ResponseError {
         err: anyhow::anyhow!("No captcha token provided"),
         response: Some((StatusCode::BAD_REQUEST, "Captcha token is required.".into())),
@@ -508,13 +548,25 @@ async fn validate_captcha(token: &Option<String>) -> Result<(), ResponseError> {
         response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
     })?;
 
-    let request = hcaptcha::Request::new(&secret, captcha).map_err(|e| ResponseError {
+    let mut request = hcaptcha::Request::new(&secret, captcha).map_err(|e| ResponseError {
         err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
         response: Some((
             StatusCode::INTERNAL_SERVER_ERROR,
             "Captcha validation failed.".into(),
         )),
     })?;
+
+    if let Some(ip) = client_ip {
+        request = request
+            .set_remoteip(&ip.to_string())
+            .map_err(|e| ResponseError {
+                err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
+                response: Some((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Captcha validation failed.".into(),
+                )),
+            })?;
+    }
 
     let response = hcaptcha::Client::new()
         .verify(request)
