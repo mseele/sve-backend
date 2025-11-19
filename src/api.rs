@@ -24,6 +24,7 @@ use urlencoding::encode;
 
 pub(crate) struct ResponseError {
     err: anyhow::Error,
+    response: Option<(StatusCode, String)>,
 }
 
 impl Error for ResponseError {
@@ -61,18 +62,24 @@ impl Display for ResponseError {
 
 impl From<anyhow::Error> for ResponseError {
     fn from(err: anyhow::Error) -> ResponseError {
-        ResponseError { err }
+        ResponseError {
+            err,
+            response: None,
+        }
     }
 }
 
 impl IntoResponse for ResponseError {
     fn into_response(self) -> Response {
         error!("{:?}", self);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            [(header::CONTENT_TYPE, "text/plain")],
-            "An internal error occurred. Please try again later.",
-        )
+
+        self.response
+            .unwrap_or_else(|| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "An internal error occurred. Please try again later.".to_string(),
+                )
+            })
             .into_response()
     }
 }
@@ -491,16 +498,22 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
 async fn validate_captcha(token: &Option<String>) -> Result<(), ResponseError> {
     let token = token.as_ref().ok_or_else(|| ResponseError {
         err: anyhow::anyhow!("No captcha token provided"),
+        response: Some((StatusCode::BAD_REQUEST, "Captcha token is required.".into())),
     })?;
 
     let secret = &secrets::get("CAPTCHA_SECRET").await?;
 
     let captcha = hcaptcha::Captcha::new(token.as_str()).map_err(|e| ResponseError {
         err: anyhow::anyhow!("Failed to create captcha: {:?}", e),
+        response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
     })?;
 
     let request = hcaptcha::Request::new(&secret, captcha).map_err(|e| ResponseError {
         err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
+        response: Some((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Captcha validation failed.".into(),
+        )),
     })?;
 
     let response = hcaptcha::Client::new()
@@ -508,6 +521,10 @@ async fn validate_captcha(token: &Option<String>) -> Result<(), ResponseError> {
         .await
         .map_err(|e| ResponseError {
             err: anyhow::anyhow!("Captcha verification failed: {:?}", e),
+            response: Some((
+                StatusCode::BAD_REQUEST,
+                "Captcha verification failed.".into(),
+            )),
         })?;
 
     if response.success() {
@@ -515,6 +532,7 @@ async fn validate_captcha(token: &Option<String>) -> Result<(), ResponseError> {
     } else {
         Err(ResponseError {
             err: anyhow::anyhow!("Captcha invalid: {:?}", response.error_codes()),
+            response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
         })
     }
 }
