@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n    v.event_id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member\nFROM\n    v_event_bookings v\nWHERE\n    v.id = $1",
+  "query": "\nSELECT\n    v.event_id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member,\n    v.enrolled\nFROM\n    v_event_bookings v\nWHERE\n    v.id = $1",
   "describe": {
     "columns": [
       {
@@ -42,6 +42,11 @@
         "ordinal": 7,
         "name": "member",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "enrolled",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -57,8 +62,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "6bf11d007b1382915657a0702ec27d9eadabcf6f8753969917a72f16298c8767"
+  "hash": "7abdbb3e499955fa0f76c2e10a5694a92d320876f3ebfb65f1d2b38cb6210824"
 }

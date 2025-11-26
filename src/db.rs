@@ -1610,8 +1610,9 @@ pub(crate) async fn cancel_event_booking(
     .execute(&mut *tx)
     .await?;
 
-    // fetch the canceled booking data
-    let canceled_booking = query!(
+    // fetch the canceled booking data (include enrolled flag so we know
+    // whether the canceled booking was an enrolled attendee or a waiting-list entry)
+    let (canceled_booking, canceled_enrolled) = query!(
         r#"
 SELECT
     v.event_id,
@@ -1621,7 +1622,8 @@ SELECT
     v.city,
     v.email,
     v.phone,
-    v.member
+    v.member,
+    v.enrolled
 FROM
     v_event_bookings v
 WHERE
@@ -1630,18 +1632,21 @@ WHERE
     )
     .map(|row| {
         // unwrap is needed because we fetch from a view
-        EventBooking::new(
-            row.event_id.unwrap(),
-            row.first_name.unwrap(),
-            row.last_name.unwrap(),
-            row.street.unwrap(),
-            row.city.unwrap(),
-            row.email.unwrap(),
-            row.phone,
-            row.member,
-            None,
-            None,
-            Vec::new(),
+        (
+            EventBooking::new(
+                row.event_id.unwrap(),
+                row.first_name.unwrap(),
+                row.last_name.unwrap(),
+                row.street.unwrap(),
+                row.city.unwrap(),
+                row.email.unwrap(),
+                row.phone,
+                row.member,
+                None,
+                None,
+                Vec::new(),
+            ),
+            row.enrolled.unwrap_or(false),
         )
     })
     .fetch_one(&mut *tx)
@@ -1649,9 +1654,14 @@ WHERE
 
     let event_id = canceled_booking.event_id;
 
-    // fetch the first waiting list entrance
-    let waiting_list_result: Option<(i32, EventBooking, String)> = query!(
-        r#"
+    // Only promote a waiting-list entry if the canceled booking was an enrolled attendee.
+    // If the canceled booking itself was from the waiting list (enrolled == false),
+    // we must not create a new attendee.
+    let first_waiting_list_booking;
+    if canceled_enrolled {
+        // fetch the first waiting list entrance
+        let waiting_list_result: Option<(i32, EventBooking, String)> = query!(
+            r#"
 SELECT
     v.id,
     v.first_name,
@@ -1670,43 +1680,46 @@ WHERE
     AND v.enrolled IS FALSE
 ORDER BY
 v.created"#,
-        event_id.get_ref()
-    )
-    .map(|row| {
-        // unwrap is needed because we fetch from a view
-        (
-            row.id.unwrap(),
-            EventBooking::new(
-                event_id.into_inner(),
-                row.first_name.unwrap(),
-                row.last_name.unwrap(),
-                row.street.unwrap(),
-                row.city.unwrap(),
-                row.email.unwrap(),
-                row.phone,
-                row.member,
-                None,
-                None,
-                Vec::new(),
-            ),
-            row.payment_id.unwrap(),
+            event_id.get_ref()
         )
-    })
-    .fetch_optional(&mut *tx)
-    .await?;
-
-    // extract and switch enrolled status for waiting list booking - if available
-    let first_waiting_list_booking;
-    if let Some((booking_id, booking, payment_id)) = waiting_list_result {
-        query!(
-            r#"UPDATE event_bookings SET enrolled = true WHERE id = $1"#,
-            booking_id,
-        )
-        .execute(&mut *tx)
+        .map(|row| {
+            // unwrap is needed because we fetch from a view
+            (
+                row.id.unwrap(),
+                EventBooking::new(
+                    event_id.into_inner(),
+                    row.first_name.unwrap(),
+                    row.last_name.unwrap(),
+                    row.street.unwrap(),
+                    row.city.unwrap(),
+                    row.email.unwrap(),
+                    row.phone,
+                    row.member,
+                    None,
+                    None,
+                    Vec::new(),
+                ),
+                row.payment_id.unwrap(),
+            )
+        })
+        .fetch_optional(&mut *tx)
         .await?;
 
-        first_waiting_list_booking = Some((booking, payment_id));
+        // extract and switch enrolled status for waiting list booking - if available
+        if let Some((booking_id, booking, payment_id)) = waiting_list_result {
+            query!(
+                r#"UPDATE event_bookings SET enrolled = true WHERE id = $1"#,
+                booking_id,
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            first_waiting_list_booking = Some((booking, payment_id));
+        } else {
+            first_waiting_list_booking = None;
+        }
     } else {
+        // canceled booking was on the waiting list -> do not promote anyone
         first_waiting_list_booking = None;
     }
 
