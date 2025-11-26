@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.3] - 2025-11-26
+
+### Features
+
+- Enhance event booking cancellation logic to include enrolled status
+
 ## [2.6.2] - 2025-11-19
 
 ### Features
