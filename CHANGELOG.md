@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.4] - 2025-12-20
+
+### Refactor
+
+- Simplify CSV reading logic by removing CSVReader trait and enhancing error handling
+
 ## [2.6.3] - 2025-11-26
 
 ### Features
