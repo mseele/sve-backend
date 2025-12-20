@@ -6,17 +6,18 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, ops::Neg};
+use tracing::warn;
 
 pub(crate) fn read_payment_records(csv: &str) -> Result<Vec<PaymentRecord>> {
-    let readers: Vec<Box<dyn CSVReader>> = vec![
-        Box::<VobaClassicCSVReader>::default(),
-        Box::<VobaRichCSVReader>::default(),
-    ];
-    readers
-        .into_iter()
-        .find(|reader| reader.is_valid_reader(csv))
-        .map(|reader| reader.read(csv))
-        .unwrap_or_else(|| bail!("Unknown CSV format"))
+    read_voba_classic_csv(csv)
+        .or_else(|e| {
+            warn!("Failed to read as voba classic csv: {}", e);
+            read_voba_rich_csv(csv)
+        })
+        .or_else(|e| {
+            warn!("Failed to read as voba rich csv: {}", e);
+            bail!("Unknown CSV format")
+        })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,15 +58,7 @@ impl PaymentRecord {
     }
 }
 
-trait CSVReader {
-    fn is_valid_reader(&self, csv: &str) -> bool;
-    fn read(&self, csv: &str) -> Result<Vec<PaymentRecord>>;
-}
-
 // impl for voba csv file with header and footer
-
-#[derive(Default)]
-struct VobaRichCSVReader {}
 
 #[derive(Deserialize)]
 struct VobaRichPaymentRecord {
@@ -113,38 +106,29 @@ impl VobaRichPaymentRecord {
     }
 }
 
-impl CSVReader for VobaRichCSVReader {
-    fn is_valid_reader(&self, csv: &str) -> bool {
-        VobaRichPaymentRecord::find_start(csv).is_some()
-    }
+fn read_voba_rich_csv(csv: &str) -> Result<Vec<PaymentRecord>> {
+    let csv_records_suffix = ";;;;;;;;;;;;;";
+    let start = VobaRichPaymentRecord::find_start(csv)
+        .ok_or_else(|| anyhow!("Title row in csv did not match:\n\n{}", csv))?;
+    let end = csv[start..].find(csv_records_suffix).ok_or_else(|| {
+        anyhow!(
+            "Found no valid end sequence in uploaded csv:\n\n{}",
+            &csv[start..]
+        )
+    })?;
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b';')
+        .from_reader(&csv.as_bytes()[start..(start + end)]);
 
-    fn read(&self, csv: &str) -> Result<Vec<PaymentRecord>> {
-        let csv_records_suffix = ";;;;;;;;;;;;;";
-        let start = VobaRichPaymentRecord::find_start(csv)
-            .ok_or_else(|| anyhow!("Title row in csv did not match:\n\n{}", csv))?;
-        let end = csv[start..].find(csv_records_suffix).ok_or_else(|| {
-            anyhow!(
-                "Found no valid end sequence in uploaded csv:\n\n{}",
-                &csv[start..]
-            )
-        })?;
-        let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b';')
-            .from_reader(&csv.as_bytes()[start..(start + end)]);
-
-        let mut result = Vec::new();
-        for record in reader.deserialize() {
-            let record: VobaRichPaymentRecord = record?;
-            result.push(record.into());
-        }
-        Ok(result)
+    let mut result = Vec::new();
+    for record in reader.deserialize() {
+        let record: VobaRichPaymentRecord = record?;
+        result.push(record.into());
     }
+    Ok(result)
 }
 
 // impl for voba csv file without header and footer
-
-#[derive(Default)]
-struct VobaClassicCSVReader {}
 
 #[derive(Deserialize)]
 struct VobaClassicPaymentRecord {
@@ -175,23 +159,17 @@ impl From<VobaClassicPaymentRecord> for PaymentRecord {
     }
 }
 
-impl CSVReader for VobaClassicCSVReader {
-    fn is_valid_reader(&self, csv: &str) -> bool {
-        csv.starts_with("Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung")
-    }
+fn read_voba_classic_csv(csv: &str) -> Result<Vec<PaymentRecord>> {
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b';')
+        .from_reader(csv.as_bytes());
 
-    fn read(&self, csv: &str) -> Result<Vec<PaymentRecord>> {
-        let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b';')
-            .from_reader(csv.as_bytes());
-
-        let mut result = Vec::new();
-        for record in reader.deserialize() {
-            let record: VobaClassicPaymentRecord = record?;
-            result.push(record.into());
-        }
-        Ok(result)
+    let mut result = Vec::new();
+    for record in reader.deserialize() {
+        let record: VobaClassicPaymentRecord = record?;
+        result.push(record.into());
     }
+    Ok(result)
 }
 
 // special serde deserializer
@@ -359,7 +337,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 ";
 
         assert_eq!(
-            VobaRichCSVReader::default().read(csv).unwrap(),
+            read_voba_rich_csv(csv).unwrap(),
             vec![
                 PaymentRecord {
                     date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
@@ -412,7 +390,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
         let mut csv = "Valuta;Textschlüssel";
 
         assert_eq!(
-            format!("{}", VobaRichCSVReader::default().read(csv).unwrap_err()),
+            format!("{}", read_voba_rich_csv(csv).unwrap_err()),
             "Title row in csv did not match:
 
 Valuta;Textschlüssel"
@@ -422,7 +400,7 @@ Valuta;Textschlüssel"
 ;;;;;";
 
         assert_eq!(
-            format!("{}", VobaRichCSVReader::default().read(csv).unwrap_err()),
+            format!("{}", read_voba_rich_csv(csv).unwrap_err()),
             "Found no valid end sequence in uploaded csv:
 
 Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;ZahlungsempfängerKto;ZahlungsempfängerIBAN;ZahlungsempfängerBLZ;ZahlungsempfängerBIC;Vorgang/Verwendungszweck;Kundenreferenz;Währung;Umsatz;Soll/Haben
@@ -441,7 +419,7 @@ Festgeldkonto (Tagesgeld);DE68500105173456568557;GENODES1FDS;VOLKSBANK IM KREIS 
 ";
 
         assert_eq!(
-            VobaClassicCSVReader::default().read(csv).unwrap(),
+            read_voba_classic_csv(csv).unwrap(),
             vec![
                 PaymentRecord {
                     date: NaiveDate::from_ymd_opt(2022, 3, 9).unwrap(),
@@ -512,7 +490,7 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 01.03.2022;;;;;;;;;;Anfangssaldo;EUR;10.000,00;H
 09.03.2022;;;;;;;;;;Endsaldo;EUR;20.000,00;H
 ";
-        assert!(VobaClassicCSVReader::default().read(csv).is_err());
+        assert!(read_voba_classic_csv(csv).is_err());
     }
 
     #[test]
