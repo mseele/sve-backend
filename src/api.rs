@@ -134,6 +134,7 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
             "events@sv-eutingen.de".to_string(),
         ],
         allowed_domain: "sv-eutingen.de".to_string(),
+        task_api_key: secrets::get("TASK_API_KEY").await?,
     };
 
     Ok(Router::new()
@@ -211,7 +212,11 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                         .route(
                             "/send_participation_confirmation/{event_id}",
                             get(send_participation_confirmation),
-                        ),
+                        )
+                        .layer(axum::middleware::from_fn_with_state(
+                            state.clone(),
+                            api_key_middleware_fn,
+                        )),
                 )
                 .nest(
                     "/admin",
@@ -264,6 +269,7 @@ struct AppState {
     jwks: Arc<RwLock<JwksCache>>,
     allowed_emails: Vec<String>,
     allowed_domain: String,
+    task_api_key: String,
 }
 
 #[derive(Clone)]
@@ -365,6 +371,19 @@ async fn auth_middleware_fn(
     }
 
     next.run(req).await
+}
+
+async fn api_key_middleware_fn(
+    State(state): State<AppState>,
+    req: Request<Body>,
+    next: Next,
+) -> Response {
+    let api_key = req.headers().get("x-api-key").and_then(|h| h.to_str().ok());
+
+    match api_key {
+        Some(key) if key == state.task_api_key => next.run(req).await,
+        _ => (StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
+    }
 }
 
 async fn fetch_jwks(jwks_url: &str) -> Result<HashMap<String, Arc<DecodingKey>>> {
