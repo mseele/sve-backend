@@ -149,31 +149,6 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                         .route("/counter", get(counter))
                         .route("/booking", post(booking))
                         .route("/prebooking/{hash}", get(prebooking))
-                        /* TODO: remove when tools is migrated */
-                        .route("/update", post(update))
-                        /* TODO: remove when tools is migrated */
-                        .route("/{id}", delete(delete_event))
-                        /* TODO: remove when tools is migrated */
-                        .nest(
-                            "/booking",
-                            Router::new()
-                                .route(
-                                    "/{id}",
-                                    patch(update_event_booking).delete(cancel_event_booking),
-                                )
-                                .route("/export/{event_id}", get(export_event_bookings))
-                                .route(
-                                    "/participants_list/{event_id}",
-                                    get(export_event_participants_list),
-                                ),
-                        )
-                        /* TODO: remove when tools is migrated */
-                        .nest(
-                            "/payments",
-                            Router::new()
-                                .route("/verify", post(verify_payments))
-                                .route("/unpaid/{event_type}", get(unpaid_bookings)),
-                        ),
                 )
                 .nest(
                     "/news",
