@@ -224,6 +224,7 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                         .nest(
                             "/events",
                             Router::new()
+                                .route("/", get(admin_events))
                                 .route("/update", post(update))
                                 .route("/{id}", delete(delete_event))
                                 .nest(
@@ -483,7 +484,21 @@ async fn events(
         &state.pg_pool,
         query.beta.take(),
         query.status.take(),
-        query.subscribers.take(),
+        Some(false), // Public endpoint never returns subscribers
+    )
+    .await?;
+    Ok(Json(events))
+}
+
+async fn admin_events(
+    State(state): State<AppState>,
+    query: Query<EventsQueryParams>,
+) -> Result<impl IntoResponse, ResponseError> {
+    let events = events::get_events(
+        &state.pg_pool,
+        query.beta,
+        query.status.clone(),
+        query.subscribers,
     )
     .await?;
     Ok(Json(events))
