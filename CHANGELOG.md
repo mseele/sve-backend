@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.3] - 2026-01-11
+
+### Bug Fixes
+
+- Add missing comma
+- Improve error handling for loading Google credentials
+
 ## [2.7.1] - 2026-01-11
 
 ### Bug Fixes
