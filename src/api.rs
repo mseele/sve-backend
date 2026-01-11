@@ -205,14 +205,6 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                         .route("/renew_calendar_watch", get(renew_calendar_watch))
                         .route("/send_event_reminders", get(send_event_reminders))
                         .route("/close_finished_events", get(close_finished_events))
-                        .route(
-                            "/send_payment_reminders/{event_type}",
-                            get(send_payment_reminders),
-                        )
-                        .route(
-                            "/send_participation_confirmation/{event_id}",
-                            get(send_participation_confirmation),
-                        )
                         .layer(axum::middleware::from_fn_with_state(
                             state.clone(),
                             api_key_middleware_fn,
@@ -246,6 +238,18 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                                     Router::new()
                                         .route("/verify", post(verify_payments))
                                         .route("/unpaid/{event_type}", get(unpaid_bookings)),
+                                ),
+                        )
+                        .nest(
+                            "/tasks",
+                            Router::new()
+                                .route(
+                                    "/send_payment_reminders/{event_type}",
+                                    get(send_payment_reminders),
+                                )
+                                .route(
+                                    "/send_participation_confirmation/{event_id}",
+                                    get(send_participation_confirmation),
                                 ),
                         )
                         .layer(axum::middleware::from_fn_with_state(
