@@ -148,7 +148,7 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                         .route("/custom_fields", get(custom_fields))
                         .route("/counter", get(counter))
                         .route("/booking", post(booking))
-                        .route("/prebooking/{hash}", get(prebooking))
+                        .route("/prebooking/{hash}", get(prebooking)),
                 )
                 .nest(
                     "/news",
