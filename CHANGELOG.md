@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.0] - 2026-01-11
+
+### Features
+
+- Integrate oidc
+- Add API key middleware for task authorization
+- Add admin events route to API for event management
+
+### Refactor
+
+- Enhance secret management by improving caching and restructuring secret retrieval logic
+
 ## [2.6.4] - 2025-12-20
 
 ### Refactor
