@@ -20,7 +20,6 @@ use std::{
     collections::{HashMap, HashSet},
     time::Duration,
 };
-use tracing::debug;
 
 pub(crate) async fn init_pool() -> Result<PgPool> {
     let pool = PgPoolOptions::new()
@@ -1828,10 +1827,6 @@ pub(crate) async fn mark_as_payment_reminder_sent(
 /// is payed.
 pub(crate) async fn get_all_finished_event_ids(pool: &PgPool) -> Result<Vec<EventId>> {
     let mut conn = pool.acquire().await?;
-
-    // TODO: debugging
-    let result = query!("SELECT NOW()").fetch_all(&mut *conn).await?;
-    debug!(?result, "result of select now()");
 
     let event_ids: Vec<EventId> = query!(
         r#"SELECT
