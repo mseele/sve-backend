@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.1] - 2026-01-11
+
+### Bug Fixes
+
+- Move admin tasks endpoints to /admin/tasks route
+
 ## [2.7.0] - 2026-01-11
 
 ### Features
