@@ -1,6 +1,6 @@
 [package]
 name = "sve_backend"
-version = "2.7.1"
+version = "2.7.2"
 edition = "2024"
 description = "Backend for the SVE website"
 authors = ["Michael Seele <mseele@gmail.com>"]
