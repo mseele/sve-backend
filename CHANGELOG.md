@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.4] - 2026-01-16
+
+### Bug Fixes
+
+- Move emails route under admin path
+
 ## [2.7.3] - 2026-01-11
 
 ### Bug Fixes
