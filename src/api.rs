@@ -157,12 +157,7 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                         .route("/unsubscribe", post(unsubscribe))
                         .route("/subscribers", get(subscribers)),
                 )
-                .nest(
-                    "/contact",
-                    Router::new()
-                        .route("/message", post(message))
-                        .route("/emails", post(emails)),
-                )
+                .nest("/contact", Router::new().route("/message", post(message)))
                 .nest(
                     "/calendar",
                     Router::new()
@@ -215,6 +210,7 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                                         .route("/unpaid/{event_type}", get(unpaid_bookings)),
                                 ),
                         )
+                        .nest("/contact", Router::new().route("/emails", post(emails)))
                         .nest(
                             "/tasks",
                             Router::new()
