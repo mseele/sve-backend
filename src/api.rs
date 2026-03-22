@@ -1,7 +1,7 @@
 use crate::logic::{calendar, contact, events, export, membership, news, secrets, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
-    MembershipApplication, NewsSubscription, PartialEvent,
+    MembershipApplication, NewsSubscription, NewsTopic, PartialEvent,
 };
 use anyhow::Result;
 use axum::body::Body;
@@ -22,7 +22,7 @@ use reqwest::Client;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
@@ -154,8 +154,7 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                     "/news",
                     Router::new()
                         .route("/subscribe", post(subscribe))
-                        .route("/unsubscribe", post(unsubscribe))
-                        .route("/subscribers", get(subscribers)),
+                        .route("/unsubscribe", post(unsubscribe)),
                 )
                 .nest("/contact", Router::new().route("/message", post(message)))
                 .nest(
@@ -211,6 +210,10 @@ pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
                                 ),
                         )
                         .nest("/contact", Router::new().route("/emails", post(emails)))
+                        .nest(
+                            "/news",
+                            Router::new().route("/subscribers", get(subscribers)),
+                        )
                         .nest(
                             "/tasks",
                             Router::new()
@@ -441,6 +444,11 @@ pub(crate) struct EventCountersQueryParams {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct SubscribersQueryParams {
+    topic: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct VerifyPaymentInput {
     csv: String,
     start_date: Option<NaiveDate>,
@@ -601,30 +609,22 @@ async fn unsubscribe(
     Ok(StatusCode::OK)
 }
 
-async fn subscribers(State(state): State<AppState>) -> Result<impl IntoResponse, ResponseError> {
+async fn subscribers(
+    State(state): State<AppState>,
+    query: Query<SubscribersQueryParams>,
+) -> Result<impl IntoResponse, ResponseError> {
+    let topics: HashSet<NewsTopic> = query
+        .topic
+        .split(',')
+        .filter_map(|s| NewsTopic::from_str(s).ok())
+        .collect();
     let subscriptions = news::get_subscriptions(&state.pg_pool).await?;
-    let result = subscriptions
+    let emails: HashSet<_> = subscriptions
         .into_iter()
-        .map(|(topic, emails)| {
-            let title: &str = &format!(
-                "---------- {}: {} ----------",
-                topic.display_name(),
-                emails.len()
-            );
-            let mut chunks = vec![];
-            for chunk in emails.into_iter().collect::<Vec<_>>().chunks(300) {
-                chunks.push(chunk.join(";"));
-            }
-            [title, &chunks.join("<br/><br/>"), title].join("<br/>")
-        })
-        .collect::<Vec<_>>()
-        .join("<br/><br/><br/>");
-
-    Ok((
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/html")],
-        result,
-    ))
+        .filter(|(topic, _)| topics.contains(topic))
+        .flat_map(|(_, emails)| emails)
+        .collect();
+    Ok(Json(emails))
 }
 
 // calendar
