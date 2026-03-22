@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.0] - 2026-03-22
+
+### Documentation
+
+- Add agent guidelines
+
+### Features
+
+- Add OAuth-protected admin endpoint for newsletter subscribers
+
 ## [2.7.4] - 2026-01-16
 
 ### Bug Fixes
