@@ -109,11 +109,11 @@ where
                 _ => None,
             };
 
-            if let Some(ip_str) = source_ip {
-                if let Ok(ip) = ip_str.parse::<IpAddr>() {
-                    debug!("Extracted client IP: {}", ip);
-                    return Ok(ClientIp(Some(ip)));
-                }
+            if let Some(ip_str) = source_ip
+                && let Ok(ip) = ip_str.parse::<IpAddr>()
+            {
+                debug!("Extracted client IP: {}", ip);
+                return Ok(ClientIp(Some(ip)));
             }
         }
 
@@ -329,7 +329,7 @@ async fn auth_middleware_fn(
     // Since we trust Google's signature verification,
     // the audience check is redundant here.
     validation.validate_aud = false;
-    let token_data = match decode::<Claims>(token, &*decoding_key, &validation) {
+    let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
         Ok(t) => t,
         Err(e) => {
             tracing::error!("JWT decode error: {:?}", e);
@@ -763,7 +763,7 @@ async fn validate_captcha(
         response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
     })?;
 
-    let mut request = hcaptcha::Request::new(&secret, captcha).map_err(|e| ResponseError {
+    let mut request = hcaptcha::Request::new(secret, captcha).map_err(|e| ResponseError {
         err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
         response: Some((
             StatusCode::INTERNAL_SERVER_ERROR,

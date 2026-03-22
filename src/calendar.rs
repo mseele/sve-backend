@@ -19,19 +19,24 @@ async fn calendar_hub() -> Result<CalendarHub<HttpsConnector<HttpConnector>>> {
         .and_then(|creds| serde_json::from_str(&creds).map_err(anyhow::Error::from))
         .map_err(|e| anyhow!("Error loading credentials: {e}"))?;
 
-    let auth = yup_oauth2::ServiceAccountAuthenticator::builder(secret)
-        .build()
-        .await?;
+    let connector = hyper_rustls::HttpsConnectorBuilder::new()
+        .with_native_roots()
+        .unwrap()
+        .https_only()
+        .enable_http2()
+        .build();
 
-    let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
-        .build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .unwrap()
-                .https_only()
-                .enable_http2()
-                .build(),
-        );
+    let executor = hyper_util::rt::TokioExecutor::new();
+    let auth = yup_oauth2::ServiceAccountAuthenticator::with_client(
+        secret,
+        yup_oauth2::CustomHyperClientBuilder::from(
+            hyper_util::client::legacy::Client::builder(executor.clone()).build(connector.clone()),
+        ),
+    )
+    .build()
+    .await?;
+
+    let client = hyper_util::client::legacy::Client::builder(executor).build(connector);
 
     Ok(CalendarHub::new(client, auth))
 }

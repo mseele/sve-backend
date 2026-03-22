@@ -4,14 +4,14 @@ use crate::{
 };
 use anyhow::{Result, anyhow};
 use chrono::Locale;
-use image::codecs::jpeg::JpegDecoder;
 use printpdf::{
-    Color, Image, ImageTransform, IndirectFontRef, Line, Mm, PdfDocument, PdfLayerIndex,
-    PdfPageReference, Point, Polygon, Rgb, Svg, SvgTransform,
+    Color, Line, LinePoint, Mm, Op, PdfDocument, PdfFontHandle, PdfPage, PdfParseErrorSeverity,
+    PdfSaveOptions, PdfWarnMsg, Point, Polygon, PolygonRing, Pt, Rgb, Svg, TextItem, TextMatrix,
+    XObjectTransform,
 };
 use simple_excel_writer::{CellValue, Column, Row, ToCellValue, Workbook};
 use sqlx::PgPool;
-use std::io::Cursor;
+use tracing::warn;
 
 /// run an excel export for the event bookings of the given event id
 pub(crate) async fn event_bookings(pool: &PgPool, event_id: EventId) -> Result<(String, Vec<u8>)> {
@@ -212,25 +212,32 @@ fn create_participant_list(
     participants: &[(String, String)],
     dates: &[String],
 ) -> Result<Vec<u8>> {
-    let (doc, page, layer) = PdfDocument::new("Teilnehmerliste", Mm(297.0), Mm(210.0), "Graphic");
+    let mut doc = PdfDocument::new("Teilnehmerliste");
+    let mut warnings = Vec::<PdfWarnMsg>::new();
 
-    let mut font_reader =
-        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Regular.ttf").as_ref());
-    let font_regular = doc.add_external_font(&mut font_reader).unwrap();
+    let font_regular = {
+        let font = printpdf::ParsedFont::from_bytes(
+            include_bytes!("../assets/fonts/Inter-Regular.ttf"),
+            0,
+            &mut Vec::new(),
+        )
+        .ok_or_else(|| anyhow!("Failed to parse Inter-Regular font"))?;
+        doc.add_font(&font)
+    };
 
-    let mut font_reader =
-        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Medium.ttf").as_ref());
-    let font_medium = doc.add_external_font(&mut font_reader).unwrap();
+    let font_medium = {
+        let font = printpdf::ParsedFont::from_bytes(
+            include_bytes!("../assets/fonts/Inter-Medium.ttf"),
+            0,
+            &mut Vec::new(),
+        )
+        .ok_or_else(|| anyhow!("Failed to parse Inter-Medium font"))?;
+        doc.add_font(&font)
+    };
 
-    for (i, chunk) in participants.chunks(16).enumerate() {
-        let (page, layer) = if i > 0 {
-            doc.add_page(Mm(297.0), Mm(210.0), "Graphic")
-        } else {
-            (page, layer)
-        };
-        create_participant_list_page(
-            doc.get_page(page),
-            layer,
+    for chunk in participants.chunks(16) {
+        let ops = create_participant_list_page(
+            &mut doc,
             &font_regular,
             &font_medium,
             event_name,
@@ -238,171 +245,243 @@ fn create_participant_list(
             chunk,
             dates,
         )?;
+        let page = PdfPage::new(Mm(297.0), Mm(210.0), ops);
+        doc.pages.push(page);
     }
 
-    Ok(doc.save_to_bytes()?)
+    let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+    for w in warnings
+        .iter()
+        .filter(|w| w.severity != PdfParseErrorSeverity::Info)
+    {
+        warn!("PDF warning (participant list): {:?}", w);
+    }
+    Ok(bytes)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn create_participant_list_page(
-    page: PdfPageReference,
-    layer: PdfLayerIndex,
-    font_regular: &IndirectFontRef,
-    font_medium: &IndirectFontRef,
+    doc: &mut PdfDocument,
+    font_regular: &printpdf::FontId,
+    font_medium: &printpdf::FontId,
     event_name: &str,
     day_and_time: &String,
     participants: &[(String, String)],
     dates: &[String],
-) -> Result<()> {
-    let graphic_layer = page.get_layer(layer);
-    let text_layer = page.add_layer("Text");
+) -> Result<Vec<Op>> {
+    let mut ops = Vec::new();
+    let mut warnings = Vec::<PdfWarnMsg>::new();
 
-    // header
-    text_layer.use_text(
-        "SV Eutingen 1947 e.V.",
-        14.0,
-        Mm(20.0),
-        Mm(190.0),
-        font_regular,
-    );
-    text_layer.use_text(
-        format!("Teilnehmerliste • {event_name} • {day_and_time}"),
-        11.0,
-        Mm(20.0),
-        Mm(183.0),
-        font_regular,
-    );
+    // Parse SVG logo
+    let svg_xobject = Svg::parse(include_str!("../assets/logo.svg"), &mut warnings)
+        .map_err(|e| anyhow!("Failed to parse SVG: {e}"))?;
+    let svg_id = doc.add_xobject(&svg_xobject);
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(14.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(190.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("SV Eutingen 1947 e.V.")],
+    });
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(11.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(183.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(format!(
+            "Teilnehmerliste \u{2022} {event_name} \u{2022} {day_and_time}"
+        ))],
+    });
+    ops.push(Op::EndTextSection);
 
-    let line = Line {
-        points: vec![
-            (Point::new(Mm(20.0), Mm(180.0)), false),
-            (Point::new(Mm(277.0), Mm(180.0)), false),
-        ],
-        ..Default::default()
-    };
-    graphic_layer.set_outline_color(Color::Rgb(Rgb::new(
-        162.0 / 255.0,
-        33.0 / 255.0,
-        34.0 / 255.0,
-        None,
-    )));
-    graphic_layer.add_line(line);
+    ops.push(Op::SetOutlineColor {
+        col: Color::Rgb(Rgb::new(162.0 / 255.0, 33.0 / 255.0, 34.0 / 255.0, None)),
+    });
+    ops.push(Op::DrawLine {
+        line: Line {
+            points: vec![
+                LinePoint {
+                    p: Point::new(Mm(20.0), Mm(180.0)),
+                    bezier: false,
+                },
+                LinePoint {
+                    p: Point::new(Mm(277.0), Mm(180.0)),
+                    bezier: false,
+                },
+            ],
+            ..Default::default()
+        },
+    });
 
-    let svg = Svg::parse(include_str!("../assets/logo.svg"))?;
-    svg.add_to_layer(
-        &graphic_layer,
-        SvgTransform {
-            translate_x: Some(Mm(265.0).into()),
-            translate_y: Some(Mm(181.0).into()),
+    // SVG logo
+    ops.push(Op::UseXobject {
+        id: svg_id,
+        transform: XObjectTransform {
+            translate_x: Some(Mm(265.0).into_pt()),
+            translate_y: Some(Mm(181.0).into_pt()),
             scale_x: Some(0.23),
             scale_y: Some(0.23),
             ..Default::default()
         },
-    );
+    });
 
     // table
     let mut y = 173.0;
     let line_height = 9.0;
 
     // header background
-    let polygon = Polygon {
-        rings: vec![vec![
-            (Point::new(Mm(20.0), Mm(y)), false),
-            (Point::new(Mm(277.0), Mm(y)), false),
-            (Point::new(Mm(277.0), Mm(y - line_height)), false),
-            (Point::new(Mm(20.0), Mm(y - line_height)), false),
-        ]],
-        ..Default::default()
-    };
-    graphic_layer.set_fill_color(Color::Rgb(Rgb::new(
-        241.0 / 255.0,
-        243.0 / 255.0,
-        244.0 / 255.0,
-        None,
-    )));
-    graphic_layer.add_polygon(polygon);
+    ops.push(Op::SetFillColor {
+        col: Color::Rgb(Rgb::new(241.0 / 255.0, 243.0 / 255.0, 244.0 / 255.0, None)),
+    });
+    ops.push(Op::DrawPolygon {
+        polygon: Polygon {
+            rings: vec![PolygonRing {
+                points: vec![
+                    LinePoint {
+                        p: Point::new(Mm(20.0), Mm(y)),
+                        bezier: false,
+                    },
+                    LinePoint {
+                        p: Point::new(Mm(277.0), Mm(y)),
+                        bezier: false,
+                    },
+                    LinePoint {
+                        p: Point::new(Mm(277.0), Mm(y - line_height)),
+                        bezier: false,
+                    },
+                    LinePoint {
+                        p: Point::new(Mm(20.0), Mm(y - line_height)),
+                        bezier: false,
+                    },
+                ],
+            }],
+            ..Default::default()
+        },
+    });
 
     for l in 0..18 {
         // horizontal line
-        let line = Line {
-            points: vec![
-                (Point::new(Mm(20.0), Mm(y)), false),
-                (Point::new(Mm(277.0), Mm(y)), false),
-            ],
-            ..Default::default()
-        };
-        graphic_layer.set_outline_color(Color::Rgb(Rgb::new(
-            189.0 / 255.0,
-            193.0 / 255.0,
-            198.0 / 255.0,
-            None,
-        )));
-        graphic_layer.add_line(line);
+        ops.push(Op::SetOutlineColor {
+            col: Color::Rgb(Rgb::new(189.0 / 255.0, 193.0 / 255.0, 198.0 / 255.0, None)),
+        });
+        ops.push(Op::DrawLine {
+            line: Line {
+                points: vec![
+                    LinePoint {
+                        p: Point::new(Mm(20.0), Mm(y)),
+                        bezier: false,
+                    },
+                    LinePoint {
+                        p: Point::new(Mm(277.0), Mm(y)),
+                        bezier: false,
+                    },
+                ],
+                ..Default::default()
+            },
+        });
 
         if l == 0 {
             // header row
             let y_text = y - (line_height - 3.0);
 
-            text_layer.use_text("Teilnehmer", 11.0, Mm(22.0), Mm(y_text), font_medium);
+            ops.push(Op::SaveGraphicsState);
+            ops.push(Op::SetFillColor {
+                col: Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)),
+            });
+            ops.push(Op::StartTextSection);
+            ops.push(Op::SetFont {
+                font: PdfFontHandle::External(font_medium.clone()),
+                size: Pt(11.0),
+            });
+            ops.push(Op::SetTextMatrix {
+                matrix: TextMatrix::Translate(Mm(22.0).into_pt(), Mm(y_text).into_pt()),
+            });
+            ops.push(Op::ShowText {
+                items: vec![TextItem::from("Teilnehmer")],
+            });
+            ops.push(Op::EndTextSection);
 
             let mut x = 107.0;
             for c in 0..10 {
                 // vertical line
-                let line = Line {
-                    points: vec![
-                        (Point::new(Mm(x), Mm(y)), false),
-                        (Point::new(Mm(x), Mm(20.0)), false),
-                    ],
-                    ..Default::default()
-                };
-                graphic_layer.set_outline_color(Color::Rgb(Rgb::new(
-                    189.0 / 255.0,
-                    193.0 / 255.0,
-                    198.0 / 255.0,
-                    None,
-                )));
-                graphic_layer.add_line(line);
+                ops.push(Op::DrawLine {
+                    line: Line {
+                        points: vec![
+                            LinePoint {
+                                p: Point::new(Mm(x), Mm(y)),
+                                bezier: false,
+                            },
+                            LinePoint {
+                                p: Point::new(Mm(x), Mm(20.0)),
+                                bezier: false,
+                            },
+                        ],
+                        ..Default::default()
+                    },
+                });
 
                 if dates.len() > c {
                     // header text
-                    text_layer.begin_text_section();
-                    text_layer.set_fill_color(Color::Rgb(Rgb::new(
-                        183.0 / 255.0,
-                        183.0 / 255.0,
-                        183.0 / 255.0,
-                        None,
-                    )));
-                    text_layer.set_font(font_medium, 11.0);
-                    text_layer.set_text_cursor(Mm(x + 3.0), Mm(y_text));
-                    text_layer.write_text(&dates[c], font_medium);
-                    text_layer.end_text_section();
+                    ops.push(Op::StartTextSection);
+                    ops.push(Op::SetFillColor {
+                        col: Color::Rgb(Rgb::new(
+                            183.0 / 255.0,
+                            183.0 / 255.0,
+                            183.0 / 255.0,
+                            None,
+                        )),
+                    });
+                    ops.push(Op::SetFont {
+                        font: PdfFontHandle::External(font_medium.clone()),
+                        size: Pt(11.0),
+                    });
+                    ops.push(Op::SetTextMatrix {
+                        matrix: TextMatrix::Translate(Mm(x + 3.0).into_pt(), Mm(y_text).into_pt()),
+                    });
+                    ops.push(Op::ShowText {
+                        items: vec![TextItem::from(dates[c].as_str())],
+                    });
+                    ops.push(Op::EndTextSection);
                 }
 
                 x += 17.0;
             }
-
-            // reset text color
-            text_layer.set_fill_color(Color::Rgb(Rgb::new(
-                0.0 / 255.0,
-                0.0 / 255.0,
-                0.0 / 255.0,
-                None,
-            )));
+            ops.push(Op::RestoreGraphicsState);
         } else if participants.len() >= l {
             let (first_name, last_name) = &participants[l - 1];
-            text_layer.use_text(
-                format!("{first_name} {last_name}"),
-                11.0,
-                Mm(22.0),
-                Mm(y - (line_height - 3.0)),
-                font_regular,
-            );
+            ops.push(Op::SaveGraphicsState);
+            ops.push(Op::SetFillColor {
+                col: Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)),
+            });
+            ops.push(Op::StartTextSection);
+            ops.push(Op::SetFont {
+                font: PdfFontHandle::External(font_regular.clone()),
+                size: Pt(11.0),
+            });
+            ops.push(Op::SetTextMatrix {
+                matrix: TextMatrix::Translate(
+                    Mm(22.0).into_pt(),
+                    Mm(y - (line_height - 3.0)).into_pt(),
+                ),
+            });
+            ops.push(Op::ShowText {
+                items: vec![TextItem::from(format!("{first_name} {last_name}"))],
+            });
+            ops.push(Op::EndTextSection);
+            ops.push(Op::RestoreGraphicsState);
         }
 
         y -= line_height;
     }
 
-    Ok(())
+    Ok(ops)
 }
 
 pub(crate) async fn create_participation_confirmation(
@@ -431,156 +510,325 @@ fn _create_participation_confirmation(
     price: String,
     dates: String,
 ) -> Result<Vec<u8>> {
-    let (doc, page, layer) =
-        PdfDocument::new("Teilnahmebescheinigung", Mm(210.0), Mm(297.0), "Layer");
-    let current_layer = doc.get_page(page).get_layer(layer);
+    let mut doc = PdfDocument::new("Teilnahmebescheinigung");
+    let mut warnings = Vec::<PdfWarnMsg>::new();
 
-    let mut font_reader =
-        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Regular.ttf").as_ref());
-    let font_regular = doc.add_external_font(&mut font_reader).unwrap();
+    let font_regular = {
+        let font = printpdf::ParsedFont::from_bytes(
+            include_bytes!("../assets/fonts/Inter-Regular.ttf"),
+            0,
+            &mut Vec::new(),
+        )
+        .ok_or_else(|| anyhow!("Failed to parse Inter-Regular font"))?;
+        doc.add_font(&font)
+    };
 
-    let mut font_reader =
-        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Medium.ttf").as_ref());
-    let font_medium = doc.add_external_font(&mut font_reader).unwrap();
+    let font_medium = {
+        let font = printpdf::ParsedFont::from_bytes(
+            include_bytes!("../assets/fonts/Inter-Medium.ttf"),
+            0,
+            &mut Vec::new(),
+        )
+        .ok_or_else(|| anyhow!("Failed to parse Inter-Medium font"))?;
+        doc.add_font(&font)
+    };
 
-    let mut font_reader =
-        std::io::Cursor::new(include_bytes!("../assets/fonts/Inter-Italic.ttf").as_ref());
-    let font_italic = doc.add_external_font(&mut font_reader).unwrap();
+    let font_italic = {
+        let font = printpdf::ParsedFont::from_bytes(
+            include_bytes!("../assets/fonts/Inter-Italic.ttf"),
+            0,
+            &mut Vec::new(),
+        )
+        .ok_or_else(|| anyhow!("Failed to parse Inter-Italic font"))?;
+        doc.add_font(&font)
+    };
+
+    let mut ops = Vec::new();
+
+    // Parse SVG logo
+    let svg_xobject = Svg::parse(include_str!("../assets/logo.svg"), &mut warnings)
+        .map_err(|e| anyhow!("Failed to parse SVG: {e}"))?;
+    let svg_id = doc.add_xobject(&svg_xobject);
+
+    // Parse signature image
+    let sign_image =
+        printpdf::RawImage::decode_from_bytes(include_bytes!("../assets/sign.jpg"), &mut warnings)
+            .map_err(|e| anyhow!("Failed to decode signature image: {e}"))?;
+    let sign_image_id = doc.add_image(&sign_image);
 
     // header
-    current_layer.use_text(
-        "SV Eutingen 1947 e.V.",
-        18.0,
-        Mm(20.0),
-        Mm(252.0),
-        &font_regular,
-    );
-    current_layer.use_text(
-        "Fussball • Fitness • Ernährung • Volleyball",
-        11.0,
-        Mm(20.0),
-        Mm(244.0),
-        &font_regular,
-    );
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(18.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(252.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("SV Eutingen 1947 e.V.")],
+    });
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(11.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(244.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            "Fussball \u{2022} Fitness \u{2022} Ern\u{e4}hrung \u{2022} Volleyball",
+        )],
+    });
+    ops.push(Op::EndTextSection);
 
-    let line = Line {
-        points: vec![
-            (Point::new(Mm(20.0), Mm(240.0)), false),
-            (Point::new(Mm(141.0), Mm(240.0)), false),
-        ],
-        ..Default::default()
-    };
-    let color = Color::Rgb(Rgb::new(162.0 / 255.0, 33.0 / 255.0, 34.0 / 255.0, None));
-    current_layer.set_outline_color(color);
-    current_layer.add_line(line);
+    ops.push(Op::SetOutlineColor {
+        col: Color::Rgb(Rgb::new(162.0 / 255.0, 33.0 / 255.0, 34.0 / 255.0, None)),
+    });
+    ops.push(Op::DrawLine {
+        line: Line {
+            points: vec![
+                LinePoint {
+                    p: Point::new(Mm(20.0), Mm(240.0)),
+                    bezier: false,
+                },
+                LinePoint {
+                    p: Point::new(Mm(141.0), Mm(240.0)),
+                    bezier: false,
+                },
+            ],
+            ..Default::default()
+        },
+    });
 
-    let svg = Svg::parse(include_str!("../assets/logo.svg"))?;
-    svg.add_to_layer(
-        &current_layer,
-        SvgTransform {
-            translate_x: Some(Mm(156.0).into()),
-            translate_y: Some(Mm(220.0).into()),
+    // SVG logo
+    ops.push(Op::UseXobject {
+        id: svg_id,
+        transform: XObjectTransform {
+            translate_x: Some(Mm(156.0).into_pt()),
+            translate_y: Some(Mm(220.0).into_pt()),
             scale_x: Some(0.75),
             scale_y: Some(0.75),
             ..Default::default()
         },
-    );
+    });
 
-    current_layer.use_text(
-        "Teilnahmebestätigung",
-        12.0,
-        Mm(20.0),
-        Mm(213.0),
-        &font_medium,
-    );
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_medium.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(213.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("Teilnahmebest\u{e4}tigung")],
+    });
+    ops.push(Op::EndTextSection);
 
-    current_layer.begin_text_section();
-    current_layer.set_font(&font_medium, 12.0);
-    current_layer.set_text_cursor(Mm(20.0), Mm(192.0));
-    current_layer.write_text(format!("{first_name} {last_name}"), &font_medium);
-    current_layer.set_font(&font_regular, 12.0);
-    current_layer.write_text(
-        " hat erfolgreich an folgendem Kurs teilgenommen:",
-        &font_regular,
-    );
-    current_layer.end_text_section();
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_medium.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(192.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(format!("{first_name} {last_name}"))],
+    });
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            " hat erfolgreich an folgendem Kurs teilgenommen:",
+        )],
+    });
+    ops.push(Op::EndTextSection);
 
-    current_layer.use_text(event_name, 12.0, Mm(20.0), Mm(177.0), &font_medium);
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_medium.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(177.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(event_name)],
+    });
+    ops.push(Op::EndTextSection);
 
-    current_layer.use_text("Kursbeginn:", 12.0, Mm(20.0), Mm(167.0), &font_regular);
-    current_layer.use_text(first_date, 12.0, Mm(48.0), Mm(167.0), &font_regular);
-    current_layer.use_text("Kursende:", 12.0, Mm(96.0), Mm(167.0), &font_regular);
-    current_layer.use_text(last_date, 12.0, Mm(119.0), Mm(167.0), &font_regular);
-    current_layer.use_text("Kosten:", 12.0, Mm(20.0), Mm(159.0), &font_regular);
-    current_layer.use_text(price, 12.0, Mm(48.0), Mm(159.0), &font_regular);
-    current_layer.use_text("Termine:", 12.0, Mm(20.0), Mm(151.0), &font_regular);
-    current_layer.use_text(dates, 12.0, Mm(48.0), Mm(151.0), &font_regular);
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(167.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("Kursbeginn:")],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(48.0).into_pt(), Mm(167.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(first_date)],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(96.0).into_pt(), Mm(167.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("Kursende:")],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(119.0).into_pt(), Mm(167.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(last_date)],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(159.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("Kosten:")],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(48.0).into_pt(), Mm(159.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(price)],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(151.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("Termine:")],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(48.0).into_pt(), Mm(151.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(dates)],
+    });
+    ops.push(Op::EndTextSection);
 
-    current_layer.use_text(
-        "Der Kurs wurde von einer lizenzierten Trainerin bzw. einem lizenzierten Trainer geleitet.",
-        12.0,
-        Mm(20.0),
-        Mm(137.0),
-        &font_regular,
-    );
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(137.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            "Der Kurs wurde von einer lizenzierten Trainerin bzw. einem lizenzierten Trainer geleitet.",
+        )],
+    });
+    ops.push(Op::EndTextSection);
 
-    current_layer.begin_text_section();
-    current_layer.set_font(&font_regular, 12.0);
-    current_layer.set_text_cursor(Mm(20.0), Mm(122.0));
-    current_layer.set_line_height(18.0);
-    current_layer.write_text(
-        "Wir bedanken uns sehr herzlich und freuen uns über eine erneute Teilnahme an den",
-        &font_regular,
-    );
-    current_layer.add_line_break();
-    current_layer.write_text("verschiedenen Sportangeboten des Vereins.", &font_regular);
-    current_layer.end_text_section();
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(122.0).into_pt()),
+    });
+    ops.push(Op::SetLineHeight { lh: Pt(18.0) });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            "Wir bedanken uns sehr herzlich und freuen uns \u{fc}ber eine erneute Teilnahme an den",
+        )],
+    });
+    ops.push(Op::AddLineBreak);
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("verschiedenen Sportangeboten des Vereins.")],
+    });
+    ops.push(Op::EndTextSection);
 
-    current_layer.use_text(
-        "Für den Sportverein Eutingen 1947 e.V.",
-        12.0,
-        Mm(20.0),
-        Mm(81.0),
-        &font_regular,
-    );
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(81.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            "F\u{fc}r den Sportverein Eutingen 1947 e.V.",
+        )],
+    });
+    ops.push(Op::EndTextSection);
 
-    let mut reader = Cursor::new(include_bytes!("../assets/sign.jpg").as_ref());
-    let image = Image::try_from(JpegDecoder::new(&mut reader)?)?;
-    image.add_to_layer(
-        current_layer.clone(),
-        ImageTransform {
-            translate_x: Some(Mm(24.0)),
-            translate_y: Some(Mm(67.0)),
+    // Signature image
+    ops.push(Op::UseXobject {
+        id: sign_image_id,
+        transform: XObjectTransform {
+            translate_x: Some(Mm(24.0).into_pt()),
+            translate_y: Some(Mm(67.0).into_pt()),
             scale_x: Some(1.0),
             scale_y: Some(1.0),
             ..Default::default()
         },
-    );
+    });
 
-    current_layer.begin_text_section();
-    current_layer.set_font(&font_italic, 12.0);
-    current_layer.set_text_cursor(Mm(20.0), Mm(61.0));
-    current_layer.set_line_height(28.0);
-    current_layer.write_text("Gez. Sebastian Lazar", &font_italic);
-    current_layer.add_line_break();
-    current_layer.write_text("- 1. Vorsitzender -", &font_italic);
-    current_layer.end_text_section();
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_italic.clone()),
+        size: Pt(12.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(20.0).into_pt(), Mm(61.0).into_pt()),
+    });
+    ops.push(Op::SetLineHeight { lh: Pt(28.0) });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("Gez. Sebastian Lazar")],
+    });
+    ops.push(Op::AddLineBreak);
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from("- 1. Vorsitzender -")],
+    });
+    ops.push(Op::EndTextSection);
 
     // footer
-    current_layer.use_text(
-        "SV Eutingen 1947 e.V. • Marktstr. 84 • 72184 Eutingen im Gäu • info@sv-eutingen.de",
-        10.0,
-        Mm(34.0),
-        Mm(24.0),
-        &font_regular,
-    );
-    current_layer.use_text(
-        "www.sv-eutingen.de • facebook.com/sveutingen",
-        10.0,
-        Mm(64.0),
-        Mm(19.0),
-        &font_regular,
-    );
+    ops.push(Op::StartTextSection);
+    ops.push(Op::SetFont {
+        font: PdfFontHandle::External(font_regular.clone()),
+        size: Pt(10.0),
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(34.0).into_pt(), Mm(24.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            "SV Eutingen 1947 e.V. \u{2022} Marktstr. 84 \u{2022} 72184 Eutingen im G\u{e4}u \u{2022} info@sv-eutingen.de",
+        )],
+    });
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Translate(Mm(64.0).into_pt(), Mm(19.0).into_pt()),
+    });
+    ops.push(Op::ShowText {
+        items: vec![TextItem::from(
+            "www.sv-eutingen.de \u{2022} facebook.com/sveutingen",
+        )],
+    });
+    ops.push(Op::EndTextSection);
 
-    Ok(doc.save_to_bytes()?)
+    let page = PdfPage::new(Mm(210.0), Mm(297.0), ops);
+    doc.pages.push(page);
+
+    let bytes = doc.save(&PdfSaveOptions::default(), &mut warnings);
+    for w in warnings
+        .iter()
+        .filter(|w| w.severity != PdfParseErrorSeverity::Info)
+    {
+        warn!("PDF warning (participation confirmation): {:?}", w);
+    }
+    Ok(bytes)
 }
