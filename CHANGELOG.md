@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.1] - 2026-03-23
+
+### Bug Fixes
+
+- Ignore errors if channel already expired
+
+### Ci
+
+- Parallelize build and test jobs
+
 ## [2.8.0] - 2026-03-22
 
 ### Documentation
