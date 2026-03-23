@@ -47,13 +47,13 @@ pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) 
 
     let hub = calendar_hub().await?;
 
-    // stop the current watch
+    // stop the current watch (ignore errors if channel already expired)
     let request = Channel {
         id: Some(id.into()),
         resource_id: Some(resource_id.into()),
         ..Default::default()
     };
-    hub.channels().stop(request).doit().await?;
+    let _ = hub.channels().stop(request).doit().await;
 
     // add a new watch
     let request = Channel {
