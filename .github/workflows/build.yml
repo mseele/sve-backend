@@ -14,10 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout # the code
-        uses: actions/checkout@v4
-
-      - name: Cache # cargo and targets
-        uses: swatinem/rust-cache@v2
+        uses: actions/checkout@v6
 
       - name: Install # missing packages
         run: |
@@ -25,22 +22,21 @@ jobs:
           sudo apt-get install --yes musl-tools
 
       - name: Build # the binary
-        uses: houseabsolute/actions-rust-cross@v0
+        uses: houseabsolute/actions-rust-cross@v1
         with:
           command: "build"
           target: aarch64-unknown-linux-musl
           args: "--release --locked"
 
-      - name: Compress binary
+      - name: Package binary
         run: |
           cd target/aarch64-unknown-linux-musl/release
           mv sve_backend bootstrap
-          upx --best bootstrap
-          7z a -mx=7 lambda.zip bootstrap
+          zip lambda.zip bootstrap
           mv lambda.zip ../../../
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lambda
           path: lambda.zip
@@ -48,10 +44,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: swatinem/rust-cache@v2
-      - run: sudo apt-get install --yes musl-tools
-      - uses: houseabsolute/actions-rust-cross@v0
+      - uses: actions/checkout@v6
+      - run: |
+          sudo apt-get update --yes
+          sudo apt-get install --yes musl-tools
+      - uses: houseabsolute/actions-rust-cross@v1
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
@@ -61,7 +58,7 @@ jobs:
     needs: [build, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: lambda
       - uses: appleboy/lambda-action@v0.2.0
