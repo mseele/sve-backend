@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.5] - 2026-03-25
+
+### Bug Fixes
+
+- Pass AWS env vars to cross Docker container
+
 ## [2.8.4] - 2026-03-25
 
 ### Bug Fixes
