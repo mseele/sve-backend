@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.4] - 2026-03-25
+
+### Bug Fixes
+
+- Add aws credentials to avoid test failure in ci/cd
+
 ## [2.8.3] - 2026-03-25
 
 ### Bug Fixes
