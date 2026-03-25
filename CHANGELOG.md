@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.2] - 2026-03-25
+
+### Bug Fixes
+
+- Enable rustls-backend for hcaptcha to fix HTTPS connections in Lambda
+
+### Ci
+
+- Update actions to latest versions and simplify pipeline
+
 ## [2.8.1] - 2026-03-23
 
 ### Bug Fixes
