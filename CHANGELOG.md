@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.6] - 2026-03-25
+
+### Bug Fixes
+
+- Use Cross.toml to pass AWS credentials into cross Docker container
+
 ## [2.8.5] - 2026-03-25
 
 ### Bug Fixes
