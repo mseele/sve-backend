@@ -4,7 +4,7 @@ use chrono::{Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Berlin;
 use google_calendar3::{
     CalendarHub,
-    api::{Channel, Event, EventDateTime},
+    api::{Channel, Event, EventDateTime, Scope},
     hyper_rustls,
     hyper_rustls::HttpsConnector,
     hyper_util,
@@ -63,7 +63,11 @@ pub(crate) async fn renew_watch(calendar_id: &str, id: &str, resource_id: &str) 
         expiration: Some(expiration),
         ..Default::default()
     };
-    hub.events().watch(request, calendar_id).doit().await?;
+    hub.events()
+        .watch(request, calendar_id)
+        .add_scope(Scope::Full)
+        .doit()
+        .await?;
 
     Ok(())
 }
@@ -77,6 +81,7 @@ pub(crate) async fn appointments(calendar_id: &str, max_results: i32) -> Result<
     let (_, events) = hub
         .events()
         .list(calendar_id)
+        .add_scope(Scope::EventReadonly)
         .max_results(max_results)
         .time_min(time_min)
         .order_by("startTime") //$NON-NLS-1$

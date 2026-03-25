@@ -39,3 +39,29 @@ pub(crate) async fn notifications(channel_id: &str) -> Result<()> {
 pub(crate) async fn renew_watch() -> Result<()> {
     calendar::renew_watch(GENERAL_ID, WATCH_ID, WATCH_RESOURCE_ID).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn init_crypto() {
+        dotenvy::dotenv().ok();
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    }
+
+    #[tokio::test]
+    async fn test_appointments() {
+        init_crypto();
+
+        let result = appointments().await;
+        assert!(result.is_ok(), "appointments() failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_renew_watch() {
+        init_crypto();
+
+        let result = renew_watch().await;
+        assert!(result.is_ok(), "renew_watch() failed: {:?}", result.err());
+    }
+}
