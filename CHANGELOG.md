@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.3] - 2026-03-25
+
+### Bug Fixes
+
+- Use correct OAuth scopes for Google Calendar API after dependency upgrade
+
 ## [2.8.2] - 2026-03-25
 
 ### Bug Fixes
