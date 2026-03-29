@@ -335,7 +335,7 @@ async fn auth_middleware_fn(
     let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
         Ok(t) => t,
         Err(e) => {
-            tracing::error!("JWT decode error: {:?}", e);
+            tracing::warn!("JWT decode error: {:?}", e);
             return (StatusCode::UNAUTHORIZED, "Invalid JWT").into_response();
         }
     };
