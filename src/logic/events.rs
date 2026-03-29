@@ -521,7 +521,7 @@ async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingRespo
             process_booking(pool, &booking, event, counter, false, payment_id).await?
         }
         BookingResult::DuplicateBooking => {
-            error!(
+            info!(
                 "Event ({}) booking failed because a duplicate booking has been detected.",
                 booking.event_id
             );
@@ -530,14 +530,14 @@ async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingRespo
             )
         }
         BookingResult::NotBookable => {
-            error!(
+            info!(
                 "Event ({}) booking failed because the event is in a unbookable state.",
                 booking.event_id
             );
             BookingResponse::failure("Das Event kann aktuell leider nicht gebucht werden.")
         }
         BookingResult::BookedOut => {
-            error!(
+            info!(
                 "Booking failed because Event ({}) was overbooked.",
                 booking.event_id
             );
@@ -1522,5 +1522,31 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
             calc_due_in_days(booking_date, start_date, String::from("{{payday 14}}")).unwrap(),
             -7
         );
+    }
+}
+
+#[cfg(test)]
+mod send_event_email_tests {
+    use super::*;
+    use crate::email::MockEmailSender;
+    use crate::models::EmailAccount;
+    use pretty_assertions::assert_eq;
+    use sqlx::PgPool;
+
+    #[sqlx::test]
+    async fn test_send_event_email_validation_requires_booking_or_waiting(pool: PgPool) {
+        let data = crate::models::EventEmail {
+            event_id: crate::models::EventId::from(1),
+            subject: "Test".to_string(),
+            body: "Body".to_string(),
+            bookings: false,
+            waiting_list: false,
+            prebooking_event_id: None,
+            attachments: None,
+        };
+        let result = send_event_email(&pool, data).await;
+        assert!(result.is_err());
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Either bookings or waiting list option need to be selected"));
     }
 }
