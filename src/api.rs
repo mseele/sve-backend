@@ -1,3 +1,4 @@
+use crate::email::RealEmailSender;
 use crate::logic::{calendar, contact, events, export, membership, news, secrets, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
@@ -506,7 +507,7 @@ async fn booking(
     extract::Json(booking): extract::Json<EventBooking>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&booking.token, ip).await?;
-    let response = events::booking(&state.pg_pool, booking).await;
+    let response = events::booking(&state.pg_pool, booking, &RealEmailSender).await;
     Ok(Json(response))
 }
 
@@ -514,7 +515,7 @@ async fn prebooking(
     State(state): State<AppState>,
     Path(hash): Path<String>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let response = events::prebooking(&state.pg_pool, hash).await;
+    let response = events::prebooking(&state.pg_pool, hash, &RealEmailSender).await;
     Ok(Json(response))
 }
 
@@ -522,7 +523,7 @@ async fn update(
     State(state): State<AppState>,
     extract::Json(partial_event): extract::Json<PartialEvent>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let event = events::update(&state.pg_pool, partial_event).await?;
+    let event = events::update(&state.pg_pool, partial_event, &RealEmailSender).await?;
     Ok(Json(event))
 }
 
@@ -567,7 +568,7 @@ async fn cancel_event_booking(
     State(state): State<AppState>,
     Path(booking_id): Path<i32>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    events::cancel_booking(&state.pg_pool, booking_id).await?;
+    events::cancel_booking(&state.pg_pool, booking_id, &RealEmailSender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -595,7 +596,7 @@ async fn subscribe(
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&subscription.token, ip).await?;
-    news::subscribe(&state.pg_pool, subscription).await?;
+    news::subscribe(&state.pg_pool, subscription, &RealEmailSender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -664,7 +665,7 @@ async fn message(
     Json(message): Json<ContactMessage>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&message.token, ip).await?;
-    contact::message(message).await?;
+    contact::message(message, &RealEmailSender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -673,9 +674,9 @@ async fn emails(
     extract::Json(body): extract::Json<EmailsBody>,
 ) -> Result<impl IntoResponse, ResponseError> {
     if let Some(emails) = body.emails {
-        contact::emails(emails).await?;
+        contact::emails(emails, &RealEmailSender).await?;
     } else if let Some(event) = body.event {
-        events::send_event_email(&state.pg_pool, event).await?;
+        events::send_event_email(&state.pg_pool, event, &RealEmailSender).await?;
     }
     Ok(StatusCode::OK)
 }
@@ -688,14 +689,14 @@ async fn membership_application(
     extract::Json(application): extract::Json<MembershipApplication>,
 ) -> Result<impl IntoResponse, ResponseError> {
     validate_captcha(&application.token, ip).await?;
-    membership::application(&state.pg_pool, application).await?;
+    membership::application(&state.pg_pool, application, &RealEmailSender).await?;
     Ok(StatusCode::OK)
 }
 
 // tasks
 
 async fn check_email_connectivity() -> Result<impl IntoResponse, ResponseError> {
-    tasks::check_email_connectivity().await;
+    tasks::check_email_connectivity(&RealEmailSender).await;
     Ok(StatusCode::OK)
 }
 
@@ -707,14 +708,14 @@ async fn renew_calendar_watch() -> Result<impl IntoResponse, ResponseError> {
 async fn send_event_reminders(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_event_reminders(&state.pg_pool).await;
+    tasks::send_event_reminders(&state.pg_pool, &RealEmailSender).await;
     Ok(StatusCode::OK)
 }
 
 async fn close_finished_events(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::close_finished_events(&state.pg_pool).await;
+    tasks::close_finished_events(&state.pg_pool, &RealEmailSender).await;
     Ok(StatusCode::OK)
 }
 
@@ -722,7 +723,7 @@ async fn send_payment_reminders(
     State(state): State<AppState>,
     Path(event_type): Path<EventType>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_payment_reminders(&state.pg_pool, event_type).await?;
+    tasks::send_payment_reminders(&state.pg_pool, event_type, &RealEmailSender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -730,7 +731,7 @@ async fn send_participation_confirmation(
     State(state): State<AppState>,
     Path(event_id): Path<EventId>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_participation_confirmation(&state.pg_pool, event_id).await?;
+    tasks::send_participation_confirmation(&state.pg_pool, event_id, &RealEmailSender).await?;
     Ok(StatusCode::OK)
 }
 

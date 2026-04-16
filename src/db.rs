@@ -1804,6 +1804,10 @@ pub(crate) async fn mark_as_payment_reminder_sent(
     pool: &PgPool,
     booking_ids: &[i32],
 ) -> Result<()> {
+    if booking_ids.is_empty() {
+        return Ok(());
+    }
+
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
         r#"UPDATE
         event_bookings
@@ -2020,4 +2024,306 @@ async fn update_subscription(
     .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod db_integration_tests {
+    use super::*;
+    use crate::models::{EventType, LifecycleStatus, NewsTopic, PartialEvent};
+    use anyhow::Result;
+    use chrono::{DateTime, Utc};
+
+    #[sqlx::test]
+    async fn test_subscribe_and_unsubscribe(pool: PgPool) -> Result<()> {
+        let subscription = crate::models::NewsSubscription::new(
+            "test@example.com".to_string(),
+            vec![NewsTopic::General, NewsTopic::Events],
+        );
+
+        let result = subscribe(&pool, subscription.clone()).await?;
+        assert_eq!(result.email, "test@example.com");
+        assert_eq!(result.topics.len(), 2);
+
+        let unsubscribe_sub = crate::models::NewsSubscription::new(
+            "test@example.com".to_string(),
+            vec![NewsTopic::General],
+        );
+        unsubscribe(&pool, &unsubscribe_sub).await?;
+
+        let subscriptions = get_subscriptions(&pool).await?;
+        let sub = subscriptions
+            .iter()
+            .find(|s| s.email == "test@example.com")
+            .unwrap();
+        assert!(!sub.topics.contains(&NewsTopic::General));
+        assert!(sub.topics.contains(&NewsTopic::Events));
+
+        let full_unsub =
+            crate::models::NewsSubscription::new("test@example.com".to_string(), vec![]);
+        unsubscribe(&pool, &full_unsub).await?;
+
+        let subscriptions = get_subscriptions(&pool).await?;
+        let sub = subscriptions
+            .iter()
+            .find(|s| s.email == "test@example.com")
+            .unwrap();
+        assert!(sub.topics.contains(&NewsTopic::Events));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_get_subscriptions(pool: PgPool) -> Result<()> {
+        let email1 = "alice@example.com";
+        let email2 = "bob@example.com";
+
+        query!(
+            r#"INSERT INTO news_subscribers (email, general, events, fitness) VALUES ($1, $2, $3, $4)"#,
+            email1, true, false, true
+        )
+        .execute(&pool)
+        .await?;
+
+        query!(
+            r#"INSERT INTO news_subscribers (email, general, events, fitness) VALUES ($1, $2, $3, $4)"#,
+            email2, false, true, false
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriptions = get_subscriptions(&pool).await?;
+        assert_eq!(subscriptions.len(), 2);
+
+        let alice = subscriptions.iter().find(|s| s.email == email1).unwrap();
+        assert!(alice.topics.contains(&NewsTopic::General));
+        assert!(!alice.topics.contains(&NewsTopic::Events));
+        assert!(alice.topics.contains(&NewsTopic::Fitness));
+
+        let bob = subscriptions.iter().find(|s| s.email == email2).unwrap();
+        assert!(!bob.topics.contains(&NewsTopic::General));
+        assert!(bob.topics.contains(&NewsTopic::Events));
+        assert!(!bob.topics.contains(&NewsTopic::Fitness));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_write_and_get_event(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Draft),
+            name: Some("Test Event".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short desc".to_string()),
+            description: Some("Full description".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(120),
+            max_subscribers: Some(50),
+            max_waiting_list: Some(10),
+            price_member: Some("25.00".parse().unwrap()),
+            price_non_member: Some("30.00".parse().unwrap()),
+            location: Some("Gym".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            ..Default::default()
+        };
+
+        let (event, _) = write_event(&pool, partial).await?;
+        assert_eq!(event.name, "Test Event");
+        assert_eq!(event.event_type, EventType::Events);
+        assert_eq!(event.lifecycle_status, LifecycleStatus::Draft);
+
+        let fetched: Option<Event> = get_event(&pool, &event.id, false).await?;
+        assert!(fetched.is_some());
+        let fetched = fetched.unwrap();
+        assert_eq!(fetched.id, event.id);
+        assert_eq!(fetched.name, "Test Event");
+
+        let partial = PartialEvent {
+            id: Some(event.id),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Updated Event".to_string()),
+            ..Default::default()
+        };
+
+        let (updated, _) = write_event(&pool, partial).await?;
+        assert_eq!(updated.name, "Updated Event");
+        assert_eq!(updated.lifecycle_status, LifecycleStatus::Published);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_get_and_cancel_booking(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Fitness),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Fitness Class".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Get fit".to_string()),
+            description: Some("Full description".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(60),
+            max_subscribers: Some(10),
+            max_waiting_list: Some(5),
+            price_member: Some("15.00".parse().unwrap()),
+            price_non_member: Some("20.00".parse().unwrap()),
+            location: Some("Studio".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            ..Default::default()
+        };
+
+        let (event, _) = write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "John",
+            "Doe",
+            "Main St",
+            "Vienna",
+            "john@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'john@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payed) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_123",
+            None::<DateTime<Utc>>,
+        )
+        .execute(&pool)
+        .await?;
+
+        let bookings = get_bookings(&pool, &event_id, None).await?;
+        assert_eq!(bookings.len(), 1);
+        let booking = &bookings[0].0;
+        assert_eq!(booking.email, "john@example.com");
+        let booking_id = bookings[0].1;
+
+        let (canceled_event, canceled_booking, waiting_promotion) =
+            cancel_event_booking(&pool, booking_id).await?;
+        assert_eq!(canceled_event.id, event_id);
+        assert_eq!(canceled_booking.email, "john@example.com");
+        assert!(waiting_promotion.is_none());
+
+        let bookings_after = get_bookings(&pool, &event_id, None).await?;
+        assert_eq!(bookings_after.len(), 0);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_mark_as_payed_and_update_payment(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Paid Event".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Pay here".to_string()),
+            description: Some("Full description".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            ..Default::default()
+        };
+
+        let (event, _) = write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Jane",
+            "Smith",
+            "Second St",
+            "Vienna",
+            "jane@example.com",
+            None::<String>,
+            false
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'jane@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payed) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_456",
+            None::<DateTime<Utc>>,
+        )
+        .execute(&pool)
+        .await?;
+
+        let booking_row = query!(r#"SELECT id FROM event_bookings WHERE payment_id = 'pay_456'"#,)
+            .fetch_one(&pool)
+            .await?;
+        let booking_id = booking_row.id;
+
+        update_payment(&pool, booking_id, true).await?;
+
+        let booking_row = query!(
+            r#"SELECT payed FROM event_bookings WHERE id = $1"#,
+            booking_id
+        )
+        .fetch_one(&pool)
+        .await?;
+        assert!(booking_row.payed.is_some());
+
+        let mut verified_payments = HashMap::new();
+        verified_payments.insert(booking_id, "AT611904300234573200".to_string());
+        mark_as_payed(&pool, &verified_payments).await?;
+
+        let booking_row = query!(
+            r#"SELECT payed, iban FROM event_bookings WHERE id = $1"#,
+            booking_id
+        )
+        .fetch_one(&pool)
+        .await?;
+        assert!(booking_row.payed.is_some());
+        assert_eq!(booking_row.iban.as_deref(), Some("AT611904300234573200"));
+
+        Ok(())
+    }
 }

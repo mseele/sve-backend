@@ -7,6 +7,8 @@ mod db;
 mod email;
 mod logic;
 mod models;
+#[cfg(test)]
+mod test_utils;
 mod hashids {
     use harsh::{Error, Harsh};
 

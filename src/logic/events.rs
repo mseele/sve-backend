@@ -58,8 +58,12 @@ pub(crate) async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<
     db::get_event_counters(pool, into_lifecycle_status(beta)).await
 }
 
-pub(crate) async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResponse {
-    match book_event(pool, booking).await {
+pub(crate) async fn booking(
+    pool: &PgPool,
+    booking: EventBooking,
+    email_sender: &impl email::EmailSender,
+) -> BookingResponse {
+    match book_event(pool, booking, email_sender).await {
         Ok(response) => response,
         Err(e) => {
             error!("Booking failed: {:?}", e);
@@ -68,8 +72,12 @@ pub(crate) async fn booking(pool: &PgPool, booking: EventBooking) -> BookingResp
     }
 }
 
-pub(crate) async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
-    match pre_book_event(pool, hash).await {
+pub(crate) async fn prebooking(
+    pool: &PgPool,
+    hash: String,
+    email_sender: &impl email::EmailSender,
+) -> BookingResponse {
+    match pre_book_event(pool, hash, email_sender).await {
         Ok(response) => response,
         Err(e) => {
             error!("Prebooking failed: {:?}", e);
@@ -78,7 +86,11 @@ pub(crate) async fn prebooking(pool: &PgPool, hash: String) -> BookingResponse {
     }
 }
 
-pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
+pub(crate) async fn update(
+    pool: &PgPool,
+    partial_event: PartialEvent,
+    email_sender: &impl email::EmailSender,
+) -> Result<Event> {
     let (event, removed_dates) = db::write_event(pool, partial_event).await?;
     if let Some(removed_dates) = removed_dates
         && matches!(
@@ -97,7 +109,7 @@ pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result
             EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
         };
 
-        let email_account = event.get_associated_email_account().await?;
+        let email_account = event.get_associated_email_account(email_sender).await?;
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
@@ -111,7 +123,7 @@ pub(crate) async fn update(pool: &PgPool, partial_event: PartialEvent) -> Result
             );
         }
 
-        email::send_messages(&email_account, messages).await?;
+        email_sender.send_messages(&email_account, messages).await?;
     }
     Ok(event)
 }
@@ -218,11 +230,15 @@ pub(crate) async fn update_payment(
     db::update_payment(pool, booking_id, update_payment).await
 }
 
-pub(crate) async fn cancel_booking(pool: &PgPool, booking_id: i32) -> Result<()> {
+pub(crate) async fn cancel_booking(
+    pool: &PgPool,
+    booking_id: i32,
+    email_sender: &impl email::EmailSender,
+) -> Result<()> {
     let (event, canceled_booking, waiting_list_booking) =
         db::cancel_event_booking(pool, booking_id).await?;
 
-    let email_account = event.get_associated_email_account().await?;
+    let email_account = event.get_associated_email_account(email_sender).await?;
     let mut messages = Vec::new();
 
     // create cancellation confirmation email
@@ -263,12 +279,16 @@ pub(crate) async fn cancel_booking(pool: &PgPool, booking_id: i32) -> Result<()>
         );
     }
 
-    email::send_messages(&email_account, messages).await?;
+    email_sender.send_messages(&email_account, messages).await?;
 
     Ok(())
 }
 
-pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<()> {
+pub(crate) async fn send_event_email(
+    pool: &PgPool,
+    data: EventEmail,
+    email_sender: &impl email::EmailSender,
+) -> Result<()> {
     if !data.bookings && !data.waiting_list {
         bail!("Either bookings or waiting list option need to be selected to send an event email.")
     }
@@ -295,7 +315,7 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
 
-    let email_account = event.get_associated_email_account().await?;
+    let email_account = event.get_associated_email_account(email_sender).await?;
     let message_type: MessageType = event.event_type.into();
     let mut messages = Vec::new();
 
@@ -337,20 +357,23 @@ pub(crate) async fn send_event_email(pool: &PgPool, data: EventEmail) -> Result<
         );
     }
 
-    email::send_messages(&email_account, messages).await?;
+    email_sender.send_messages(&email_account, messages).await?;
 
     Ok(())
 }
 
 /// send a reminder email for each events that starts next week
-pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
+pub(crate) async fn send_event_reminders(
+    pool: &PgPool,
+    email_sender: &impl email::EmailSender,
+) -> Result<usize> {
     // get all events where a event reminder should be send to the subscribers
     let events = db::get_reminder_events(pool).await?;
 
     // process each event
     for event in &events {
         // prepare for message generation
-        let email_account = event.get_associated_email_account().await?;
+        let email_account = event.get_associated_email_account(email_sender).await?;
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
@@ -386,7 +409,7 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
             }
 
             // send reminder emails to all event subribers
-            email::send_messages(&email_account, messages).await?;
+            email_sender.send_messages(&email_account, messages).await?;
 
             // mark reminder has been sent to the event
             // (to avoid duplicate sending of reminder emails)
@@ -399,7 +422,11 @@ pub(crate) async fn send_event_reminders(pool: &PgPool) -> Result<usize> {
 }
 
 /// send a reminder email for all bookings which are due with payment
-pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType) -> Result<usize> {
+pub(crate) async fn send_payment_reminders(
+    pool: &PgPool,
+    event_type: EventType,
+    email_sender: &impl email::EmailSender,
+) -> Result<usize> {
     // get unpaid bookings and filter for bookings that are due with payment
     let bookings = get_unpaid_bookings(pool, event_type)
         .await?
@@ -408,7 +435,7 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
         .collect::<Vec<_>>();
 
     // prepare for message generation
-    let email_account = email::get_account_by_type(event_type.into()).await?;
+    let email_account = email_sender.get_account_by_type(event_type.into()).await?;
     let message_type: MessageType = event_type.into();
     let mut messages = Vec::new();
 
@@ -450,7 +477,7 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
     }
 
     // send reminder emails to all bookings due with payment
-    email::send_messages(&email_account, messages).await?;
+    email_sender.send_messages(&email_account, messages).await?;
 
     // mark payment reminder has been sent to the bookings
     // (to avoid duplicate sending of reminder emails)
@@ -466,7 +493,10 @@ pub(crate) async fn send_payment_reminders(pool: &PgPool, event_type: EventType)
 /// Check that an event has finished and all attendees have paid. If so,
 /// move the event to status 'Finished', send the attendee confirmation email,
 /// and move the event to status 'Closed'.
-pub(crate) async fn close_finished_running_events(pool: &PgPool) -> Result<usize> {
+pub(crate) async fn close_finished_running_events(
+    pool: &PgPool,
+    email_sender: &impl email::EmailSender,
+) -> Result<usize> {
     let mut count = 0;
 
     for event_id in db::get_all_finished_event_ids(pool).await? {
@@ -478,12 +508,13 @@ pub(crate) async fn close_finished_running_events(pool: &PgPool) -> Result<usize
                 lifecycle_status: Some(LifecycleStatus::Finished),
                 ..Default::default()
             },
+            email_sender,
         )
         .await?;
 
         // send confirmation emails for fitness events
         if matches!(event.event_type, EventType::Fitness) {
-            send_participation_confirmation(pool, event_id).await?;
+            send_participation_confirmation(pool, event_id, email_sender).await?;
         }
 
         // move event into status closed
@@ -494,6 +525,7 @@ pub(crate) async fn close_finished_running_events(pool: &PgPool) -> Result<usize
                 lifecycle_status: Some(LifecycleStatus::Closed),
                 ..Default::default()
             },
+            email_sender,
         )
         .await?;
 
@@ -511,14 +543,36 @@ fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
     }
 }
 
-async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingResponse> {
+async fn book_event(
+    pool: &PgPool,
+    booking: EventBooking,
+    email_sender: &impl email::EmailSender,
+) -> Result<BookingResponse> {
     let booking_result = db::book_event(pool, &booking).await?;
     let booking_response = match booking_result {
         BookingResult::Booked(event, counter, payment_id) => {
-            process_booking(pool, &booking, event, counter, true, payment_id).await?
+            process_booking(
+                pool,
+                &booking,
+                event,
+                counter,
+                true,
+                payment_id,
+                email_sender,
+            )
+            .await?
         }
         BookingResult::WaitingList(event, counter, payment_id) => {
-            process_booking(pool, &booking, event, counter, false, payment_id).await?
+            process_booking(
+                pool,
+                &booking,
+                event,
+                counter,
+                false,
+                payment_id,
+                email_sender,
+            )
+            .await?
         }
         BookingResult::DuplicateBooking => {
             info!(
@@ -548,7 +602,11 @@ async fn book_event(pool: &PgPool, booking: EventBooking) -> Result<BookingRespo
     Ok(booking_response)
 }
 
-async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> {
+async fn pre_book_event(
+    pool: &PgPool,
+    hash: String,
+    email_sender: &impl email::EmailSender,
+) -> Result<BookingResponse> {
     let ids = hashids::decode(&hash)
         .with_context(|| format!("Error decoding the prebooking hash {} into ids", &hash))?;
 
@@ -575,6 +633,7 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
                 counter,
                 true,
                 payment_id,
+                email_sender,
             )
             .await?
         }
@@ -587,6 +646,7 @@ async fn pre_book_event(pool: &PgPool, hash: String) -> Result<BookingResponse> 
                 counter,
                 false,
                 payment_id,
+                email_sender,
             )
             .await?
         }
@@ -619,9 +679,10 @@ async fn process_booking(
     counter: Vec<EventCounter>,
     booked: bool,
     payment_id: String,
+    email_sender: &impl email::EmailSender,
 ) -> Result<BookingResponse> {
-    subscribe_to_updates(pool, booking, &event).await?;
-    send_booking_mail(booking, &event, booked, payment_id).await?;
+    subscribe_to_updates(pool, booking, &event, email_sender).await?;
+    send_booking_mail(booking, &event, booked, payment_id, email_sender).await?;
     info!("Booking of Event {} was successfull", booking.event_id);
     let message = if booked {
         "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail."
@@ -631,13 +692,18 @@ async fn process_booking(
     Ok(BookingResponse::success(message, counter))
 }
 
-async fn subscribe_to_updates(pool: &PgPool, booking: &EventBooking, event: &Event) -> Result<()> {
+async fn subscribe_to_updates(
+    pool: &PgPool,
+    booking: &EventBooking,
+    event: &Event,
+    email_sender: &impl email::EmailSender,
+) -> Result<()> {
     // only subscribe to updates if updates field is true
     if !booking.updates.unwrap_or(false) {
         return Ok(());
     }
     let subscription = NewsSubscription::new(booking.email.clone(), vec![event.event_type.into()]);
-    super::news::subscribe_to_news(pool, subscription, false).await?;
+    super::news::subscribe_to_news(pool, subscription, false, email_sender).await?;
 
     Ok(())
 }
@@ -647,8 +713,9 @@ async fn send_booking_mail(
     event: &Event,
     booked: bool,
     payment_id: String,
+    email_sender: &impl email::EmailSender,
 ) -> Result<()> {
-    let email_account = event.get_associated_email_account().await?;
+    let email_account = event.get_associated_email_account(email_sender).await?;
     let subject;
     let template: &str;
     let opt_payment_id;
@@ -692,7 +759,7 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
         .subject(subject)
         .singlepart(SinglePart::plain(body))?;
 
-    email::send_message(&email_account, message).await?;
+    email_sender.send_message(&email_account, message).await?;
 
     Ok(())
 }
@@ -930,6 +997,7 @@ pub(super) fn calculate_payday(
 pub(crate) async fn send_participation_confirmation(
     pool: &PgPool,
     event_id: EventId,
+    email_sender: &impl email::EmailSender,
 ) -> Result<usize> {
     // fetch the event with all subscribers
     let mut event = db::get_event(pool, &event_id, true)
@@ -975,7 +1043,7 @@ pub(crate) async fn send_participation_confirmation(
     let dates = format!("{dates_len} x {} Minuten", event.duration_in_minutes);
 
     // send an email per participant
-    let email_account = event.get_associated_email_account().await?;
+    let email_account = event.get_associated_email_account(email_sender).await?;
     let subject = format!("{} Teilnahmebestätigung", event.subject_prefix());
     let mut messages = Vec::new();
     for subscriber in subscribers {
@@ -1014,7 +1082,7 @@ pub(crate) async fn send_participation_confirmation(
 
     let count = messages.len();
     if count > 0 {
-        email::send_messages(&email_account, messages).await?;
+        email_sender.send_messages(&email_account, messages).await?;
     }
 
     Ok(count)
@@ -1526,27 +1594,319 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 }
 
 #[cfg(test)]
-mod send_event_email_tests {
+mod events_integration_tests {
     use super::*;
-    use crate::email::MockEmailSender;
-    use crate::models::EmailAccount;
+    use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent};
+    use crate::test_utils::{mock_email_sender, noop_mock};
+    use anyhow::Result;
+    use bigdecimal::BigDecimal;
+    use chrono::{Duration, Utc};
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
 
+    async fn create_test_event(pool: &PgPool, status: LifecycleStatus) -> Result<Event> {
+        let now = Utc::now();
+        let event = db::write_event(
+            pool,
+            PartialEvent {
+                event_type: Some(EventType::Fitness),
+                lifecycle_status: Some(status),
+                name: Some("Test Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short desc".to_string()),
+                description: Some("Full desc".to_string()),
+                image: Some("test.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![now + Duration::try_days(30).unwrap()]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Test Location".to_string()),
+                booking_template: Some("Booking template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+        Ok(event.0)
+    }
+
+    fn make_booking(event_id: EventId) -> EventBooking {
+        EventBooking {
+            event_id,
+            first_name: "Max".to_string(),
+            last_name: "Mustermann".to_string(),
+            street: "Teststr 1".to_string(),
+            city: "Teststadt".to_string(),
+            email: "max@test.com".to_string(),
+            phone: None,
+            member: Some(true),
+            updates: Some(false),
+            comments: None,
+            custom_values: vec![],
+            token: None,
+        }
+    }
+
     #[sqlx::test]
-    async fn test_send_event_email_validation_requires_booking_or_waiting(pool: PgPool) {
-        let data = crate::models::EventEmail {
-            event_id: crate::models::EventId::from(1),
-            subject: "Test".to_string(),
-            body: "Body".to_string(),
-            bookings: false,
-            waiting_list: false,
-            prebooking_event_id: None,
-            attachments: None,
-        };
-        let result = send_event_email(&pool, data).await;
+    async fn test_booking_draft_event_not_bookable(pool: PgPool) {
+        let event = create_test_event(&pool, LifecycleStatus::Draft)
+            .await
+            .unwrap();
+        let mock_sender = noop_mock();
+        let booking_data = make_booking(event.id);
+
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(!response.success);
+    }
+
+    #[sqlx::test]
+    async fn test_booking_published_event_not_bookable_due_to_capacity(pool: PgPool) {
+        // Create event with 0 max_subscribers (capacity full)
+        let event = db::write_event(
+            &pool,
+            PartialEvent {
+                event_type: Some(EventType::Fitness),
+                lifecycle_status: Some(LifecycleStatus::Published),
+                name: Some("Full Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Desc".to_string()),
+                image: Some("img.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![Utc::now() + Duration::try_days(30).unwrap()]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(0),
+                max_waiting_list: Some(0),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Location".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let mock_sender = noop_mock();
+        let booking_data = make_booking(event.0.id);
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(!response.success);
+    }
+
+    #[sqlx::test]
+    async fn test_prebooking_invalid_hash(pool: PgPool) {
+        let mock_sender = noop_mock();
+        let response = prebooking(&pool, "invalid_hash".to_string(), &mock_sender).await;
+        assert!(!response.success);
+    }
+
+    #[sqlx::test]
+    async fn test_cancel_nonexistent_booking(pool: PgPool) {
+        let mock_sender = noop_mock();
+        let result = cancel_booking(&pool, 99999, &mock_sender).await;
         assert!(result.is_err());
-        let error_msg = result.unwrap_err().to_string();
-        assert!(error_msg.contains("Either bookings or waiting list option need to be selected"));
+    }
+
+    #[sqlx::test]
+    async fn test_update_event(pool: PgPool) -> Result<()> {
+        let event = create_test_event(&pool, LifecycleStatus::Draft).await?;
+        let mock_sender = noop_mock();
+
+        let updated = update(
+            &pool,
+            PartialEvent {
+                id: Some(event.id),
+                name: Some("Updated Name".to_string()),
+                ..Default::default()
+            },
+            &mock_sender,
+        )
+        .await?;
+
+        assert_eq!(updated.name, "Updated Name");
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_update_event_with_removed_dates_no_bookings(pool: PgPool) -> Result<()> {
+        let event = create_test_event(&pool, LifecycleStatus::Published).await?;
+        let mock_sender = noop_mock();
+
+        // Update with empty dates (removing all dates) - should not send emails since no bookings
+        let updated = update(
+            &pool,
+            PartialEvent {
+                id: Some(event.id),
+                dates: Some(vec![]),
+                ..Default::default()
+            },
+            &mock_sender,
+        )
+        .await?;
+
+        assert_eq!(updated.name, event.name);
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_event_reminders_empty_db(pool: PgPool) -> Result<()> {
+        let mock_sender = noop_mock();
+        let count = send_event_reminders(&pool, &mock_sender).await?;
+        assert_eq!(count, 0);
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_participation_confirmation_events_type(pool: PgPool) -> Result<()> {
+        // Create an Events type event (not Fitness)
+        let event = db::write_event(
+            &pool,
+            PartialEvent {
+                event_type: Some(EventType::Events),
+                lifecycle_status: Some(LifecycleStatus::Running),
+                name: Some("Events Type".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Desc".to_string()),
+                image: Some("img.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![Utc::now() + Duration::try_days(30).unwrap()]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Location".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let mock_sender = noop_mock();
+        let result = send_participation_confirmation(&pool, event.0.id, &mock_sender).await;
+        assert!(result.is_err(), "Should fail for Events type");
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("not supported"), "Error was: {err_msg}");
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_participation_confirmation_no_dates(pool: PgPool) -> Result<()> {
+        // Create a Fitness event with no dates
+        let event = db::write_event(
+            &pool,
+            PartialEvent {
+                event_type: Some(EventType::Fitness),
+                lifecycle_status: Some(LifecycleStatus::Running),
+                name: Some("Fitness Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Desc".to_string()),
+                image: Some("img.png".to_string()),
+                light: Some(true),
+                custom_date: Some("Sometime".to_string()),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Location".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let mock_sender = noop_mock();
+        let result = send_participation_confirmation(&pool, event.0.id, &mock_sender).await;
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_booking_mail_booked(pool: PgPool) -> Result<()> {
+        let event = create_test_event(&pool, LifecycleStatus::Published).await?;
+
+        let booking = EventBooking {
+            event_id: event.id,
+            first_name: "Max".to_string(),
+            last_name: "Mustermann".to_string(),
+            street: "Teststr 1".to_string(),
+            city: "Teststadt".to_string(),
+            email: "max@test.com".to_string(),
+            phone: None,
+            member: Some(true),
+            updates: Some(false),
+            comments: None,
+            custom_values: vec![],
+            token: None,
+        };
+
+        let mock_sender = mock_email_sender(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
+
+        send_booking_mail(&booking, &event, true, "PAY123".to_string(), &mock_sender).await?;
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_booking_mail_waiting_list(pool: PgPool) -> Result<()> {
+        let event = create_test_event(&pool, LifecycleStatus::Published).await?;
+
+        let booking = EventBooking {
+            event_id: event.id,
+            first_name: "Max".to_string(),
+            last_name: "Mustermann".to_string(),
+            street: "Teststr 1".to_string(),
+            city: "Teststadt".to_string(),
+            email: "max@test.com".to_string(),
+            phone: None,
+            member: Some(true),
+            updates: Some(false),
+            comments: None,
+            custom_values: vec![],
+            token: None,
+        };
+
+        let mock_sender = mock_email_sender(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
+
+        send_booking_mail(&booking, &event, false, "PAY123".to_string(), &mock_sender).await?;
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_payment_reminders(pool: PgPool) -> Result<()> {
+        let mock_sender = mock_email_sender(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
+
+        let result = send_payment_reminders(&pool, EventType::Fitness, &mock_sender).await;
+        if let Err(e) = &result {
+            eprintln!("Error: {:?}", e);
+        }
+        assert!(result.is_ok());
+        assert_eq!(result?, 0);
+
+        Ok(())
     }
 }

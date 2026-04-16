@@ -19,7 +19,7 @@ base64_serde_type!(Base64Standard, STANDARD);
 
 /// Special i32 that is encoded / decoded to a short
 /// unique id on json serialization / deserialization.
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub(crate) struct EventId(i32);
 
@@ -30,12 +30,6 @@ impl EventId {
 
     pub(crate) fn into_inner(self) -> i32 {
         self.0
-    }
-}
-
-impl Debug for EventId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.0, f)
     }
 }
 
@@ -186,10 +180,17 @@ impl Event {
         self.event_type.subject_prefix()
     }
 
-    pub(crate) async fn get_associated_email_account(&self) -> Result<EmailAccount> {
+    pub(crate) async fn get_associated_email_account(
+        &self,
+        email_sender: &impl email::EmailSender,
+    ) -> Result<EmailAccount> {
         match &self.alt_email_address {
-            Some(email_address) => email::get_account_by_address(email_address).await,
-            None => email::get_account_by_type(self.event_type.into()).await,
+            Some(email_address) => email_sender.get_account_by_address(email_address).await,
+            None => {
+                email_sender
+                    .get_account_by_type(self.event_type.into())
+                    .await
+            }
         }
     }
 }
@@ -225,7 +226,7 @@ pub(crate) struct PartialEvent {
     pub(crate) custom_fields: Option<Vec<EventCustomField>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "event_type")]
 pub(crate) enum EventType {
     Fitness,
@@ -292,7 +293,7 @@ impl FromStr for EventType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::Type)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "lifecycle_status")]
 pub(crate) enum LifecycleStatus {
     /// Not visible and not bookable.
@@ -482,7 +483,7 @@ impl EventCounter {
 
 #[derive(Serialize, Debug)]
 pub(crate) struct BookingResponse {
-    success: bool,
+    pub(crate) success: bool,
     message: String,
     counter: Vec<EventCounter>,
 }
@@ -679,7 +680,7 @@ impl Appointment {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub(crate) struct EmailAccount {
     #[serde(rename = "type")]
     pub(crate) email_type: EmailType,
@@ -689,6 +690,15 @@ pub(crate) struct EmailAccount {
 }
 
 impl EmailAccount {
+    #[cfg(test)]
+    pub(crate) fn new_for_test(email_type: EmailType, address: &str) -> Self {
+        Self {
+            email_type,
+            address: address.to_string(),
+            password: Vec::new(),
+        }
+    }
+
     pub(crate) fn mailbox(&self) -> Result<Mailbox> {
         Ok(self.address.parse()?)
     }
@@ -712,7 +722,7 @@ impl EmailAccount {
     }
 }
 
-#[derive(Deserialize, PartialEq, Eq, Hash, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
 pub(crate) enum EmailType {
     Fitness,
     Events,
@@ -1083,5 +1093,176 @@ mod tests {
             false,
             Vec::new(),
         )
+    }
+}
+
+#[cfg(test)]
+mod additional_model_tests {
+    use super::*;
+    use bigdecimal::FromPrimitive;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_membership_type_get_label() {
+        assert_eq!(MembershipType::Fitness.get_label(), "Sparte Fitness");
+        assert_eq!(
+            MembershipType::Family.get_label(),
+            "Familienbeitrag beliebige Kinder"
+        );
+        assert_eq!(
+            MembershipType::AdultActive.get_label(),
+            "Aktiver Erwachsener"
+        );
+        assert_eq!(
+            MembershipType::AdultSuporting.get_label(),
+            "Fördermitglied Erwachsener"
+        );
+        assert_eq!(
+            MembershipType::AdultPremium.get_label(),
+            "Premiummitglied Erwachsener"
+        );
+        assert_eq!(MembershipType::Youth.get_label(), "Kind, Jugendliche(r)");
+        assert_eq!(MembershipType::Free.get_label(), "Beitragsfrei");
+    }
+
+    #[test]
+    fn test_membership_type_get_department() {
+        assert_eq!(MembershipType::Fitness.get_department(), "Fitness");
+        assert_eq!(MembershipType::Family.get_department(), "Hauptverein");
+        assert_eq!(MembershipType::AdultActive.get_department(), "Hauptverein");
+        assert_eq!(
+            MembershipType::AdultSuporting.get_department(),
+            "Hauptverein"
+        );
+        assert_eq!(MembershipType::AdultPremium.get_department(), "Hauptverein");
+        assert_eq!(MembershipType::Youth.get_department(), "Hauptverein");
+        assert_eq!(MembershipType::Free.get_department(), "Hauptverein");
+    }
+
+    #[test]
+    fn test_event_counter_is_booked_up() {
+        // Unlimited (-1) should never be booked up
+        let counter = EventCounter::new(0, -1, 10, 100, 5);
+        assert!(!counter.is_booked_up());
+        // Full: subscribers >= max and waiting_list >= max_waiting
+        let counter = EventCounter::new(0, 10, 5, 10, 5);
+        assert!(counter.is_booked_up());
+        // Partial: subscribers full but waiting list not full
+        let counter = EventCounter::new(0, 10, 5, 10, 3);
+        assert!(!counter.is_booked_up());
+        // Partial: waiting list full but subscribers not full
+        let counter = EventCounter::new(0, 10, 5, 8, 5);
+        assert!(!counter.is_booked_up());
+        // Empty: no subscribers, empty waiting
+        let counter = EventCounter::new(0, 10, 5, 0, 0);
+        assert!(!counter.is_booked_up());
+    }
+
+    #[test]
+    fn test_lifecycle_status_is_bookable() {
+        assert!(!LifecycleStatus::Draft.is_bookable());
+        assert!(LifecycleStatus::Review.is_bookable());
+        assert!(LifecycleStatus::Published.is_bookable());
+        assert!(LifecycleStatus::Running.is_bookable());
+        assert!(!LifecycleStatus::Finished.is_bookable());
+        assert!(!LifecycleStatus::Closed.is_bookable());
+        assert!(!LifecycleStatus::Archived.is_bookable());
+    }
+
+    #[test]
+    fn test_event_type_subject_prefix() {
+        assert_eq!(EventType::Fitness.subject_prefix(), "[Fitness@SVE]");
+        assert_eq!(EventType::Events.subject_prefix(), "[Events@SVE]");
+    }
+
+    #[test]
+    fn test_event_type_from_str() {
+        use std::str::FromStr;
+        assert_eq!(EventType::from_str("Fitness").unwrap(), EventType::Fitness);
+        assert_eq!(EventType::from_str("Events").unwrap(), EventType::Events);
+        assert!(EventType::from_str("Other").is_err());
+        assert!(EventType::from_str("fitness").is_err());
+    }
+
+    #[test]
+    fn test_lifecycle_status_from_str() {
+        use std::str::FromStr;
+        assert_eq!(
+            LifecycleStatus::from_str("draft").unwrap(),
+            LifecycleStatus::Draft
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("Draft").unwrap(),
+            LifecycleStatus::Draft
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("DRAFT").unwrap(),
+            LifecycleStatus::Draft
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("review").unwrap(),
+            LifecycleStatus::Review
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("published").unwrap(),
+            LifecycleStatus::Published
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("running").unwrap(),
+            LifecycleStatus::Running
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("finished").unwrap(),
+            LifecycleStatus::Finished
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("closed").unwrap(),
+            LifecycleStatus::Closed
+        );
+        assert_eq!(
+            LifecycleStatus::from_str("archived").unwrap(),
+            LifecycleStatus::Archived
+        );
+        assert!(LifecycleStatus::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn test_news_topic_display_name_and_from_str() {
+        assert_eq!(NewsTopic::General.display_name(), "Allgemein");
+        assert_eq!(NewsTopic::Events.display_name(), "Events");
+        assert_eq!(NewsTopic::Fitness.display_name(), "Fitness");
+        assert_eq!(NewsTopic::from_str("General").unwrap(), NewsTopic::General);
+        assert_eq!(NewsTopic::from_str("Events").unwrap(), NewsTopic::Events);
+        assert_eq!(NewsTopic::from_str("Fitness").unwrap(), NewsTopic::Fitness);
+        assert!(NewsTopic::from_str("Other").is_err());
+    }
+
+    #[test]
+    fn test_to_euro_formatting() {
+        use bigdecimal::FromPrimitive;
+        use std::str::FromStr;
+        let amount = BigDecimal::from_i8(59).unwrap();
+        assert_eq!(amount.to_euro_without_symbol(), "59,00");
+        assert_eq!(amount.to_euro(), "59,00 €");
+        let amount = BigDecimal::from_str("5.99").unwrap();
+        assert_eq!(amount.to_euro_without_symbol(), "5,99");
+        let amount = BigDecimal::from_i8(0).unwrap();
+        assert_eq!(amount.to_euro_without_symbol(), "0,00");
+        let amount = BigDecimal::from_str("1234.56").unwrap();
+        assert_eq!(amount.to_euro_without_symbol(), "1234,56");
+    }
+
+    #[test]
+    fn test_from_euro_parsing() {
+        use std::str::FromStr;
+        let s = "59,00";
+        let parsed: BigDecimal = s.parse_euro_without_symbol().unwrap();
+        assert_eq!(parsed, BigDecimal::from_i8(59).unwrap());
+        let s = "1.234,56";
+        let parsed: BigDecimal = s.parse_euro_without_symbol().unwrap();
+        assert_eq!(parsed, BigDecimal::from_str("1234.56").unwrap());
+        let s = "100";
+        let parsed: BigDecimal = s.parse_euro_without_symbol().unwrap();
+        assert_eq!(parsed, BigDecimal::from_i8(100).unwrap());
     }
 }

@@ -1,3 +1,7 @@
+use async_trait::async_trait;
+#[cfg(test)]
+use mockall::automock;
+
 use crate::{
     logic::secrets,
     models::{EmailAccount, EmailType},
@@ -75,4 +79,39 @@ async fn email_accounts() -> Result<Vec<EmailAccount>> {
     let email_accounts: Vec<EmailAccount> =
         serde_json::from_str(&secrets::get("EMAIL_ACCOUNTS").await?)?;
     Ok(email_accounts)
+}
+
+#[async_trait]
+#[cfg_attr(test, automock)]
+pub trait EmailSender {
+    async fn test_connection(&self) -> Result<()>;
+    async fn send_message(&self, from: &EmailAccount, message: Message) -> Result<()>;
+    async fn send_messages(&self, from: &EmailAccount, messages: Vec<Message>) -> Result<()>;
+    async fn get_account_by_address(&self, email_address: &str) -> Result<EmailAccount>;
+    async fn get_account_by_type(&self, email_type: EmailType) -> Result<EmailAccount>;
+}
+
+pub(crate) struct RealEmailSender;
+
+#[async_trait]
+impl EmailSender for RealEmailSender {
+    async fn test_connection(&self) -> Result<()> {
+        test_connection().await
+    }
+
+    async fn send_message(&self, from: &EmailAccount, message: Message) -> Result<()> {
+        send_message(from, message).await
+    }
+
+    async fn send_messages(&self, from: &EmailAccount, messages: Vec<Message>) -> Result<()> {
+        send_messages(from, messages).await
+    }
+
+    async fn get_account_by_address(&self, email_address: &str) -> Result<EmailAccount> {
+        get_account_by_address(email_address).await
+    }
+
+    async fn get_account_by_type(&self, email_type: EmailType) -> Result<EmailAccount> {
+        get_account_by_type(email_type).await
+    }
 }
