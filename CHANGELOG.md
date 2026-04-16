@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.0] - 2026-04-16
+
+### Bug Fixes
+
+- Switch from error to info for booking failures
+- Switch from error to warn for jwt decode error
+
+### Features
+
+- Add comprehensive tests
+
 ## [2.8.6] - 2026-03-25
 
 ### Bug Fixes
