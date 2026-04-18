@@ -34,14 +34,14 @@ jobs:
           target: aarch64-unknown-linux-musl
           args: "--release --locked"
 
-      - name: Package binary
+      - name: Package # the artifact
         run: |
           cd target/aarch64-unknown-linux-musl/release
           mv sve_backend bootstrap
           zip lambda.zip bootstrap
           mv lambda.zip ../../../
 
-      - name: Upload artifact
+      - name: Upload # the artifact
         uses: actions/upload-artifact@v7
         with:
           name: lambda
@@ -71,13 +71,17 @@ jobs:
       SQLX_OFFLINE: true
       CROSS_CONTAINER_OPTS: --network=host
     steps:
-      - uses: actions/checkout@v6
-      - name: Cache
+      - name: Checkout # the code
+        uses: actions/checkout@v6
+
+      - name: Cache # the build
         uses: Swatinem/rust-cache@v2
         with:
           key: aarch64-unknown-linux-musl
           shared-key: sve-backend
-      - uses: houseabsolute/actions-rust-cross@v1
+
+      - name: Test # the code
+        uses: houseabsolute/actions-rust-cross@v1
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
@@ -87,10 +91,13 @@ jobs:
     needs: [build, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v8
+      - name: Download # the artifact
+        uses: actions/download-artifact@v8
         with:
           name: lambda
-      - uses: appleboy/lambda-action@v0.2.0
+
+      - name: Deploy # the function
+        uses: appleboy/lambda-action@v0.2.0
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
