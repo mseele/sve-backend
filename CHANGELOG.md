@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.1] - 2026-04-18
+
+### Bug Fixes
+
+- Remove obsolete SQL query file
+
 ## [2.9.0] - 2026-04-16
 
 ### Bug Fixes
