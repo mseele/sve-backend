@@ -58,8 +58,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      SQLX_OFFLINE: true
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -69,6 +67,9 @@ jobs:
           sudo apt-get update --yes
           sudo apt-get install --yes musl-tools
       - uses: houseabsolute/actions-rust-cross@v1
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+          SQLX_OFFLINE: true
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
