@@ -61,15 +61,15 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      SQLX_OFFLINE: true
+      CROSS_CONTAINER_OPTS: --network=host
     steps:
       - uses: actions/checkout@v6
-      - run: |
-          sudo apt-get update --yes
-          sudo apt-get install --yes musl-tools
       - uses: houseabsolute/actions-rust-cross@v1
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
-          SQLX_OFFLINE: true
+          SQLX_OFFLINE: "true"
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
