@@ -58,6 +58,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      SQLX_OFFLINE: true
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT payed, iban FROM event_bookings WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "payed",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "iban",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "58dd2ad001fd9576f2ccb27a65172d2fa7039606fab0ab4f0e34eed5c00c59ff"
+}
