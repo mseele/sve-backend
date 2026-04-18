@@ -78,9 +78,6 @@ jobs:
           key: aarch64-unknown-linux-musl
           shared-key: sve-backend
       - uses: houseabsolute/actions-rust-cross@v1
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
-          SQLX_OFFLINE: "true"
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
