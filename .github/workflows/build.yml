@@ -21,6 +21,12 @@ jobs:
           sudo apt-get update --yes
           sudo apt-get install --yes musl-tools
 
+      - name: Cache # the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-unknown-linux-musl
+          shared-key: sve-backend
+
       - name: Build # the binary
         uses: houseabsolute/actions-rust-cross@v1
         with:
@@ -66,6 +72,11 @@ jobs:
       CROSS_CONTAINER_OPTS: --network=host
     steps:
       - uses: actions/checkout@v6
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aarch64-unknown-linux-musl
+          shared-key: sve-backend
       - uses: houseabsolute/actions-rust-cross@v1
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
