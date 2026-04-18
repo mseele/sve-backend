@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.4] - 2026-04-18
+
+### Bug Fixes
+
+- Pass DATABASE_URL and SQLX_OFFLINE at step level for cross container
+
 ## [2.9.3] - 2026-04-18
 
 ### Bug Fixes
