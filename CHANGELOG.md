@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.6] - 2026-04-21
+
+### Features
+
+- Add rust cache for faster ci/cd
+
+### Performance
+
+- Cache hashids Harsh encoder with LazyLock
+- Use tokio::sync::RwLock for JWKS cache
+
+### Refactor
+
+- Improve clarity of build workflow steps
+- Split db.rs into focused modules (events, bookings, news)
+- Move email infrastructure from models to email module
+
 ## [2.9.5] - 2026-04-18
 
 ### Bug Fixes
