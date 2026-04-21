@@ -249,10 +249,9 @@ pub(crate) async fn cancel_booking(
     };
     let body = template::render_booking(body, &canceled_booking, &event, None, None, None)?;
     messages.push(
-        email_account
-            .new_message()?
+        crate::email::new_message_builder(&email_account)?
             .to(canceled_booking.email.parse()?)
-            .bcc(email_account.mailbox()?)
+            .bcc(crate::email::mailbox(&email_account)?)
             .subject(subject)
             .singlepart(SinglePart::plain(body))?,
     );
@@ -270,10 +269,9 @@ pub(crate) async fn cancel_booking(
         )?;
 
         messages.push(
-            email_account
-                .new_message()?
+            crate::email::new_message_builder(&email_account)?
                 .to(new_booking.email.parse()?)
-                .bcc(email_account.mailbox()?)
+                .bcc(crate::email::mailbox(&email_account)?)
                 .subject(subject)
                 .singlepart(SinglePart::plain(body))?,
         );
@@ -752,10 +750,9 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
         )
     }
 
-    let message = email_account
-        .new_message()?
+    let message = crate::email::new_message_builder(&email_account)?
         .to(booking.email.parse()?)
-        .bcc(email_account.mailbox()?)
+        .bcc(crate::email::mailbox(&email_account)?)
         .subject(subject)
         .singlepart(SinglePart::plain(body))?;
 
@@ -1063,8 +1060,7 @@ pub(crate) async fn send_participation_confirmation(
 
             let body = template::render_participation_confirmation(template, &event, &subscriber)?;
 
-            let message = email_account
-                .new_message()?
+            let message = crate::email::new_message_builder(&email_account)?
                 .to(subscriber.email.parse()?)
                 .subject(subject.clone())
                 .multipart(

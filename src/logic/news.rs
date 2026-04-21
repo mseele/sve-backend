@@ -107,12 +107,11 @@ async fn send_mail(subscription: NewsSubscription, email_sender: &impl EmailSend
     let email_account = email_sender
         .get_account_by_type(primary_news_topic.into())
         .await?;
-    let message = email_account
-        .new_message()?
+    let message = crate::email::new_message_builder(&email_account)?
         .header(header::MIME_VERSION_1_0)
         .header(ContentType::TEXT_PLAIN)
         .to(subscription.email.parse()?)
-        .bcc(email_account.mailbox()?)
+        .bcc(crate::email::mailbox(&email_account)?)
         .subject(subject)
         .singlepart(SinglePart::plain(format!(
             "Lieber Interessent/In,

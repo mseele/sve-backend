@@ -36,8 +36,7 @@ pub(crate) async fn message(
 
     let body = build_contact_body(&contact_message);
 
-    let message = email_account
-        .new_message()?
+    let message = crate::email::new_message_builder(&email_account)?
         .subject(format!(
             "[Kontakt@Web] Nachricht von {}",
             contact_message.name

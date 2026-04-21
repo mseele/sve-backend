@@ -7,12 +7,38 @@ use crate::{
     models::{EmailAccount, EmailType},
 };
 use anyhow::{Context, Result, bail};
-use lettre::{AsyncTransport, Message};
+use lettre::message::Mailbox;
+use lettre::message::MessageBuilder;
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
+use std::str::from_utf8;
+
+pub(crate) fn mailbox(account: &EmailAccount) -> Result<Mailbox> {
+    Ok(account.address.parse()?)
+}
+
+pub(crate) fn new_message_builder(account: &EmailAccount) -> Result<MessageBuilder> {
+    Ok(Message::builder().from(mailbox(account)?).date_now())
+}
+
+pub(crate) fn create_mailer(account: &EmailAccount) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
+    let transport = AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.gmail.com")?
+        .credentials(Credentials::new(
+            account.address.clone(),
+            from_utf8(&account.password)
+                .with_context(|| {
+                    format!("Invalid UTF-8 sequence in password of {}", account.address)
+                })?
+                .into(),
+        ))
+        .build();
+    Ok(transport)
+}
 
 pub(crate) async fn test_connection() -> Result<()> {
     let mut errors = Vec::new();
     for email_account in email_accounts().await? {
-        let result = email_account.mailer()?.test_connection().await;
+        let result = create_mailer(&email_account)?.test_connection().await;
         match result {
             Ok(result) => {
                 if !result {
@@ -45,7 +71,7 @@ pub(crate) async fn send_message(from: &EmailAccount, message: Message) -> Resul
 }
 
 pub(crate) async fn send_messages(from: &EmailAccount, messages: Vec<Message>) -> Result<()> {
-    let mailer = from.mailer()?;
+    let mailer = create_mailer(from)?;
     for message in messages {
         mailer.send(message).await?;
     }

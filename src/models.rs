@@ -1,17 +1,15 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use bigdecimal::{BigDecimal, ParseBigDecimalError};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use lettre::Message;
 use lettre::message::header::ContentType;
-use lettre::message::{Attachment, Mailbox, MessageBuilder, MultiPart, SinglePart};
-use lettre::transport::smtp::authentication::Credentials;
-use lettre::{AsyncSmtpTransport, Message, Tokio1Executor};
+use lettre::message::{Attachment, MultiPart, SinglePart};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Debug, Display};
 use std::ops::Deref;
 use std::str::FromStr;
-use std::str::from_utf8;
 
 use crate::{email, hashids};
 
@@ -686,7 +684,7 @@ pub(crate) struct EmailAccount {
     pub(crate) email_type: EmailType,
     pub(crate) address: String,
     #[serde(with = "Base64Standard")]
-    password: Vec<u8>,
+    pub(crate) password: Vec<u8>,
 }
 
 impl EmailAccount {
@@ -697,28 +695,6 @@ impl EmailAccount {
             address: address.to_string(),
             password: Vec::new(),
         }
-    }
-
-    pub(crate) fn mailbox(&self) -> Result<Mailbox> {
-        Ok(self.address.parse()?)
-    }
-
-    pub(crate) fn new_message(&self) -> Result<MessageBuilder> {
-        Ok(Message::builder().from(self.mailbox()?).date_now())
-    }
-
-    pub(crate) fn mailer(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>> {
-        let transport = AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.gmail.com")?
-            .credentials(Credentials::new(
-                self.address.clone(),
-                from_utf8(&self.password)
-                    .with_context(|| {
-                        format!("Invalid UTF-8 sequence in password of {}", self.address)
-                    })?
-                    .into(),
-            ))
-            .build();
-        Ok(transport)
     }
 }
 
@@ -772,8 +748,7 @@ impl Email {
     }
 
     pub(crate) fn into_message(self, email_account: &EmailAccount) -> Result<Message> {
-        let message_builder = email_account
-            .new_message()?
+        let message_builder = crate::email::new_message_builder(email_account)?
             .to(self.to.parse()?)
             .subject(self.subject);
         let message = match self.attachments {

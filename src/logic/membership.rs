@@ -61,8 +61,7 @@ fn create_welcome_email(
     let template = include_str!("../../templates/membership_application.txt");
     let body = template::render_membership_application(template, membership_application)?;
 
-    let message = email_account
-        .new_message()?
+    let message = crate::email::new_message_builder(email_account)?
         .to(membership_application.email.parse()?)
         .subject("Willkomen beim SV Eutingen 1947 e.V.")
         .singlepart(SinglePart::plain(body))?;
@@ -235,8 +234,7 @@ fn create_internal_email(
 
     let attachment: String = csv::write_membership_application(membership_application)?;
 
-    let message = email_account
-        .new_message()?
+    let message = crate::email::new_message_builder(email_account)?
         .to("mitglieder@sv-eutingen.de".parse()?)
         .subject("Neuer Mitgliedsantrag")
         .multipart(
