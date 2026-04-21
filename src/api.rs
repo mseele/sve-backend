@@ -19,7 +19,6 @@ use axum::{Json, Router};
 use chrono::NaiveDate;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use lambda_http::request::RequestContext;
-use reqwest::Client;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -29,7 +28,8 @@ use std::fmt::Debug;
 use std::fmt::{self, Display};
 use std::net::IpAddr;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{debug, error};
 use urlencoding::encode;
 
@@ -122,14 +122,16 @@ where
     }
 }
 
-pub(crate) async fn router(pg_pool: PgPool) -> Result<Router> {
+pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Result<Router> {
     let mut jwks_cache = JwksCache::new();
-    jwks_cache.keys = fetch_jwks("https://www.googleapis.com/oauth2/v3/certs").await?;
+    jwks_cache.keys =
+        fetch_jwks(&http_client, "https://www.googleapis.com/oauth2/v3/certs").await?;
     let jwks = Arc::new(RwLock::new(jwks_cache));
 
     let state = AppState {
         pg_pool,
         jwks,
+        http_client: http_client.clone(),
         allowed_emails: vec![
             "fitness@sv-eutingen.de".to_string(),
             "events@sv-eutingen.de".to_string(),
@@ -247,6 +249,7 @@ struct Claims {
 struct AppState {
     pg_pool: PgPool,
     jwks: Arc<RwLock<JwksCache>>,
+    http_client: reqwest::Client,
     allowed_emails: Vec<String>,
     allowed_domain: String,
     task_api_key: String,
@@ -304,14 +307,19 @@ async fn auth_middleware_fn(
 
     let decoding_key = {
         let needs_refresh = {
-            let jwks_cache = state.jwks.read().unwrap();
+            let jwks_cache = state.jwks.read().await;
             jwks_cache.is_expired() || !jwks_cache.keys.contains_key(&kid)
         };
         if needs_refresh {
             tracing::info!("Refreshing JWKS cache (expired or missing kid: {})", kid);
-            match fetch_jwks("https://www.googleapis.com/oauth2/v3/certs").await {
+            match fetch_jwks(
+                &state.http_client,
+                "https://www.googleapis.com/oauth2/v3/certs",
+            )
+            .await
+            {
                 Ok(new_keys) => {
-                    let mut jwks_cache = state.jwks.write().unwrap();
+                    let mut jwks_cache = state.jwks.write().await;
                     jwks_cache.keys = new_keys;
                     jwks_cache.last_updated = std::time::Instant::now();
                 }
@@ -322,7 +330,7 @@ async fn auth_middleware_fn(
                 }
             }
         }
-        let jwks_cache = state.jwks.read().unwrap();
+        let jwks_cache = state.jwks.read().await;
         match jwks_cache.keys.get(&kid).cloned() {
             Some(k) => k,
             None => return (StatusCode::UNAUTHORIZED, "Unknown JWT key").into_response(),
@@ -366,8 +374,10 @@ async fn api_key_middleware_fn(
     }
 }
 
-async fn fetch_jwks(jwks_url: &str) -> Result<HashMap<String, Arc<DecodingKey>>> {
-    let client = Client::new();
+async fn fetch_jwks(
+    client: &reqwest::Client,
+    jwks_url: &str,
+) -> Result<HashMap<String, Arc<DecodingKey>>> {
     let res = client
         .get(jwks_url)
         .send()

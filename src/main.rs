@@ -61,8 +61,9 @@ async fn main() -> Result<(), Error> {
         .expect("Failed to install rustls crypto provider");
 
     let pool = db::init_pool().await?;
+    let http_client = reqwest::Client::new();
 
-    let app = api::router(pool).await?.layer(
+    let app = api::router(pool, http_client).await?.layer(
         ServiceBuilder::new().layer(
             TraceLayer::new_for_http()
                 .on_request(DefaultOnRequest::new().level(Level::INFO))
