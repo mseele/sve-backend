@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n    v.id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member,\n    v.payment_id\nFROM\n    v_event_bookings v\nWHERE\n    v.event_id = $1\n    AND v.canceled IS NULL\n    AND v.enrolled IS FALSE\nORDER BY\nv.created",
+  "query": "\nSELECT\n    v.id,\n    v.first_name,\n    v.last_name,\n    v.street,\n    v.city,\n    v.email,\n    v.phone,\n    v.member,\n    v.payment_id\nFROM\n    v_event_bookings v\nWHERE\n    v.event_id = $1\n    AND v.canceled IS NULL\n    AND v.enrolled IS FALSE\nORDER BY\n    v.created",
   "describe": {
     "columns": [
       {
@@ -66,5 +66,5 @@
       true
     ]
   },
-  "hash": "774531f3f7b213473469b13e414d2e3ad1e547ef2a13da58821872a8c8d3e908"
+  "hash": "27e5d91ad2712c5b342fd0e13b7f95b2f1182de6c4137bf149cbf4f023197ae7"
 }
