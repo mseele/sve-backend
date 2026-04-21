@@ -10,23 +10,25 @@ mod models;
 #[cfg(test)]
 mod test_utils;
 mod hashids {
+    use std::sync::LazyLock;
+
     use harsh::{Error, Harsh};
 
-    fn harsh() -> Harsh {
+    static HARSH: LazyLock<Harsh> = LazyLock::new(|| {
         Harsh::builder()
             .salt("#mehralseinverein")
             .length(10)
             .alphabet("abcdefghijklmnopqrstuvwxyz")
             .build()
             .unwrap()
-    }
+    });
 
     pub(crate) fn encode(values: &[u64]) -> String {
-        harsh().encode(values)
+        HARSH.encode(values)
     }
 
     pub(crate) fn decode<T: AsRef<str>>(input: T) -> Result<Vec<u64>, Error> {
-        harsh().decode(input)
+        HARSH.decode(input)
     }
 }
 
