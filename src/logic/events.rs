@@ -1,11 +1,11 @@
 use super::csv::PaymentRecord;
-use super::{export, template};
+use super::{banking, export, secrets, template};
 use crate::db::BookingResult;
 use crate::email;
 use crate::models::{
     BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventEmail,
-    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, ToEuro,
-    UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
+    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent,
+    PaymentMethod, ToEuro, UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
 use anyhow::{Context, Result, anyhow, bail};
@@ -14,6 +14,7 @@ use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{DecoderTrap, all::ISO_8859_1};
+
 use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, MultiPart, SinglePart};
@@ -72,12 +73,22 @@ pub(crate) async fn booking(
     }
 }
 
+pub(crate) async fn prebook_with_iban(
+    pool: &PgPool,
+    hash: &str,
+    iban: String,
+    email_sender: &impl email::EmailSender,
+) -> Result<BookingResponse> {
+    let normalized = banking::validate_iban(&iban)?;
+    pre_book_event(pool, hash.to_string(), Some(normalized), email_sender).await
+}
+
 pub(crate) async fn prebooking(
     pool: &PgPool,
     hash: String,
     email_sender: &impl email::EmailSender,
 ) -> BookingResponse {
-    match pre_book_event(pool, hash, email_sender).await {
+    match pre_book_event(pool, hash, None, email_sender).await {
         Ok(response) => response,
         Err(e) => {
             error!("Prebooking failed: {:?}", e);
@@ -155,7 +166,7 @@ pub(crate) async fn verify_payments(
     let (verified_payments, result) =
         compare_payment_records_with_bookings(&payment_records, &mut bookings)?;
     if !verified_payments.is_empty() {
-        db::mark_as_payed(pool, &verified_payments).await?;
+        db::mark_as_paid(pool, &verified_payments).await?;
     }
 
     Ok(result)
@@ -187,7 +198,7 @@ pub(crate) async fn get_unpaid_bookings(
     Ok(bookings)
 }
 
-/// calculate the days until the booking should be payed
+/// calculate the days until the booking should be paid
 fn calc_due_in_days(
     booking_date: DateTime<Utc>,
     first_event_date: DateTime<Utc>,
@@ -228,6 +239,77 @@ pub(crate) async fn update_payment(
     update_payment: bool,
 ) -> Result<()> {
     db::update_payment(pool, booking_id, update_payment).await
+}
+
+pub(crate) async fn export_sepa_xml(pool: &PgPool, event_id: EventId) -> Result<(String, String)> {
+    use crate::models::SepaExportError;
+
+    let event = db::get_event(pool, &event_id, false)
+        .await?
+        .ok_or_else(|| anyhow!("Event not found"))?;
+
+    if event.payment_method != PaymentMethod::SepaDirectDebit {
+        return Err(anyhow::Error::from(SepaExportError::NotASepaEvent));
+    }
+
+    let creditor_name = secrets::get("SEPA_CREDITOR_NAME").await?;
+    let creditor_iban = secrets::get("SEPA_CREDITOR_IBAN").await?;
+
+    if creditor_name.is_empty() || creditor_iban.is_empty() {
+        return Err(anyhow::Error::from(SepaExportError::ConfigIncomplete));
+    }
+    let creditor_bic = banking::lookup_bic(&creditor_iban)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to lookup creditor BIC: {}", e))?;
+
+    let mut tx = pool.begin().await?;
+
+    db::lock_sepa_eligible_bookings(&mut tx, event_id).await?;
+
+    let bookings = db::get_sepa_eligible_bookings(&mut tx, event_id).await?;
+
+    if bookings.is_empty() {
+        return Err(anyhow::Error::from(SepaExportError::NoBookingsAvailable));
+    }
+
+    let mut booking_data = Vec::new();
+    let mut failed_ibans = Vec::new();
+    for sub in &bookings {
+        match sub.iban.as_ref() {
+            Some(iban) => match banking::lookup_bic(iban).await {
+                Ok(bic) => booking_data.push((sub.clone(), bic)),
+                Err(_) => failed_ibans.push(iban.clone()),
+            },
+            None => failed_ibans.push("(missing)".to_string()),
+        }
+    }
+
+    if !failed_ibans.is_empty() {
+        return Err(anyhow::Error::from(SepaExportError::BicLookupFailed(
+            format!("BIC lookup failed for IBAN(s): {}", failed_ibans.join(", ")),
+        )));
+    }
+
+    let xml = banking::generate_sepa_xml(
+        &event,
+        &booking_data,
+        &creditor_name,
+        &creditor_iban,
+        &creditor_bic,
+    )?;
+
+    let booking_ids: Vec<i32> = bookings.iter().map(|b| b.id).collect();
+    db::mark_sepa_exported(&mut tx, &booking_ids).await?;
+
+    tx.commit().await?;
+
+    let filename = format!(
+        "sepa-{}-{}.xml",
+        event.name.replace(' ', "_").to_lowercase(),
+        Utc::now().format("%Y-%m-%d"),
+    );
+
+    Ok((filename, xml))
 }
 
 pub(crate) async fn cancel_booking(
@@ -488,9 +570,8 @@ pub(crate) async fn send_payment_reminders(
     Ok(booking_ids.len())
 }
 
-/// Check that an event has finished and all attendees have paid. If so,
-/// move the event to status 'Finished', send the attendee confirmation email,
-/// and move the event to status 'Closed'.
+/// Check that an event has finished. If so, move the event to status 'Finished',
+/// send the attendee confirmation email, and move the event to status 'Closed'.
 pub(crate) async fn close_finished_running_events(
     pool: &PgPool,
     email_sender: &impl email::EmailSender,
@@ -543,9 +624,24 @@ fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
 
 async fn book_event(
     pool: &PgPool,
-    booking: EventBooking,
+    mut booking: EventBooking,
     email_sender: &impl email::EmailSender,
 ) -> Result<BookingResponse> {
+    let event = db::get_event(pool, &booking.event_id, false)
+        .await?
+        .ok_or_else(|| anyhow!("Event not found"))?;
+
+    if event.payment_method == PaymentMethod::SepaDirectDebit {
+        let raw_iban = booking
+            .iban
+            .as_ref()
+            .ok_or_else(|| anyhow!("Bitte gib eine gültige IBAN ein."))?;
+        let normalized = banking::validate_iban(raw_iban)?;
+        booking.iban = Some(normalized);
+    } else {
+        booking.iban = None;
+    }
+
     let booking_result = db::book_event(pool, &booking).await?;
     let booking_response = match booking_result {
         BookingResult::Booked(event, counter, payment_id) => {
@@ -603,12 +699,12 @@ async fn book_event(
 async fn pre_book_event(
     pool: &PgPool,
     hash: String,
+    provided_iban: Option<String>,
     email_sender: &impl email::EmailSender,
 ) -> Result<BookingResponse> {
     let ids = hashids::decode(&hash)
         .with_context(|| format!("Error decoding the prebooking hash {} into ids", &hash))?;
 
-    // fail if the length is not correct
     if ids.len() != 2 {
         bail!(
             "Booking failed because decoded prebooking hash ({}) has an invalid length: {}",
@@ -618,9 +714,29 @@ async fn pre_book_event(
     }
 
     let event_id = EventId::from(i32::try_from(ids[0])?);
-    let subscriber_id = ids[1].try_into()?;
+    let subscriber_id: i32 = ids[1].try_into()?;
 
-    let (booking_result, booking) = db::pre_book_event(pool, event_id, subscriber_id).await?;
+    let event = db::get_event(pool, &event_id, false)
+        .await?
+        .ok_or_else(|| anyhow!("Event not found"))?;
+
+    if !event.lifecycle_status.is_bookable() {
+        return Ok(BookingResponse::failure(
+            "Diese Veranstaltung ist aktuell nicht buchbar.",
+        ));
+    }
+
+    let mut iban = provided_iban;
+    if event.payment_method == PaymentMethod::SepaDirectDebit && iban.is_none() {
+        let prior_iban = db::find_prior_sepa_iban(pool, subscriber_id).await?;
+        if let Some(prior) = prior_iban {
+            iban = Some(prior);
+        } else {
+            return Ok(BookingResponse::requires_iban("Bitte gib deine IBAN ein."));
+        }
+    }
+
+    let (booking_result, booking) = db::pre_book_event(pool, event_id, subscriber_id, iban).await?;
     let booking_response = match booking_result {
         BookingResult::Booked(event, counter, payment_id) => {
             process_booking(
@@ -854,7 +970,7 @@ fn compare_payment_records_with_bookings(
         let mut error_ids = HashSet::new();
         let mut error_total = false;
         for (payment_id, booking) in &matched_bookings {
-            if booking.payed.is_some() {
+            if booking.payment_confirmed_at.is_some() {
                 payment_bookings_with_errors
                     .entry(payment_id.to_owned())
                     .or_insert_with(Vec::new)
@@ -1592,13 +1708,37 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 #[cfg(test)]
 mod events_integration_tests {
     use super::*;
-    use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent};
+    use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent, PaymentMethod};
     use crate::test_utils::{mock_email_sender, noop_mock};
     use anyhow::Result;
     use bigdecimal::BigDecimal;
     use chrono::{Duration, Utc};
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
+
+    fn mock_email_sender_times(
+        accounts: Vec<(crate::models::EmailType, &str)>,
+        times: usize,
+    ) -> crate::email::MockEmailSender {
+        use crate::email::MockEmailSender;
+        use crate::models::EmailAccount;
+        let mut mock = MockEmailSender::new();
+        for (email_type, address) in accounts {
+            let account = EmailAccount::new_for_test(email_type.clone(), address);
+            mock.expect_get_account_by_type()
+                .withf(move |t| t == &email_type)
+                .times(times)
+                .returning(move |_| {
+                    let account = account.clone();
+                    Box::pin(async move { Ok(account) })
+                });
+        }
+        mock.expect_send_message()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        mock.expect_send_messages()
+            .returning(|_, _| Box::pin(async { Ok(()) }));
+        mock
+    }
 
     async fn create_test_event(pool: &PgPool, status: LifecycleStatus) -> Result<Event> {
         let now = Utc::now();
@@ -1644,6 +1784,7 @@ mod events_integration_tests {
             comments: None,
             custom_values: vec![],
             token: None,
+            iban: None,
         }
     }
 
@@ -1848,6 +1989,7 @@ mod events_integration_tests {
             comments: None,
             custom_values: vec![],
             token: None,
+            iban: None,
         };
 
         let mock_sender = mock_email_sender(vec![(
@@ -1877,6 +2019,7 @@ mod events_integration_tests {
             comments: None,
             custom_values: vec![],
             token: None,
+            iban: None,
         };
 
         let mock_sender = mock_email_sender(vec![(
@@ -1902,6 +2045,298 @@ mod events_integration_tests {
         }
         assert!(result.is_ok());
         assert_eq!(result?, 0);
+
+        Ok(())
+    }
+
+    // ---- SEPA-related integration tests ----
+
+    async fn create_test_event_with_payment_method(
+        pool: &PgPool,
+        status: LifecycleStatus,
+        payment_method: PaymentMethod,
+    ) -> Result<Event> {
+        let now = Utc::now();
+        let event = db::write_event(
+            pool,
+            PartialEvent {
+                event_type: Some(EventType::Fitness),
+                lifecycle_status: Some(status),
+                name: Some("SEPA Test Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short desc".to_string()),
+                description: Some("Full desc".to_string()),
+                image: Some("test.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![now + Duration::try_days(30).unwrap()]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Test Location".to_string()),
+                booking_template: Some("Booking template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                payment_method: Some(payment_method),
+                ..Default::default()
+            },
+        )
+        .await?;
+        Ok(event.0)
+    }
+
+    #[sqlx::test]
+    async fn test_booking_sepa_event_with_valid_iban(pool: PgPool) -> Result<()> {
+        let event = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+        let mock_sender = mock_email_sender(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
+
+        let mut booking_data = make_booking(event.id);
+        booking_data.iban = Some("DE89 3704 0044 0532 0130 00".to_string());
+
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(response.success, "Booking should succeed with valid IBAN");
+
+        let bookings = db::get_bookings(&pool, &event.id, None).await?;
+        assert_eq!(bookings.len(), 1);
+        assert_eq!(
+            bookings[0].0.iban.as_deref(),
+            Some("DE89370400440532013000"),
+            "IBAN should be normalized"
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_booking_sepa_event_without_iban(pool: PgPool) -> Result<()> {
+        let event = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+        let mock_sender = noop_mock();
+
+        let booking_data = make_booking(event.id);
+        // iban is None by default
+
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(!response.success, "Booking should fail without IBAN");
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_booking_bank_transfer_event_clears_iban(pool: PgPool) -> Result<()> {
+        let event = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::BankTransfer,
+        )
+        .await?;
+        let mock_sender = mock_email_sender(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
+
+        let mut booking_data = make_booking(event.id);
+        booking_data.iban = Some("DE89370400440532013000".to_string());
+
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(response.success, "Booking should succeed for BankTransfer");
+
+        let bookings = db::get_bookings(&pool, &event.id, None).await?;
+        assert_eq!(bookings.len(), 1);
+        assert_eq!(
+            bookings[0].0.iban, None,
+            "IBAN should be cleared for BankTransfer events"
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_prebooking_sepa_without_iban_no_prior(pool: PgPool) -> Result<()> {
+        let event = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+        let mock_sender = noop_mock();
+
+        // Insert a subscriber directly (no prior SEPA booking with IBAN)
+        let subscriber_row = sqlx::query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id"#,
+            "Max",
+            "Mustermann",
+            "Teststr 1",
+            "Teststadt",
+            "max@test.com",
+            None::<String>,
+            true
+        )
+        .fetch_one(&pool)
+        .await?;
+        let subscriber_id = subscriber_row.id;
+
+        let hash =
+            crate::hashids::encode(&[event.id.into_inner().try_into()?, subscriber_id.try_into()?]);
+        let response = prebooking(&pool, hash, &mock_sender).await;
+        assert!(
+            !response.success,
+            "Prebooking should fail without IBAN and no prior booking"
+        );
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(
+            json.contains("\"requires_iban\":true"),
+            "Response should indicate IBAN is required, got: {}",
+            json
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_prebooking_sepa_without_iban_with_prior(pool: PgPool) -> Result<()> {
+        let event1 = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+        let mock_sender = mock_email_sender_times(
+            vec![(crate::models::EmailType::Fitness, "test@example.com")],
+            2,
+        );
+
+        // First booking with IBAN to establish subscriber
+        let mut booking_data = make_booking(event1.id);
+        booking_data.iban = Some("DE89370400440532013000".to_string());
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(response.success, "First booking should succeed");
+
+        let bookings1 = db::get_bookings(&pool, &event1.id, None).await?;
+        let subscriber_id = bookings1[0].1;
+
+        // Second SEPA event
+        let event2 = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+
+        let hash = crate::hashids::encode(&[
+            event2.id.into_inner().try_into()?,
+            subscriber_id.try_into()?,
+        ]);
+        let response = prebooking(&pool, hash, &mock_sender).await;
+        assert!(
+            response.success,
+            "Prebooking should succeed using prior IBAN"
+        );
+
+        let bookings2 = db::get_bookings(&pool, &event2.id, None).await?;
+        assert_eq!(bookings2.len(), 1);
+        assert_eq!(
+            bookings2[0].0.iban.as_deref(),
+            Some("DE89370400440532013000"),
+            "Prior IBAN should be reused"
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_prebook_with_iban_valid(pool: PgPool) -> Result<()> {
+        let event1 = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+        let mock_sender = mock_email_sender_times(
+            vec![(crate::models::EmailType::Fitness, "test@example.com")],
+            2,
+        );
+
+        // First booking to establish subscriber
+        let mut booking_data = make_booking(event1.id);
+        booking_data.iban = Some("DE89370400440532013000".to_string());
+        let response = super::booking(&pool, booking_data, &mock_sender).await;
+        assert!(response.success);
+
+        let bookings1 = db::get_bookings(&pool, &event1.id, None).await?;
+        let subscriber_id = bookings1[0].1;
+
+        // Second SEPA event
+        let event2 = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+
+        let hash = crate::hashids::encode(&[
+            event2.id.into_inner().try_into()?,
+            subscriber_id.try_into()?,
+        ]);
+        let response = prebook_with_iban(
+            &pool,
+            &hash,
+            "DE89 3704 0044 0532 0130 00".to_string(),
+            &mock_sender,
+        )
+        .await?;
+        assert!(
+            response.success,
+            "Prebooking with valid IBAN should succeed"
+        );
+
+        let bookings2 = db::get_bookings(&pool, &event2.id, None).await?;
+        assert_eq!(bookings2.len(), 1);
+        assert_eq!(
+            bookings2[0].0.iban.as_deref(),
+            Some("DE89370400440532013000"),
+            "Provided IBAN should be normalized and stored"
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_export_sepa_xml_non_sepa_event(pool: PgPool) -> Result<()> {
+        let event = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::BankTransfer,
+        )
+        .await?;
+
+        let result = export_sepa_xml(&pool, event.id).await;
+        assert!(result.is_err(), "Should fail for non-SEPA events");
+        let err = result.unwrap_err();
+        let sepa_err = err.downcast_ref::<crate::models::SepaExportError>();
+        assert!(
+            matches!(
+                sepa_err,
+                Some(crate::models::SepaExportError::NotASepaEvent)
+            ),
+            "Expected NotASepaEvent, got: {:?}",
+            sepa_err
+        );
 
         Ok(())
     }

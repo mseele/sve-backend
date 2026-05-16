@@ -1,6 +1,6 @@
 use crate::{
     db,
-    models::{Event, EventId, EventSubscription, ToEuro},
+    models::{Event, EventId, EventSubscription, PaymentMethod, ToEuro},
 };
 use anyhow::{Result, anyhow};
 use chrono::Locale;
@@ -88,6 +88,11 @@ fn create_sheet(
         custom_fields.push(custom_field.name.clone());
     }
 
+    let payment_column = match event.payment_method {
+        PaymentMethod::BankTransfer => "Zahlung bestätigt",
+        PaymentMethod::SepaDirectDebit => "SEPA exportiert",
+    };
+
     sheet.add_column(Column { width: 100.0 });
 
     workbook.write_sheet(&mut sheet, |sheet_writer| {
@@ -103,7 +108,7 @@ fn create_sheet(
         row.add_cell("Mitglied");
         row.add_cell("Betrag");
         row.add_cell("Buchungsnr");
-        row.add_cell("Bezahlt");
+        row.add_cell(payment_column);
         for custom_field in custom_fields.iter() {
             row.add_cell(custom_field.to_owned());
         }
@@ -124,7 +129,14 @@ fn create_sheet(
             row.add_cell(bool(value.member));
             row.add_cell(event.price(value.member).to_euro());
             row.add_cell(value.payment_id);
-            row.add_cell(bool(value.payed));
+            match event.payment_method {
+                PaymentMethod::BankTransfer => {
+                    row.add_cell(bool(value.payment_confirmed_at.is_some()));
+                }
+                PaymentMethod::SepaDirectDebit => {
+                    row.add_cell(bool(value.sepa_exported_at.is_some()));
+                }
+            }
             for (index, _) in custom_fields.iter().enumerate() {
                 row.add_cell(opt(value.custom_values.get(index).cloned()));
             }
