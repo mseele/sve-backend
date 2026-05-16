@@ -1,3 +1,4 @@
+pub(crate) mod banking;
 pub(crate) mod calendar;
 pub(crate) mod contact;
 pub(crate) mod csv;

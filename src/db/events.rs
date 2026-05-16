@@ -1,6 +1,6 @@
 use crate::models::{
     Event, EventCounter, EventCustomField, EventCustomFieldType, EventId, EventSubscription,
-    EventType, LifecycleStatus, PartialEvent,
+    EventType, LifecycleStatus, PartialEvent, PaymentMethod,
 };
 use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Utc};
@@ -46,6 +46,7 @@ SELECT
     e.alt_booking_button_text,
     e.alt_email_address,
     e.external_operator,
+    e.payment_method AS payment_method,
     vev.subscribers,
     vev.waiting_list
 FROM
@@ -177,7 +178,8 @@ SELECT
     e.payment_account,
     e.alt_booking_button_text,
     e.alt_email_address,
-    e.external_operator
+    e.external_operator,
+    e.payment_method AS payment_method
 FROM
     events e
 WHERE
@@ -316,7 +318,9 @@ SELECT
     v.enrolled,
     v.member,
     v.payment_id,
-    v.payed IS NOT NULL AS payed,
+    v.payment_confirmed_at,
+    v.sepa_exported_at,
+    v.iban,
     v.comment,
     v.custom_value_1,
     v.custom_value_2,
@@ -358,7 +362,9 @@ ORDER BY
                 row.try_get("enrolled")?,
                 row.try_get("member")?,
                 row.try_get("payment_id")?,
-                row.try_get("payed")?,
+                row.try_get("payment_confirmed_at")?,
+                row.try_get("sepa_exported_at")?,
+                row.try_get("iban")?,
                 row.try_get("comment")?,
                 vec![
                     row.try_get::<Option<String>, _>("custom_value_1")?,
@@ -399,6 +405,30 @@ async fn update_event(
     partial_event: PartialEvent,
 ) -> Result<(Event, Option<Vec<DateTime<Utc>>>)> {
     let mut tx = pool.begin().await?;
+
+    if let Some(new_method) = &partial_event.payment_method {
+        let row = query!(
+            r#"
+            SELECT
+                payment_method AS "payment_method: PaymentMethod",
+                EXISTS(SELECT 1 FROM event_bookings WHERE event_id = $1) AS has_bookings
+            FROM events
+            WHERE id = $1
+            "#,
+            id.get_ref()
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        match row {
+            Some(row) => {
+                if row.has_bookings.unwrap_or(false) && new_method != &row.payment_method {
+                    bail!("Cannot change payment_method after bookings exist");
+                }
+            }
+            None => bail!("Error fetching event with id '{}'", id),
+        }
+    }
 
     let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new("UPDATE events SET ");
     let mut update_is_needed = false;
@@ -468,6 +498,11 @@ async fn update_event(
         &mut separated,
         "EXTERNAL_OPERATOR",
         partial_event.external_operator,
+    );
+    update_is_needed |= push_bind(
+        &mut separated,
+        "PAYMENT_METHOD",
+        partial_event.payment_method,
     );
     update_is_needed |= push_bind(
         &mut separated,
@@ -634,6 +669,9 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
     let external_operator = partial_event
         .external_operator
         .ok_or_else(|| anyhow!("Attribute 'external_operator' is missing"))?;
+    let payment_method = partial_event
+        .payment_method
+        .unwrap_or(PaymentMethod::BankTransfer);
     let (custom_field_1, custom_field_2, custom_field_3, custom_field_4) =
         match partial_event.custom_fields {
             Some(custom_fields) => (
@@ -649,9 +687,9 @@ async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Ev
 
     let mut new_event: Event = query!(
         r#"
-INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator, custom_field_1, custom_field_2, custom_field_3, custom_field_4)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator"#,
+INSERT INTO events (closed, event_type, lifecycle_status, name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator, custom_field_1, custom_field_2, custom_field_3, custom_field_4, payment_method)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_status AS "lifecycle_status: LifecycleStatus", name, sort_index, short_description, description, image, light, custom_date, duration_in_minutes, max_subscribers, max_waiting_list, price_member, price_non_member, cost_per_date, location, booking_template, payment_account, alt_booking_button_text, alt_email_address, external_operator, payment_method AS "payment_method: PaymentMethod""#,
         closed,
         event_type as EventType,
         lifecycle_status as LifecycleStatus,
@@ -678,6 +716,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
         custom_field_2,
         custom_field_3,
         custom_field_4,
+        payment_method as PaymentMethod,
     )
     .map(|row| {
         Event::new(
@@ -707,6 +746,7 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
             row.alt_email_address,
             row.external_operator,
             Vec::new(),
+            row.payment_method,
         )
     })
     .fetch_one(&mut *tx)
@@ -938,8 +978,7 @@ WHERE
 }
 
 /// Return the id's of all events in status 'Running'
-/// where all event dates are in the past and every booking
-/// is payed.
+/// where all event dates are in the past.
 pub(crate) async fn get_all_finished_event_ids(pool: &PgPool) -> Result<Vec<EventId>> {
     let mut conn = pool.acquire().await?;
 
@@ -957,17 +996,7 @@ WHERE
     FROM
         event_dates ed
     WHERE
-        ed.event_id = e.id) < NOW()
-    AND NOT EXISTS (
-    SELECT
-        1
-    FROM
-        event_bookings eb
-    WHERE
-        eb.event_id = e.id
-        AND eb.enrolled IS TRUE
-        AND eb.canceled IS NULL
-        AND eb.payed IS NULL)"#
+        ed.event_id = e.id) < NOW()"#
     )
     .map(|row| row.id.into())
     .fetch_all(&mut *conn)
@@ -1004,15 +1033,16 @@ fn map_event(row: &PgRow) -> Result<Event> {
         row.try_get("alt_email_address")?,
         row.try_get("external_operator")?,
         Vec::new(),
+        row.try_get("payment_method")?,
     ))
 }
 
 #[cfg(test)]
 mod db_integration_tests {
     use super::*;
-    use crate::models::{EventType, LifecycleStatus, PartialEvent};
+    use crate::models::{EventType, LifecycleStatus, PartialEvent, PaymentMethod};
     use anyhow::Result;
-    use chrono::Utc;
+    use chrono::{DateTime, Utc};
 
     #[sqlx::test]
     async fn test_write_and_get_event(pool: PgPool) -> Result<()> {
@@ -1059,6 +1089,122 @@ mod db_integration_tests {
         let (updated, _) = write_event(&pool, partial).await?;
         assert_eq!(updated.name, "Updated Event");
         assert_eq!(updated.lifecycle_status, LifecycleStatus::Published);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_create_event_with_sepa_payment_method(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Draft),
+            name: Some("SEPA Event".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short desc".to_string()),
+            description: Some("Full description".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(120),
+            max_subscribers: Some(50),
+            max_waiting_list: Some(10),
+            price_member: Some("25.00".parse().unwrap()),
+            price_non_member: Some("30.00".parse().unwrap()),
+            location: Some("Gym".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event, _) = write_event(&pool, partial).await?;
+        assert_eq!(event.name, "SEPA Event");
+        assert_eq!(event.payment_method, PaymentMethod::SepaDirectDebit);
+
+        let fetched: Option<Event> = get_event(&pool, &event.id, false).await?;
+        assert!(fetched.is_some());
+        let fetched = fetched.unwrap();
+        assert_eq!(fetched.payment_method, PaymentMethod::SepaDirectDebit);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_payment_method_immutability(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Immutable Payment Method".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short desc".to_string()),
+            description: Some("Full description".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(120),
+            max_subscribers: Some(50),
+            max_waiting_list: Some(10),
+            price_member: Some("25.00".parse().unwrap()),
+            price_non_member: Some("30.00".parse().unwrap()),
+            location: Some("Gym".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::BankTransfer),
+            ..Default::default()
+        };
+
+        let (event, _) = write_event(&pool, partial).await?;
+        let event_id = event.id;
+        assert_eq!(event.payment_method, PaymentMethod::BankTransfer);
+
+        // Insert a subscriber and booking to block payment_method changes
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Eve",
+            "Green",
+            "Main St",
+            "Vienna",
+            "eve@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'eve@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_001",
+            None::<DateTime<Utc>>,
+        )
+        .execute(&pool)
+        .await?;
+
+        // Attempt to change payment_method should fail
+        let update_partial = PartialEvent {
+            id: Some(event_id),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let result = write_event(&pool, update_partial).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Cannot change payment_method after bookings exist"));
 
         Ok(())
     }

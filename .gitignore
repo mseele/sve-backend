@@ -1,5 +1,6 @@
-/target
-/secrets
-/pgsync
-.vscode/launch.json
 .env
+.vscode/launch.json
+.worktrees/
+/pgsync
+/secrets
+/target

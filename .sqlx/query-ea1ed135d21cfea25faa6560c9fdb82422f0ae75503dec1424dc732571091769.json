@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n    e.id\nFROM\n    events e\nWHERE\n    e.lifecycle_status = 'Running'\n    AND e.custom_date IS NULL\n    AND (\n    SELECT\n        MAX(ed.date)\n    FROM\n        event_dates ed\n    WHERE\n        ed.event_id = e.id) < NOW()",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ea1ed135d21cfea25faa6560c9fdb82422f0ae75503dec1424dc732571091769"
+}

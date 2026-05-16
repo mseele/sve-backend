@@ -35,6 +35,10 @@ struct Secrets {
     pub google_creds: String,
     #[serde(rename = "EMAIL_ACCOUNTS")]
     pub email_accounts: String,
+    #[serde(default, rename = "SEPA_CREDITOR_NAME")]
+    pub sepa_creditor_name: String,
+    #[serde(default, rename = "SEPA_CREDITOR_IBAN")]
+    pub sepa_creditor_iban: String,
 }
 
 /// Loads a secret from an environment variable if present, otherwise from AWS Secrets Manager.
@@ -51,6 +55,8 @@ pub async fn get(key: &str) -> Result<String> {
         "CAPTCHA_SECRET" => Ok(secrets.captcha_secret),
         "GOOGLE_CREDS" => Ok(secrets.google_creds),
         "EMAIL_ACCOUNTS" => Ok(secrets.email_accounts),
+        "SEPA_CREDITOR_NAME" => Ok(secrets.sepa_creditor_name),
+        "SEPA_CREDITOR_IBAN" => Ok(secrets.sepa_creditor_iban),
         _ => Err(anyhow!("Unknown secret key: {}", key)),
     }
 }

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT eb.id\n        FROM event_bookings eb\n        WHERE eb.event_id = $1\n          AND eb.enrolled IS TRUE\n          AND eb.canceled IS NULL\n          AND eb.sepa_exported_at IS NULL\n        FOR UPDATE\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3df75e01bcef6b3990b9cf8f2d40cb9bb7ae243577c0affae77e5094f26eed39"
+}
