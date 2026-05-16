@@ -1,11 +1,13 @@
 use super::events;
 use crate::models::{
-    Event, EventBooking, EventSubscription, MembershipApplication, ToEuro, UnpaidEventBooking,
+    Event, EventBooking, EventSubscription, MembershipApplication, PaymentMethod, ToEuro,
+    UnpaidEventBooking,
 };
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Locale, Utc};
 use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderErrorReason,
+    Renderable,
 };
 use serde::Serialize;
 
@@ -21,6 +23,7 @@ struct BookingTemplateData<'a> {
     payment_id: Option<String>,
     link: Option<String>,
     direct_booking: Option<bool>,
+    payment_type: String,
 }
 
 impl<'a> BookingTemplateData<'a> {
@@ -38,10 +41,15 @@ impl<'a> BookingTemplateData<'a> {
             location: event.location.trim(),
             price: booking.price(event).to_euro(),
             dates: format_dates(&event.dates),
-            payment_details: format_payment_details(event, &payment_id),
+            payment_details: format_payment_details(
+                &event.payment_account,
+                &payment_id,
+                &event.payment_method,
+            ),
             payment_id,
             link: prebooking_link,
             direct_booking,
+            payment_type: format!("{:?}", event.payment_method),
         }
     }
 
@@ -54,10 +62,15 @@ impl<'a> BookingTemplateData<'a> {
             location: event.location.trim(),
             price: booking.price.to_euro(),
             dates: format_dates(&event.dates),
-            payment_details: format_payment_details(event, &payment_id),
+            payment_details: format_payment_details(
+                &event.payment_account,
+                &payment_id,
+                &event.payment_method,
+            ),
             payment_id,
             link: None,
             direct_booking: None,
+            payment_type: format!("{:?}", event.payment_method),
         }
     }
 }
@@ -186,6 +199,33 @@ impl HelperDef for PaydayHelper<'_> {
     }
 }
 
+struct EqHelper;
+
+impl HelperDef for EqHelper {
+    fn call<'reg: 'rc, 'rc>(
+        &self,
+        h: &Helper<'rc>,
+        r: &'reg Handlebars<'reg>,
+        ctx: &'rc Context,
+        rc: &mut RenderContext<'reg, 'rc>,
+        out: &mut dyn Output,
+    ) -> HelperResult {
+        let param1 = h
+            .param(0)
+            .ok_or(RenderErrorReason::ParamNotFoundForIndex("eq", 0))?;
+        let param2 = h
+            .param(1)
+            .ok_or(RenderErrorReason::ParamNotFoundForIndex("eq", 1))?;
+
+        let render = param1.value() == param2.value();
+        let tmpl = if render { h.template() } else { h.inverse() };
+        match tmpl {
+            Some(t) => t.render(r, ctx, rc, out),
+            None => Ok(()),
+        }
+    }
+}
+
 fn format_dates(dates: &[DateTime<Utc>]) -> String {
     format_and_filter_dates(dates, |_d| true)
 }
@@ -205,15 +245,17 @@ where
         .join("\n")
 }
 
-fn format_payment_details(event: &Event, payment_id: &Option<String>) -> Option<String> {
-    match (&event.payment_account, payment_id) {
-        (Some(payment_account), Some(payment_id)) => Some(format!(
-            r#"{}
-Verwendungszweck: {}"#,
-            payment_account, payment_id,
-        )),
-        _ => None,
+fn format_payment_details(
+    payment_account: &Option<String>,
+    payment_id: &Option<String>,
+    payment_method: &PaymentMethod,
+) -> Option<String> {
+    if *payment_method == PaymentMethod::SepaDirectDebit {
+        return None;
     }
+    let account = payment_account.as_ref()?;
+    let id = payment_id.as_ref()?;
+    Some(format!("{}\nVerwendungszweck: {}", account, id))
 }
 
 pub(crate) fn render_booking<'a>(
@@ -304,6 +346,7 @@ where
     let mut handlebars = Handlebars::new();
     handlebars.set_strict_mode(true);
     handlebars.register_escape_fn(handlebars::no_escape);
+    handlebars.register_helper("eq", Box::new(EqHelper));
     if let Some(payday_helper) = payday_helper {
         handlebars.register_helper("payday", Box::new(payday_helper));
     }
@@ -315,7 +358,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{EventType, LifecycleStatus};
+    use crate::models::{EventType, LifecycleStatus, PaymentMethod};
     use bigdecimal::{BigDecimal, FromPrimitive};
     use chrono::{DateTime, Duration, Locale, TimeZone, Utc};
     use pretty_assertions::assert_eq;
@@ -334,6 +377,7 @@ mod tests {
             None,
             None,
             Vec::new(),
+            None,
         );
         let booking_non_member = EventBooking::new(
             1,
@@ -347,6 +391,7 @@ mod tests {
             None,
             None,
             Vec::new(),
+            None,
         );
         let event = Event::new(
             0,
@@ -386,6 +431,7 @@ IBAN: DE16 6429 1010 0034 4696 05",
             None,
             false,
             Vec::new(),
+            PaymentMethod::BankTransfer,
         );
 
         assert_eq!(
@@ -576,6 +622,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             false,
             Vec::new(),
+            PaymentMethod::BankTransfer,
         );
         let event_subscription = EventSubscription::new(
             0,
@@ -589,7 +636,9 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             true,
             true,
             String::from("123"),
-            true,
+            Some(Utc::now()),
+            None,
+            None,
             None,
             Vec::new(),
         );
@@ -652,6 +701,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             false,
             Vec::new(),
+            PaymentMethod::BankTransfer,
         );
         let event_subscription = EventSubscription::new(
             0,
@@ -665,7 +715,9 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             true,
             true,
             String::from("123"),
-            true,
+            Some(Utc::now()),
+            None,
+            None,
             None,
             Vec::new(),
         );
@@ -717,6 +769,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             false,
             Vec::new(),
+            PaymentMethod::BankTransfer,
         );
         let booking = EventBooking::new(
             0,
@@ -730,6 +783,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             None,
             Vec::new(),
+            None,
         );
 
         assert_eq!(
@@ -788,6 +842,7 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             None,
             false,
             Vec::new(),
+            PaymentMethod::BankTransfer,
         )
     }
 }

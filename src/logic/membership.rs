@@ -1,3 +1,4 @@
+use super::banking;
 use super::csv;
 use super::news;
 use super::template;
@@ -9,7 +10,7 @@ use crate::models::NewsSubscription;
 use crate::models::NewsTopic;
 use anyhow::Context;
 use anyhow::Result;
-use iban::Iban;
+use iban::{Iban, IbanLike};
 use lettre::Message;
 use lettre::message::Attachment;
 use lettre::message::MultiPart;
@@ -47,7 +48,7 @@ pub(crate) async fn application(
         .await?;
     let messages = vec![
         create_welcome_email(&email_account, &membership_application)?,
-        create_internal_email(&email_account, membership_application, bank_account)?,
+        create_internal_email(&email_account, membership_application, bank_account).await?,
     ];
     email_sender.send_messages(&email_account, messages).await?;
 
@@ -219,16 +220,20 @@ fn build_internal_email_html(
     Ok(body)
 }
 
-fn create_internal_email(
+async fn create_internal_email(
     email_account: &EmailAccount,
     membership_application: MembershipApplication,
     bank_account: Iban,
 ) -> Result<Message> {
-    let (bank_name, bic) = bank_account
+    let bic = banking::lookup_bic(bank_account.electronic_str())
+        .await
+        .unwrap_or_else(|_| "-".to_string());
+
+    let bank_name = bank_account
         .bank_identifier()
         .and_then(fints_institute_db::get_bank_by_bank_code)
-        .map(|bank| (bank.institute, bank.bic))
-        .unwrap_or_else(|| ("-".into(), "-".into()));
+        .map(|bank| bank.institute.to_string())
+        .unwrap_or_else(|| "-".to_string());
 
     let body = build_internal_email_html(&membership_application, &bank_name, &bic)?;
 
