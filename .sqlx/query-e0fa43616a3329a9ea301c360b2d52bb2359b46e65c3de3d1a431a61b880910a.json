@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "event_bookings",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Bool",
+        "Bool",
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e0fa43616a3329a9ea301c360b2d52bb2359b46e65c3de3d1a431a61b880910a"
+}

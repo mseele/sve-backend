@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT payment_confirmed_at, iban FROM event_bookings WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "payment_confirmed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_bookings",
+            "name": "payment_confirmed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "iban",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_bookings",
+            "name": "iban"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "633c0a34f9cbf09bb22406d4031275ca6da0798fc521e417abeb6410a978a700"
+}

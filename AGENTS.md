@@ -111,7 +111,7 @@ pub(crate) async fn fetch_data() -> Result<Data> {
 
 - Use compile-time checked queries (stored in `.sqlx/`)
 - Use `QueryBuilder` for dynamic queries
-- Run `cargo sqlx prepare` to update query metadata after SQL changes
+- Run `cargo sqlx prepare -- --all-targets` to update query metadata after SQL changes (the `--all-targets` flag is required so test-only `query!` macros are cached for CI's `SQLX_OFFLINE=true` builds)
 
 ### Async/Await
 

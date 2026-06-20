@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT sepa_exported_at FROM event_bookings WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sepa_exported_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_bookings",
+            "name": "sepa_exported_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2edfbec4da90b5d3b5bc66eb7713e2df07d58624f8bd2d7dbd820bd5f82ccea8"
+}
