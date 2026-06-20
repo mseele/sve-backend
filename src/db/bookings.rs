@@ -1,13 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgPool, Postgres, QueryBuilder, Row, query, query_scalar};
 
 use super::events::fetch_event;
 use crate::models::{
-    Event, EventBooking, EventCounter, EventCustomField, EventCustomFieldType, EventId, EventType,
-    LifecycleStatus, UnpaidEventBooking, VerifyPaymentBookingRecord,
+    Event, EventBooking, EventCounter, EventCustomField, EventCustomFieldType, EventId,
+    EventSubscription, EventType, LifecycleStatus, PaymentMethod, SepaPaymentNotAllowed,
+    UnpaidEventBooking, VerifyPaymentBookingRecord,
 };
 
 pub(crate) async fn get_bookings_to_verify_payment(
@@ -27,7 +28,7 @@ SELECT
     b.payment_id,
     b.canceled,
     b.enrolled,
-    b.payed
+    b.payment_confirmed_at
 FROM
     events e,
     event_bookings b,
@@ -57,7 +58,7 @@ ORDER BY
                 row.get("payment_id"),
                 row.get("canceled"),
                 row.get("enrolled"),
-                row.get("payed"),
+                row.get("payment_confirmed_at"),
             )
         })
         .fetch_all(pool)
@@ -114,7 +115,8 @@ WHERE
     AND b.subscriber_id = s.id
     AND b.enrolled IS TRUE
     AND b.canceled IS NULL
-    AND b.payed IS NULL
+    AND b.payment_confirmed_at IS NULL
+    AND e.payment_method = 'BankTransfer'
 	AND e.lifecycle_status IN('Review', 'Published', 'Running')
 ORDER BY
     b.payment_reminder_sent,
@@ -148,20 +150,37 @@ ORDER BY
     Ok(result)
 }
 
-pub(crate) async fn mark_as_payed(
+pub(crate) async fn mark_as_paid(
     pool: &PgPool,
     verified_payments: &HashMap<i32, String>,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
-    // TODO: improve by using batch update
+    let booking_ids: Vec<i32> = verified_payments.keys().cloned().collect();
+    let bank_transfer_booking_ids: HashSet<i32> = sqlx::query_scalar!(
+        r#"
+    SELECT eb.id
+    FROM event_bookings eb
+    JOIN events e ON eb.event_id = e.id
+    WHERE eb.id = ANY($1) AND e.payment_method = 'BankTransfer'"#,
+        &booking_ids
+    )
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .collect();
+
+    if bank_transfer_booking_ids.len() != booking_ids.len() {
+        bail!("mark_as_paid can only be called with BankTransfer bookings");
+    }
+
     for (booking_id, iban) in verified_payments {
         query!(
             r#"
 UPDATE
     event_bookings
 SET
-    payed = NOW(),
+    payment_confirmed_at = NOW(),
     iban = $1
 WHERE
     id = $2"#,
@@ -184,10 +203,24 @@ pub(crate) async fn update_payment(
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
+    let payment_method: PaymentMethod = sqlx::query_scalar!(
+        r#"SELECT e.payment_method AS "payment_method: PaymentMethod"
+        FROM events e
+        JOIN event_bookings eb ON eb.event_id = e.id
+        WHERE eb.id = $1"#,
+        booking_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+
+    if payment_method == PaymentMethod::SepaDirectDebit {
+        return Err(SepaPaymentNotAllowed.into());
+    }
+
     match update_payment {
         true => {
             query!(
-                r#"UPDATE event_bookings SET payed = NOW() WHERE id = $1"#,
+                r#"UPDATE event_bookings SET payment_confirmed_at = NOW() WHERE id = $1"#,
                 booking_id,
             )
             .execute(&mut *tx)
@@ -195,7 +228,7 @@ pub(crate) async fn update_payment(
         }
         false => {
             query!(
-                r#"UPDATE event_bookings SET payed = NULL WHERE id = $1"#,
+                r#"UPDATE event_bookings SET payment_confirmed_at = NULL WHERE id = $1"#,
                 booking_id,
             )
             .execute(&mut *tx)
@@ -262,7 +295,8 @@ SELECT
     v.custom_value_1,
     v.custom_value_2,
     v.custom_value_3,
-    v.custom_value_4
+    v.custom_value_4,
+    v.iban
 FROM
     v_event_bookings v
 WHERE
@@ -311,6 +345,7 @@ ORDER BY
                 .into_iter()
                 .flatten()
                 .collect(),
+                row.try_get("iban")?,
             ),
             row.try_get("subscriber_id")?,
             row.try_get("payment_id")?,
@@ -398,6 +433,7 @@ pub(crate) async fn pre_book_event(
     pool: &PgPool,
     event_id: EventId,
     subscriber_id: i32,
+    iban: Option<String>,
 ) -> Result<(BookingResult, Option<EventBooking>)> {
     let mut tx = pool.begin().await?;
 
@@ -415,6 +451,7 @@ pub(crate) async fn pre_book_event(
                 true,
                 &None,
                 &[],
+                &iban,
             )
             .await?;
 
@@ -447,6 +484,7 @@ WHERE
                     None,
                     None,
                     Vec::new(),
+                    iban.clone(),
                 )
             })
             .fetch_one(&mut *tx)
@@ -537,12 +575,14 @@ async fn process_booking(
         pre_booking,
         &booking.comments,
         &booking.custom_values,
+        &booking.iban,
     )
     .await?;
 
     Ok(result)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn insert_booking(
     conn: &mut PgConnection,
     event_id: &EventId,
@@ -551,6 +591,7 @@ async fn insert_booking(
     pre_booking: bool,
     comments: &Option<String>,
     custom_values: &[String],
+    iban: &Option<String>,
 ) -> Result<BookingResult> {
     // check for duplicate booking
     if let EventSubscriberId::Existing(id) = subscriber_id {
@@ -596,14 +637,15 @@ WHERE
     query!(
         r#"
 INSERT INTO public.event_bookings
-(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id, custom_value_1, custom_value_2, custom_value_3, custom_value_4)
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+(event_id, enrolled, pre_booking, subscriber_id, comment, payment_id, iban, custom_value_1, custom_value_2, custom_value_3, custom_value_4)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
         event_id.get_ref(),
         enrolled,
         pre_booking,
         subscriber_id.get_id(),
         comment,
         payment_id,
+        iban.as_deref(),
         custom_values.first(),
         custom_values.get(1),
         custom_values.get(2),
@@ -758,6 +800,7 @@ WHERE
                 None,
                 None,
                 Vec::new(),
+                None,
             ),
             row.enrolled.unwrap_or(false),
         )
@@ -810,6 +853,7 @@ ORDER BY
                     None,
                     None,
                     Vec::new(),
+                    None,
                 ),
                 row.payment_id.unwrap(),
             )
@@ -872,10 +916,105 @@ pub(crate) async fn mark_as_payment_reminder_sent(
     Ok(())
 }
 
+pub(crate) async fn find_prior_sepa_iban(
+    pool: &PgPool,
+    subscriber_id: i32,
+) -> Result<Option<String>> {
+    let iban = query_scalar!(
+        r#"SELECT eb.iban FROM event_bookings eb
+        JOIN events e ON eb.event_id = e.id
+        WHERE eb.subscriber_id = $1 AND eb.iban IS NOT NULL AND e.payment_method = 'SepaDirectDebit'
+        ORDER BY eb.created DESC LIMIT 1"#,
+        subscriber_id
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(iban.flatten())
+}
+
+pub(crate) async fn lock_sepa_eligible_bookings(
+    conn: &mut PgConnection,
+    event_id: EventId,
+) -> Result<()> {
+    query!(
+        r#"
+        SELECT eb.id
+        FROM event_bookings eb
+        WHERE eb.event_id = $1
+          AND eb.enrolled IS TRUE
+          AND eb.canceled IS NULL
+          AND eb.sepa_exported_at IS NULL
+        FOR UPDATE
+        "#,
+        event_id.into_inner()
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn get_sepa_eligible_bookings(
+    conn: &mut PgConnection,
+    event_id: EventId,
+) -> Result<Vec<EventSubscription>> {
+    let bookings = query!(
+        r#"
+        SELECT v.*
+        FROM v_event_bookings v
+        WHERE v.event_id = $1
+          AND v.enrolled IS TRUE
+          AND v.canceled IS NULL
+          AND v.sepa_exported_at IS NULL
+        "#,
+        event_id.into_inner()
+    )
+    .map(|row| {
+        EventSubscription::new(
+            row.id.unwrap(),
+            row.created.unwrap(),
+            row.first_name.unwrap(),
+            row.last_name.unwrap(),
+            row.street.unwrap(),
+            row.city.unwrap(),
+            row.email.unwrap(),
+            row.phone,
+            row.enrolled.unwrap(),
+            row.member.unwrap(),
+            row.payment_id.unwrap(),
+            row.payment_confirmed_at,
+            row.sepa_exported_at,
+            row.iban,
+            row.comment,
+            vec![
+                row.custom_value_1,
+                row.custom_value_2,
+                row.custom_value_3,
+                row.custom_value_4,
+            ]
+            .into_iter()
+            .flatten()
+            .collect(),
+        )
+    })
+    .fetch_all(conn)
+    .await?;
+    Ok(bookings)
+}
+
+pub(crate) async fn mark_sepa_exported(conn: &mut PgConnection, booking_ids: &[i32]) -> Result<()> {
+    query!(
+        r#"UPDATE event_bookings SET sepa_exported_at = NOW() WHERE id = ANY($1)"#,
+        booking_ids
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod db_integration_tests {
     use super::*;
-    use crate::models::{EventType, LifecycleStatus, PartialEvent};
+    use crate::models::{EventType, LifecycleStatus, PartialEvent, PaymentMethod};
     use anyhow::Result;
     use chrono::{DateTime, Utc};
     use std::collections::HashMap;
@@ -928,7 +1067,7 @@ mod db_integration_tests {
         let subscriber_id = subscriber_row.id;
 
         query!(
-            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payed) 
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
             event_id.get_ref(),
             subscriber_id,
@@ -960,7 +1099,7 @@ mod db_integration_tests {
     }
 
     #[sqlx::test]
-    async fn test_mark_as_payed_and_update_payment(pool: PgPool) -> Result<()> {
+    async fn test_mark_as_paid_and_update_payment(pool: PgPool) -> Result<()> {
         let partial = PartialEvent {
             event_type: Some(EventType::Events),
             lifecycle_status: Some(LifecycleStatus::Published),
@@ -980,6 +1119,7 @@ mod db_integration_tests {
             payment_account: Some("Account".to_string()),
             external_operator: Some(false),
             dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::BankTransfer),
             ..Default::default()
         };
 
@@ -1007,7 +1147,7 @@ mod db_integration_tests {
         let subscriber_id = subscriber_row.id;
 
         query!(
-            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payed) 
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at) 
             VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
             event_id.get_ref(),
             subscriber_id,
@@ -1028,25 +1168,557 @@ mod db_integration_tests {
         update_payment(&pool, booking_id, true).await?;
 
         let booking_row = query!(
-            r#"SELECT payed FROM event_bookings WHERE id = $1"#,
+            r#"SELECT payment_confirmed_at FROM event_bookings WHERE id = $1"#,
             booking_id
         )
         .fetch_one(&pool)
         .await?;
-        assert!(booking_row.payed.is_some());
+        assert!(booking_row.payment_confirmed_at.is_some());
 
         let mut verified_payments = HashMap::new();
         verified_payments.insert(booking_id, "AT611904300234573200".to_string());
-        mark_as_payed(&pool, &verified_payments).await?;
+        mark_as_paid(&pool, &verified_payments).await?;
 
         let booking_row = query!(
-            r#"SELECT payed, iban FROM event_bookings WHERE id = $1"#,
+            r#"SELECT payment_confirmed_at, iban FROM event_bookings WHERE id = $1"#,
             booking_id
         )
         .fetch_one(&pool)
         .await?;
-        assert!(booking_row.payed.is_some());
+        assert!(booking_row.payment_confirmed_at.is_some());
         assert_eq!(booking_row.iban.as_deref(), Some("AT611904300234573200"));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_find_prior_sepa_iban(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Event 1".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event1, _) = crate::db::events::write_event(&pool, partial).await?;
+
+        let partial2 = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Event 2".to_string()),
+            sort_index: Some(2),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event2, _) = crate::db::events::write_event(&pool, partial2).await?;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Alice",
+            "Smith",
+            "Main St",
+            "Vienna",
+            "alice@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'alice@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        // First booking with older IBAN (earlier event)
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            event1.id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_001",
+            Some("DE89370400440532013000"),
+            None::<DateTime<Utc>>,
+        )
+        .execute(&pool)
+        .await?;
+
+        // Second booking with newer IBAN (later event)
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            event2.id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_002",
+            Some("DE75512108001245126199"),
+            None::<DateTime<Utc>>,
+        )
+        .execute(&pool)
+        .await?;
+
+        let prior_iban = find_prior_sepa_iban(&pool, subscriber_id).await?;
+        assert_eq!(prior_iban.as_deref(), Some("DE75512108001245126199"));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_sepa_eligible_bookings(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Export Event".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        for (i, (email, member)) in [
+            ("eligible@example.com", true),
+            ("exported@example.com", true),
+            ("canceled@example.com", true),
+            ("waiting@example.com", true),
+        ]
+        .iter()
+        .enumerate()
+        {
+            query!(
+                r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+                format!("User{}", i),
+                "Test",
+                "Main St",
+                "Vienna",
+                *email,
+                None::<String>,
+                *member
+            )
+            .execute(&pool)
+            .await?;
+
+            let subscriber_row = query!(
+                r#"SELECT id FROM event_subscribers WHERE email = $1"#,
+                *email
+            )
+            .fetch_one(&pool)
+            .await?;
+            let subscriber_id = subscriber_row.id;
+
+            let (enrolled, canceled, sepa_exported_at) = match i {
+                0 => (true, None::<DateTime<Utc>>, None::<DateTime<Utc>>), // eligible
+                1 => (true, None::<DateTime<Utc>>, Some(Utc::now())),      // already exported
+                2 => (true, Some(Utc::now()), None::<DateTime<Utc>>),      // canceled
+                3 => (false, None::<DateTime<Utc>>, None::<DateTime<Utc>>), // waiting list
+                _ => unreachable!(),
+            };
+
+            query!(
+                r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at, sepa_exported_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+                event_id.get_ref(),
+                subscriber_id,
+                enrolled,
+                false,
+                canceled,
+                format!("pay_{:03}", i),
+                Some("DE89370400440532013000"),
+                None::<DateTime<Utc>>,
+                sepa_exported_at,
+            )
+            .execute(&pool)
+            .await?;
+        }
+
+        let mut conn = pool.acquire().await?;
+        let eligible = get_sepa_eligible_bookings(&mut conn, event_id).await?;
+        assert_eq!(eligible.len(), 1);
+        assert_eq!(eligible[0].email, "eligible@example.com");
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_mark_sepa_exported(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Export".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Bob",
+            "Jones",
+            "Main St",
+            "Vienna",
+            "bob@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'bob@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        let booking_row = query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_999",
+            Some("DE89370400440532013000"),
+            None::<DateTime<Utc>>,
+        )
+        .fetch_one(&pool)
+        .await?;
+        let booking_id = booking_row.id;
+
+        let mut conn = pool.acquire().await?;
+        mark_sepa_exported(&mut conn, &[booking_id]).await?;
+
+        let row = query!(
+            r#"SELECT sepa_exported_at FROM event_bookings WHERE id = $1"#,
+            booking_id
+        )
+        .fetch_one(&pool)
+        .await?;
+        assert!(row.sepa_exported_at.is_some());
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_update_payment_rejects_sepa(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Only".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Carol",
+            "White",
+            "Main St",
+            "Vienna",
+            "carol@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'carol@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        let booking_row = query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_sepa",
+            Some("DE89370400440532013000"),
+            None::<DateTime<Utc>>,
+        )
+        .fetch_one(&pool)
+        .await?;
+        let booking_id = booking_row.id;
+
+        let result = update_payment(&pool, booking_id, true).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Cannot update payment for SEPA bookings"));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_get_event_bookings_without_payment_filters_sepa(pool: PgPool) -> Result<()> {
+        let sepa_partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Event".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let bank_partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Bank Event".to_string()),
+            sort_index: Some(2),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::BankTransfer),
+            ..Default::default()
+        };
+
+        let (sepa_event, _) = crate::db::events::write_event(&pool, sepa_partial).await?;
+        let (bank_event, _) = crate::db::events::write_event(&pool, bank_partial).await?;
+
+        for (i, (email, event_id)) in [
+            ("sepa_user@example.com", sepa_event.id.get_ref()),
+            ("bank_user@example.com", bank_event.id.get_ref()),
+        ]
+        .iter()
+        .enumerate()
+        {
+            query!(
+                r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+                format!("User{}", i),
+                "Test",
+                "Main St",
+                "Vienna",
+                *email,
+                None::<String>,
+                true
+            )
+            .execute(&pool)
+            .await?;
+
+            let subscriber_row = query!(
+                r#"SELECT id FROM event_subscribers WHERE email = $1"#,
+                *email
+            )
+            .fetch_one(&pool)
+            .await?;
+            let subscriber_id = subscriber_row.id;
+
+            query!(
+                r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+                event_id,
+                subscriber_id,
+                true,
+                false,
+                None::<DateTime<Utc>>,
+                format!("pay_{:03}", i),
+                None::<DateTime<Utc>>,
+            )
+            .execute(&pool)
+            .await?;
+        }
+
+        let unpaid = get_event_bookings_without_payment(&pool, EventType::Events).await?;
+        let emails: Vec<&str> = unpaid.iter().map(|u| u.0.email.as_str()).collect();
+        assert_eq!(emails.len(), 1);
+        assert_eq!(emails[0], "bank_user@example.com");
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_mark_as_paid_rejects_sepa(pool: PgPool) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("SEPA Only".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("50.00".parse().unwrap()),
+            price_non_member: Some("60.00".parse().unwrap()),
+            location: Some("Hall".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::SepaDirectDebit),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Dave",
+            "Black",
+            "Main St",
+            "Vienna",
+            "dave@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'dave@example.com'"#,)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        let booking_row = query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, iban, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_sepa2",
+            Some("DE89370400440532013000"),
+            None::<DateTime<Utc>>,
+        )
+        .fetch_one(&pool)
+        .await?;
+        let booking_id = booking_row.id;
+
+        let mut verified_payments = HashMap::new();
+        verified_payments.insert(booking_id, "DE89370400440532013000".to_string());
+        let result = mark_as_paid(&pool, &verified_payments).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("mark_as_paid can only be called with BankTransfer bookings"));
 
         Ok(())
     }

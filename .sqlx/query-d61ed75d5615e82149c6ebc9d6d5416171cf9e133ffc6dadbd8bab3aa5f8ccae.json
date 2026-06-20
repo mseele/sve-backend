@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE event_bookings SET payment_confirmed_at = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d61ed75d5615e82149c6ebc9d6d5416171cf9e133ffc6dadbd8bab3aa5f8ccae"
+}

@@ -151,7 +151,8 @@ pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Res
                         .route("/custom_fields", get(custom_fields))
                         .route("/counter", get(counter))
                         .route("/booking", post(booking))
-                        .route("/prebooking/{hash}", get(prebooking)),
+                        .route("/prebooking/{hash}", get(prebooking))
+                        .route("/prebooking/{hash}/iban", post(prebooking_iban)),
                 )
                 .nest(
                     "/news",
@@ -191,6 +192,7 @@ pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Res
                                 .route("/", get(admin_events))
                                 .route("/update", post(update))
                                 .route("/{id}", delete(delete_event))
+                                .route("/{id}/sepa_xml", post(export_sepa_xml))
                                 .nest(
                                     "/booking",
                                     Router::new()
@@ -529,6 +531,21 @@ async fn prebooking(
     Ok(Json(response))
 }
 
+#[derive(Deserialize)]
+struct IbanPayload {
+    iban: String,
+}
+
+async fn prebooking_iban(
+    State(state): State<AppState>,
+    Path(hash): Path<String>,
+    Json(payload): Json<IbanPayload>,
+) -> Result<impl IntoResponse, ResponseError> {
+    let response =
+        events::prebook_with_iban(&state.pg_pool, &hash, payload.iban, &RealEmailSender).await?;
+    Ok(Json(response))
+}
+
 async fn update(
     State(state): State<AppState>,
     extract::Json(partial_event): extract::Json<PartialEvent>,
@@ -569,7 +586,23 @@ async fn update_event_booking(
     query: Query<UpdateEventBookingQueryParams>,
 ) -> Result<impl IntoResponse, ResponseError> {
     if let Some(update_payment) = query.update_payment {
-        events::update_payment(&state.pg_pool, booking_id, update_payment).await?;
+        match events::update_payment(&state.pg_pool, booking_id, update_payment).await {
+            Ok(()) => {}
+            Err(e) => {
+                if e.downcast_ref::<crate::models::SepaPaymentNotAllowed>()
+                    .is_some()
+                {
+                    return Err(ResponseError {
+                        err: e,
+                        response: Some((
+                            StatusCode::BAD_REQUEST,
+                            "Cannot update payment for SEPA bookings".to_string(),
+                        )),
+                    });
+                }
+                return Err(e.into());
+            }
+        }
     }
     Ok(StatusCode::OK)
 }
@@ -596,6 +629,42 @@ async fn export_event_participants_list(
 ) -> Result<impl IntoResponse, ResponseError> {
     let (filename, bytes) = export::event_participants_list(&state.pg_pool, event_id).await?;
     Ok(into_file_response(filename, bytes))
+}
+
+async fn export_sepa_xml(
+    State(state): State<AppState>,
+    Path(event_id): Path<EventId>,
+) -> Result<impl IntoResponse, ResponseError> {
+    use crate::models::SepaExportError;
+
+    let (filename, xml) = match events::export_sepa_xml(&state.pg_pool, event_id).await {
+        Ok(result) => result,
+        Err(e) => {
+            if let Some(sepa_err) = e.downcast_ref::<SepaExportError>() {
+                let status = match sepa_err {
+                    SepaExportError::NotASepaEvent => StatusCode::BAD_REQUEST,
+                    SepaExportError::NoBookingsAvailable => StatusCode::CONFLICT,
+                    SepaExportError::BicLookupFailed(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                    SepaExportError::ConfigIncomplete => StatusCode::INTERNAL_SERVER_ERROR,
+                };
+                let message = e.to_string();
+                return Err(ResponseError {
+                    err: e,
+                    response: Some((status, message)),
+                });
+            }
+            return Err(e.into());
+        }
+    };
+
+    Ok(Response::builder()
+        .header("Content-Type", "application/xml")
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", filename),
+        )
+        .body(Body::from(xml))
+        .unwrap())
 }
 
 // news

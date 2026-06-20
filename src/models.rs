@@ -103,6 +103,7 @@ pub(crate) struct Event {
     pub(crate) alt_email_address: Option<String>,
     pub(crate) external_operator: bool,
     pub(crate) custom_fields: Vec<EventCustomField>,
+    pub(crate) payment_method: PaymentMethod,
     pub(crate) subscribers: Option<Vec<EventSubscription>>,
 }
 
@@ -135,6 +136,7 @@ impl Event {
         alt_email_address: Option<String>,
         external_operator: bool,
         custom_fields: Vec<EventCustomField>,
+        payment_method: PaymentMethod,
     ) -> Self {
         Self {
             id: id.into(),
@@ -163,6 +165,7 @@ impl Event {
             alt_email_address,
             external_operator,
             custom_fields,
+            payment_method,
             subscribers: None,
         }
     }
@@ -222,6 +225,7 @@ pub(crate) struct PartialEvent {
     pub(crate) alt_email_address: Option<String>,
     pub(crate) external_operator: Option<bool>,
     pub(crate) custom_fields: Option<Vec<EventCustomField>>,
+    pub(crate) payment_method: Option<PaymentMethod>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, sqlx::Type)]
@@ -325,16 +329,18 @@ pub(crate) enum LifecycleStatus {
 
 impl LifecycleStatus {
     pub(crate) fn is_bookable(self) -> bool {
-        match self {
-            LifecycleStatus::Draft => false,
-            LifecycleStatus::Review => true,
-            LifecycleStatus::Published => true,
-            LifecycleStatus::Running => true,
-            LifecycleStatus::Finished => false,
-            LifecycleStatus::Closed => false,
-            LifecycleStatus::Archived => false,
-        }
+        matches!(
+            self,
+            LifecycleStatus::Review | LifecycleStatus::Published | LifecycleStatus::Running
+        )
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "payment_method")]
+pub(crate) enum PaymentMethod {
+    BankTransfer,
+    SepaDirectDebit,
 }
 
 impl FromStr for LifecycleStatus {
@@ -403,6 +409,7 @@ pub(crate) struct EventBooking {
     pub(crate) comments: Option<String>,
     pub(crate) custom_values: Vec<String>,
     pub(crate) token: Option<String>,
+    pub(crate) iban: Option<String>,
 }
 
 impl EventBooking {
@@ -419,6 +426,7 @@ impl EventBooking {
         updates: Option<bool>,
         comments: Option<String>,
         custom_values: Vec<String>,
+        iban: Option<String>,
     ) -> Self {
         Self {
             event_id: event_id.into(),
@@ -433,6 +441,7 @@ impl EventBooking {
             comments,
             custom_values,
             token: None,
+            iban,
         }
     }
 
@@ -484,6 +493,8 @@ pub(crate) struct BookingResponse {
     pub(crate) success: bool,
     message: String,
     counter: Vec<EventCounter>,
+    #[serde(skip_serializing_if = "is_false")]
+    requires_iban: bool,
 }
 
 impl BookingResponse {
@@ -492,6 +503,7 @@ impl BookingResponse {
             success: true,
             message: message.into(),
             counter,
+            requires_iban: false,
         }
     }
 
@@ -500,6 +512,16 @@ impl BookingResponse {
             success: false,
             message: message.into(),
             counter: Vec::new(),
+            requires_iban: false,
+        }
+    }
+
+    pub(crate) fn requires_iban(message: &str) -> Self {
+        Self {
+            success: false,
+            message: message.into(),
+            counter: Vec::new(),
+            requires_iban: true,
         }
     }
 }
@@ -517,7 +539,9 @@ pub(crate) struct EventSubscription {
     pub(crate) enrolled: bool,
     pub(crate) member: bool,
     pub(crate) payment_id: String,
-    pub(crate) payed: bool,
+    pub(crate) payment_confirmed_at: Option<DateTime<Utc>>,
+    pub(crate) sepa_exported_at: Option<DateTime<Utc>>,
+    pub(crate) iban: Option<String>,
     pub(crate) comment: Option<String>,
     pub(crate) custom_values: Vec<String>,
 }
@@ -536,7 +560,9 @@ impl EventSubscription {
         enrolled: bool,
         member: bool,
         payment_id: String,
-        payed: bool,
+        payment_confirmed_at: Option<DateTime<Utc>>,
+        sepa_exported_at: Option<DateTime<Utc>>,
+        iban: Option<String>,
         comment: Option<String>,
         custom_values: Vec<String>,
     ) -> Self {
@@ -552,7 +578,9 @@ impl EventSubscription {
             enrolled,
             member,
             payment_id,
-            payed,
+            payment_confirmed_at,
+            sepa_exported_at,
+            iban,
             comment,
             custom_values,
         }
@@ -796,6 +824,44 @@ impl From<MessageType> for EmailType {
     }
 }
 
+fn is_false(v: &bool) -> bool {
+    !v
+}
+
+#[derive(Debug)]
+pub(crate) struct SepaPaymentNotAllowed;
+
+impl std::fmt::Display for SepaPaymentNotAllowed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cannot update payment for SEPA bookings")
+    }
+}
+
+impl std::error::Error for SepaPaymentNotAllowed {}
+
+#[derive(Debug)]
+pub(crate) enum SepaExportError {
+    NotASepaEvent,
+    NoBookingsAvailable,
+    BicLookupFailed(String),
+    ConfigIncomplete,
+}
+
+impl std::fmt::Display for SepaExportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SepaExportError::NotASepaEvent => write!(f, "Event does not support SEPA direct debit"),
+            SepaExportError::NoBookingsAvailable => {
+                write!(f, "No bookings available for SEPA export")
+            }
+            SepaExportError::BicLookupFailed(msg) => write!(f, "{}", msg),
+            SepaExportError::ConfigIncomplete => write!(f, "SEPA config incomplete."),
+        }
+    }
+}
+
+impl std::error::Error for SepaExportError {}
+
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub(crate) struct VerifyPaymentBookingRecord {
     pub(crate) booking_id: i32,
@@ -805,7 +871,7 @@ pub(crate) struct VerifyPaymentBookingRecord {
     pub(crate) payment_id: String,
     pub(crate) canceled: Option<DateTime<Utc>>,
     pub(crate) enrolled: bool,
-    pub(crate) payed: Option<DateTime<Utc>>,
+    pub(crate) payment_confirmed_at: Option<DateTime<Utc>>,
 }
 
 impl VerifyPaymentBookingRecord {
@@ -818,7 +884,7 @@ impl VerifyPaymentBookingRecord {
         payment_id: String,
         canceled: Option<DateTime<Utc>>,
         enrolled: bool,
-        payed: Option<DateTime<Utc>>,
+        payment_confirmed_at: Option<DateTime<Utc>>,
     ) -> Self {
         Self {
             booking_id,
@@ -828,7 +894,7 @@ impl VerifyPaymentBookingRecord {
             payment_id,
             canceled,
             enrolled,
-            payed,
+            payment_confirmed_at,
         }
     }
 }
@@ -1007,6 +1073,7 @@ mod tests {
             None,
             None,
             Vec::new(),
+            None,
         );
         let no_member = EventBooking::new(
             0,
@@ -1020,6 +1087,7 @@ mod tests {
             None,
             None,
             Vec::new(),
+            None,
         );
 
         let event = new_event("59.0", "69");
@@ -1067,6 +1135,7 @@ mod tests {
             None,
             false,
             Vec::new(),
+            PaymentMethod::BankTransfer,
         )
     }
 }

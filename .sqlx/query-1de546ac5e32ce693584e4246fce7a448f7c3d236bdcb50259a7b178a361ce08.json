@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT v.*\n        FROM v_event_bookings v\n        WHERE v.event_id = $1\n          AND v.enrolled IS TRUE\n          AND v.canceled IS NULL\n          AND v.sepa_exported_at IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "created",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "canceled",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "enrolled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "pre_booking",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "subscriber_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "comment",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "payment_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "payment_confirmed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "iban",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "payment_reminder_sent",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "custom_value_1",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "custom_value_2",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "custom_value_3",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "custom_value_4",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "sepa_exported_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "first_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 18,
+        "name": "last_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "street",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "city",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 21,
+        "name": "email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 22,
+        "name": "phone",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 23,
+        "name": "member",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "1de546ac5e32ce693584e4246fce7a448f7c3d236bdcb50259a7b178a361ce08"
+}
