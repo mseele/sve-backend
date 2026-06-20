@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.10.0] - 2026-06-20
+## [2.10.1] - 2026-06-20
+
+### Bug Fixes
+
+- Force cross for aarch64-musl to provide ring C toolchain
 
 ### Features
 
