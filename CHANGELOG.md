@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.0] - 2026-06-20
+
+### Features
+
+- Add SEPA Lastschrift direct debit support
+
 ## [2.9.6] - 2026-04-21
 
 ### Features
