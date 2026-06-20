@@ -16,23 +16,14 @@ jobs:
       - name: Checkout # the code
         uses: actions/checkout@v6
 
-      - name: Install # missing packages
-        run: |
-          sudo apt-get update --yes
-          sudo apt-get install --yes musl-tools
-
-      - name: Cache # the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: aarch64-unknown-linux-musl
-          shared-key: sve-backend
-
       - name: Build # the binary
         uses: houseabsolute/actions-rust-cross@v1
         with:
           command: "build"
           target: aarch64-unknown-linux-musl
           args: "--release --locked"
+          force-use-cross: true
+          rust-cache-parameters: '{"shared-key":"sve-backend"}'
 
       - name: Package # the artifact
         run: |
@@ -74,18 +65,14 @@ jobs:
       - name: Checkout # the code
         uses: actions/checkout@v6
 
-      - name: Cache # the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: aarch64-unknown-linux-musl
-          shared-key: sve-backend
-
       - name: Test # the code
         uses: houseabsolute/actions-rust-cross@v1
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
           args: "--release --locked"
+          force-use-cross: true
+          rust-cache-parameters: '{"shared-key":"sve-backend"}'
 
   deploy:
     needs: [build, test]
