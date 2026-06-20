@@ -16,6 +16,12 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "payment_method"
+          }
         }
       }
     ],

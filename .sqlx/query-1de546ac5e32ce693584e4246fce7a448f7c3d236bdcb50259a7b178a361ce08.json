@@ -6,122 +6,266 @@
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "event_id",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "event_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "created",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "created"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "canceled",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "canceled"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "enrolled",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "enrolled"
+          }
+        }
       },
       {
         "ordinal": 5,
         "name": "pre_booking",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "pre_booking"
+          }
+        }
       },
       {
         "ordinal": 6,
         "name": "subscriber_id",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "subscriber_id"
+          }
+        }
       },
       {
         "ordinal": 7,
         "name": "comment",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "comment"
+          }
+        }
       },
       {
         "ordinal": 8,
         "name": "payment_id",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "payment_id"
+          }
+        }
       },
       {
         "ordinal": 9,
         "name": "payment_confirmed_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "payment_confirmed_at"
+          }
+        }
       },
       {
         "ordinal": 10,
         "name": "iban",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "iban"
+          }
+        }
       },
       {
         "ordinal": 11,
         "name": "payment_reminder_sent",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "payment_reminder_sent"
+          }
+        }
       },
       {
         "ordinal": 12,
         "name": "custom_value_1",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "custom_value_1"
+          }
+        }
       },
       {
         "ordinal": 13,
         "name": "custom_value_2",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "custom_value_2"
+          }
+        }
       },
       {
         "ordinal": 14,
         "name": "custom_value_3",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "custom_value_3"
+          }
+        }
       },
       {
         "ordinal": 15,
         "name": "custom_value_4",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "custom_value_4"
+          }
+        }
       },
       {
         "ordinal": 16,
         "name": "sepa_exported_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "sepa_exported_at"
+          }
+        }
       },
       {
         "ordinal": 17,
         "name": "first_name",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "first_name"
+          }
+        }
       },
       {
         "ordinal": 18,
         "name": "last_name",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "last_name"
+          }
+        }
       },
       {
         "ordinal": 19,
         "name": "street",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "street"
+          }
+        }
       },
       {
         "ordinal": 20,
         "name": "city",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "city"
+          }
+        }
       },
       {
         "ordinal": 21,
         "name": "email",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "email"
+          }
+        }
       },
       {
         "ordinal": 22,
         "name": "phone",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "phone"
+          }
+        }
       },
       {
         "ordinal": 23,
         "name": "member",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "member"
+          }
+        }
       }
     ],
     "parameters": {

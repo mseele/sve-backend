@@ -16,12 +16,19 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "payment_method"
+          }
         }
       },
       {
         "ordinal": 1,
         "name": "has_bookings",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {

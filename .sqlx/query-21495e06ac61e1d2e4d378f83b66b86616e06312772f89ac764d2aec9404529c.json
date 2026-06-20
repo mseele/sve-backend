@@ -21,6 +21,12 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "lifecycle_status"
+          }
         }
       }
     ],

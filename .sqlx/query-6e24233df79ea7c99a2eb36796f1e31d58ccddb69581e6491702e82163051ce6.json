@@ -6,17 +6,35 @@
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "created",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "created"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "closed",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "closed"
+          }
+        }
       },
       {
         "ordinal": 3,
@@ -30,6 +48,12 @@
                 "Events"
               ]
             }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "event_type"
           }
         }
       },
@@ -51,102 +75,222 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "lifecycle_status"
+          }
         }
       },
       {
         "ordinal": 5,
         "name": "name",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "name"
+          }
+        }
       },
       {
         "ordinal": 6,
         "name": "sort_index",
-        "type_info": "Int2"
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "sort_index"
+          }
+        }
       },
       {
         "ordinal": 7,
         "name": "short_description",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "short_description"
+          }
+        }
       },
       {
         "ordinal": 8,
         "name": "description",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "description"
+          }
+        }
       },
       {
         "ordinal": 9,
         "name": "image",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "image"
+          }
+        }
       },
       {
         "ordinal": 10,
         "name": "light",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "light"
+          }
+        }
       },
       {
         "ordinal": 11,
         "name": "custom_date",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "custom_date"
+          }
+        }
       },
       {
         "ordinal": 12,
         "name": "duration_in_minutes",
-        "type_info": "Int2"
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "duration_in_minutes"
+          }
+        }
       },
       {
         "ordinal": 13,
         "name": "max_subscribers",
-        "type_info": "Int2"
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "max_subscribers"
+          }
+        }
       },
       {
         "ordinal": 14,
         "name": "max_waiting_list",
-        "type_info": "Int2"
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "max_waiting_list"
+          }
+        }
       },
       {
         "ordinal": 15,
         "name": "price_member",
-        "type_info": "Numeric"
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "price_member"
+          }
+        }
       },
       {
         "ordinal": 16,
         "name": "price_non_member",
-        "type_info": "Numeric"
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "price_non_member"
+          }
+        }
       },
       {
         "ordinal": 17,
         "name": "cost_per_date",
-        "type_info": "Numeric"
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "cost_per_date"
+          }
+        }
       },
       {
         "ordinal": 18,
         "name": "location",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "location"
+          }
+        }
       },
       {
         "ordinal": 19,
         "name": "booking_template",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "booking_template"
+          }
+        }
       },
       {
         "ordinal": 20,
         "name": "payment_account",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "payment_account"
+          }
+        }
       },
       {
         "ordinal": 21,
         "name": "alt_booking_button_text",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "alt_booking_button_text"
+          }
+        }
       },
       {
         "ordinal": 22,
         "name": "alt_email_address",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "alt_email_address"
+          }
+        }
       },
       {
         "ordinal": 23,
         "name": "external_operator",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "external_operator"
+          }
+        }
       },
       {
         "ordinal": 24,
@@ -160,6 +304,12 @@
                 "SepaDirectDebit"
               ]
             }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "payment_method"
           }
         }
       }

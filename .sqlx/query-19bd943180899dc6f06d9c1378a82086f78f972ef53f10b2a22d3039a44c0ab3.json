@@ -6,22 +6,46 @@
       {
         "ordinal": 0,
         "name": "id",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "news_subscribers",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "general",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "news_subscribers",
+            "name": "general"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "events",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "news_subscribers",
+            "name": "events"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "fitness",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "news_subscribers",
+            "name": "fitness"
+          }
+        }
       }
     ],
     "parameters": {

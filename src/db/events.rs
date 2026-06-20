@@ -586,13 +586,13 @@ async fn update_event(
     Ok((event, removed_dates))
 }
 
-fn push_bind<'gb, 'args, T>(
-    separated: &mut Separated<'gb, 'args, Postgres, &str>,
+fn push_bind<'gb, T>(
+    separated: &mut Separated<'gb, Postgres, &str>,
     key: &str,
     value: Option<T>,
 ) -> bool
 where
-    T: 'args + sqlx::Encode<'args, Postgres> + Send + sqlx::Type<Postgres>,
+    T: 'gb + sqlx::Encode<'gb, Postgres> + Send + sqlx::Type<Postgres>,
 {
     match value {
         Some(v) => {
