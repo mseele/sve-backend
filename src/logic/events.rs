@@ -2,6 +2,7 @@ use super::csv::PaymentRecord;
 use super::{banking, export, secrets, template};
 use crate::db::BookingResult;
 use crate::email;
+use crate::error::ValidationError;
 use crate::models::{
     BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventEmail,
     EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent,
@@ -67,8 +68,12 @@ pub(crate) async fn booking(
     match book_event(pool, booking, email_sender).await {
         Ok(response) => response,
         Err(e) => {
-            error!("Booking failed: {:?}", e);
-            BookingResponse::failure(MESSAGE_FAIL)
+            if let Some(validation_err) = e.downcast_ref::<ValidationError>() {
+                BookingResponse::failure(&validation_err.message)
+            } else {
+                error!("Booking failed: {:?}", e);
+                BookingResponse::failure(MESSAGE_FAIL)
+            }
         }
     }
 }
@@ -632,10 +637,13 @@ async fn book_event(
         .ok_or_else(|| anyhow!("Event not found"))?;
 
     if event.payment_method == PaymentMethod::SepaDirectDebit {
-        let raw_iban = booking
-            .iban
-            .as_ref()
-            .ok_or_else(|| anyhow!("Bitte gib eine gültige IBAN ein."))?;
+        let raw_iban = booking.iban.as_ref().ok_or_else(|| {
+            warn!(
+                "IBAN missing for SEPA booking of event {}",
+                booking.event_id
+            );
+            ValidationError::new("Bitte gib eine gültige IBAN ein.")
+        })?;
         let normalized = banking::validate_iban(raw_iban)?;
         booking.iban = Some(normalized);
     } else {

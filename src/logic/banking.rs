@@ -5,14 +5,17 @@ use num_traits::ToPrimitive;
 use quick_xml::Writer;
 use quick_xml::events::Event as XmlEvent;
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText};
+use tracing::warn;
 use uuid::Uuid;
 
+use crate::error::ValidationError;
 use crate::models::{Event, EventSubscription};
 
-pub(crate) fn validate_iban(raw: &str) -> Result<String> {
-    let iban: iban::Iban = raw
-        .parse()
-        .map_err(|_| anyhow!("Bitte gib eine gültige IBAN ein."))?;
+pub(crate) fn validate_iban(raw: &str) -> Result<String, ValidationError> {
+    let iban: iban::Iban = raw.parse().map_err(|e| {
+        warn!("IBAN ({}) validation failed for input: {}", raw, e);
+        ValidationError::new("Bitte gib eine gültige IBAN ein.")
+    })?;
 
     Ok(iban.electronic_str().to_string())
 }

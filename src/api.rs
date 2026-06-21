@@ -1,4 +1,5 @@
 use crate::email::RealEmailSender;
+use crate::error::ValidationError;
 use crate::logic::{calendar, contact, events, export, membership, news, secrets, tasks};
 use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
@@ -73,6 +74,15 @@ impl Display for ResponseError {
 
 impl From<anyhow::Error> for ResponseError {
     fn from(err: anyhow::Error) -> ResponseError {
+        if let Some(message) = err
+            .downcast_ref::<ValidationError>()
+            .map(|v| v.message.clone())
+        {
+            return ResponseError {
+                err,
+                response: Some((StatusCode::BAD_REQUEST, message)),
+            };
+        }
         ResponseError {
             err,
             response: None,
@@ -82,7 +92,11 @@ impl From<anyhow::Error> for ResponseError {
 
 impl IntoResponse for ResponseError {
     fn into_response(self) -> Response {
-        error!("{:?}", self);
+        if self.response.is_some() {
+            debug!("{:?}", self.err);
+        } else {
+            error!("{:?}", self);
+        }
 
         self.response
             .unwrap_or_else(|| {

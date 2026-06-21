@@ -5,6 +5,7 @@ mod api;
 mod calendar;
 mod db;
 mod email;
+mod error;
 mod logic;
 mod models;
 #[cfg(test)]
