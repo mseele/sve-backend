@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.4] - 2026-06-21
+
+### Bug Fixes
+
+- Add support for lowercase IBAN's
+
 ## [2.10.3] - 2026-06-21
 
 ### Bug Fixes
