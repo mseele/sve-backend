@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.3] - 2026-06-21
+
+### Bug Fixes
+
+- Improve iban validation on error
+
 ## [2.10.2] - 2026-06-20
 
 ### Bug Fixes
