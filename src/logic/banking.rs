@@ -12,8 +12,9 @@ use crate::error::ValidationError;
 use crate::models::{Event, EventSubscription};
 
 pub(crate) fn validate_iban(raw: &str) -> Result<String, ValidationError> {
-    let iban: iban::Iban = raw.parse().map_err(|e| {
-        warn!("IBAN ({}) validation failed for input: {}", raw, e);
+    let normalized = raw.to_uppercase();
+    let iban: iban::Iban = normalized.parse().map_err(|_| {
+        warn!("IBAN validation failed for input: {}", normalized);
         ValidationError::new("Bitte gib eine gültige IBAN ein.")
     })?;
 
@@ -244,6 +245,9 @@ mod tests {
 
         let result = validate_iban("FR1420041010050500013M02606").unwrap();
         assert_eq!(result, "FR1420041010050500013M02606");
+
+        let result = validate_iban("de89370400440532013000").unwrap();
+        assert_eq!(result, "DE89370400440532013000");
 
         let result = validate_iban("DE00000000000000000000");
         assert!(result.is_err());
