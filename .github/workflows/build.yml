@@ -70,9 +70,9 @@ jobs:
         with:
           command: "test"
           target: aarch64-unknown-linux-musl
-          args: "--release --locked"
+          args: "--locked"
           force-use-cross: true
-          rust-cache-parameters: '{"shared-key":"sve-backend"}'
+          rust-cache-parameters: '{"shared-key":"sve-backend-test"}'
 
   deploy:
     needs: [build, test]
