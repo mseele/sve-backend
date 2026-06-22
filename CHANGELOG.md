@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.5] - 2026-06-22
+
+### Refactor
+
+- Remove duplicate code
+
+### Ci
+
+- Speed up test build
+
 ## [2.10.4] - 2026-06-21
 
 ### Bug Fixes
