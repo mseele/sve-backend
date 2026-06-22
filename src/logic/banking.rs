@@ -11,14 +11,16 @@ use uuid::Uuid;
 use crate::error::ValidationError;
 use crate::models::{Event, EventSubscription};
 
-pub(crate) fn validate_iban(raw: &str) -> Result<String, ValidationError> {
+pub(crate) fn validate_iban(raw: &str) -> Result<iban::Iban, ValidationError> {
     let normalized = raw.to_uppercase();
-    let iban: iban::Iban = normalized.parse().map_err(|_| {
+    normalized.parse().map_err(|_| {
         warn!("IBAN validation failed for input: {}", normalized);
         ValidationError::new("Bitte gib eine gültige IBAN ein.")
-    })?;
+    })
+}
 
-    Ok(iban.electronic_str().to_string())
+pub(crate) fn validate_iban_str(raw: &str) -> Result<String, ValidationError> {
+    Ok(validate_iban(raw)?.electronic_str().to_string())
 }
 
 pub(crate) async fn lookup_bic(iban: &str) -> Result<String> {
@@ -236,20 +238,20 @@ mod tests {
     use chrono::Utc;
 
     #[test]
-    fn test_validate_iban() {
-        let result = validate_iban("DE89 3704 0044 0532 0130 00").unwrap();
+    fn test_validate_iban_str() {
+        let result = validate_iban_str("DE89 3704 0044 0532 0130 00").unwrap();
         assert_eq!(result, "DE89370400440532013000");
 
-        let result = validate_iban("DE89370400440532013000").unwrap();
+        let result = validate_iban_str("DE89370400440532013000").unwrap();
         assert_eq!(result, "DE89370400440532013000");
 
-        let result = validate_iban("FR1420041010050500013M02606").unwrap();
+        let result = validate_iban_str("FR1420041010050500013M02606").unwrap();
         assert_eq!(result, "FR1420041010050500013M02606");
 
-        let result = validate_iban("de89370400440532013000").unwrap();
+        let result = validate_iban_str("de89370400440532013000").unwrap();
         assert_eq!(result, "DE89370400440532013000");
 
-        let result = validate_iban("DE00000000000000000000");
+        let result = validate_iban_str("DE00000000000000000000");
         assert!(result.is_err());
     }
 

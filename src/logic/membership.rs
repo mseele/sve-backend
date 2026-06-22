@@ -8,7 +8,6 @@ use crate::models::EmailType;
 use crate::models::MembershipApplication;
 use crate::models::NewsSubscription;
 use crate::models::NewsTopic;
-use anyhow::Context;
 use anyhow::Result;
 use iban::{Iban, IbanLike};
 use lettre::Message;
@@ -23,10 +22,7 @@ pub(crate) async fn application(
     membership_application: MembershipApplication,
     email_sender: &impl EmailSender,
 ) -> Result<()> {
-    let bank_account = membership_application
-        .iban
-        .parse::<Iban>()
-        .with_context(|| "Error parsing iban")?;
+    let bank_account = banking::validate_iban(&membership_application.iban)?;
 
     // subscribe to news if newsletter is selected
     if membership_application.newsletter {

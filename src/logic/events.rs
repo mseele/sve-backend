@@ -84,7 +84,7 @@ pub(crate) async fn prebook_with_iban(
     iban: String,
     email_sender: &impl email::EmailSender,
 ) -> Result<BookingResponse> {
-    let normalized = banking::validate_iban(&iban)?;
+    let normalized = banking::validate_iban_str(&iban)?;
     pre_book_event(pool, hash.to_string(), Some(normalized), email_sender).await
 }
 
@@ -644,7 +644,7 @@ async fn book_event(
             );
             ValidationError::new("Bitte gib eine gültige IBAN ein.")
         })?;
-        let normalized = banking::validate_iban(raw_iban)?;
+        let normalized = banking::validate_iban_str(raw_iban)?;
         booking.iban = Some(normalized);
     } else {
         booking.iban = None;
