@@ -1,176 +1,60 @@
 # Agent Guidelines for SVE Backend
 
-This is a Rust backend service for the SVE website, deployed as an AWS Lambda.
+Rust backend service for the SVE website, deployed as an AWS Lambda.
 
-## Build Commands
+## Commands
 
 ```bash
-# Build for development
+# Build / test / lint
 cargo build
-
-# Build for release (optimized)
-cargo build --release
-
-# Build for Lambda target (CI)
-cargo build --release --locked --target aarch64-unknown-linux-musl
-```
-
-## Test Commands
-
-```bash
-# Run all tests
 cargo test
-
-# Run a single test
-cargo test test_name
-
-# Run tests with output
-cargo test -- --nocapture
-```
-
-## Lint Commands
-
-```bash
-# Check code with Clippy
-cargo clippy
-
-# Check with all features
 cargo clippy --all-features
-
-# Format code
 cargo fmt
 
-# Check formatting without modifying
-cargo fmt -- --check
+# Lambda CI build
+cargo build --release --locked --target aarch64-unknown-linux-musl
+
+# Update SQLx offline metadata after query changes
+cargo sqlx prepare -- --all-targets
 ```
 
-## Code Style Guidelines
+## Style
 
-### Imports
+- Import order: `std::`, external crates, `crate::` (blank lines between groups).
+- `pub(crate)` for crate-wide items.
+- PascalCase types/enums, snake_case functions/variables, SCREAMING_SNAKE_CASE constants.
+- `anyhow::Result<T>`, `?`, `bail!`, `.context()` for errors.
+- `i32` for DB IDs, `BigDecimal` for money, `DateTime<Utc>` for timestamps.
+- Compile-time checked SQLx queries; `QueryBuilder` for dynamic queries.
+- Inline `#[cfg(test)]` modules; use `pretty_assertions`.
 
-Order imports in three groups separated by blank lines:
-1. Standard library (`std::`)
-2. External crates (`axum::`, `sqlx::`, etc.)
-3. Internal modules (`crate::`)
+## Structure
 
-Example:
-```rust
-use std::collections::HashMap;
+- Logic: `src/logic/`
+- Models: `src/models.rs`
+- Routes: `src/api.rs`
+- DB: `src/db.rs`
 
-use axum::extract::State;
-use sqlx::PgPool;
+## Environment
 
-use crate::models::Event;
-use crate::db;
-```
+Load from `.env` in development:
 
-### Visibility
+- `DATABASE_URL`
+- `CAPTCHA_SECRET`
+- Secrets managed via `src/logic/secrets.rs`
 
-Use `pub(crate)` for items that need to be accessible across the crate but not externally.
+Run local server: `cargo run` (port 8080).
 
-### Naming Conventions
+## Agent skills
 
-- **Structs/Enums**: PascalCase (`EventBooking`, `LifecycleStatus`)
-- **Functions/Variables**: snake_case (`get_events`, `event_id`)
-- **Constants**: SCREAMING_SNAKE_CASE (`MESSAGE_FAIL`)
-- **Enum variants**: PascalCase (`Draft`, `Published`)
+### Issue tracker
 
-### Types
+Issues live in GitHub Issues (`mseele/sve-backend`). External PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
 
-- Use `anyhow::Result<T>` for error handling
-- Use `i32` for database IDs (wrapped in newtypes like `EventId`)
-- Use `BigDecimal` for monetary values (from `bigdecimal` crate)
-- Use `DateTime<Utc>` for timestamps
-- Newtype pattern for type-safe IDs with custom serialization
+### Triage labels
 
-### Error Handling
+Use the default canonical label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
 
-- Use `anyhow` for error propagation with `?` operator
-- Use `bail!()` macro for early returns with errors
-- Use `.context()` for adding error context
-- Custom error types implement `std::error::Error`
+### Domain docs
 
-Example:
-```rust
-use anyhow::{Result, bail, Context};
-
-pub(crate) async fn fetch_data() -> Result<Data> {
-    let result = db::query()
-        .await
-        .context("Failed to fetch data from database")?;
-    
-    if result.is_empty() {
-        bail!("No data found");
-    }
-    
-    Ok(result)
-}
-```
-
-### SQLx Patterns
-
-- Use compile-time checked queries (stored in `.sqlx/`)
-- Use `QueryBuilder` for dynamic queries
-- Run `cargo sqlx prepare -- --all-targets` to update query metadata after SQL changes (the `--all-targets` flag is required so test-only `query!` macros are cached for CI's `SQLX_OFFLINE=true` builds)
-
-### Async/Await
-
-- All database and external service calls are async
-- Use `tokio` runtime with `#[tokio::main]`
-- Prefer `async fn` for most operations
-
-### Testing
-
-- Write inline tests in `#[cfg(test)]` modules at file end
-- Use `pretty_assertions` crate for better test output
-- Use descriptive test names: `test_price_calculation`
-
-Example:
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn test_price() {
-        let booking = EventBooking::new(...);
-        assert_eq!(booking.price(), expected);
-    }
-}
-```
-
-### Documentation
-
-- Document complex business logic with inline comments
-- Document public APIs with doc comments (`///`)
-- Include doc comments on enums explaining variants
-
-### Code Organization
-
-- Keep modules focused on single responsibility
-- Logic lives in `src/logic/`, models in `src/models.rs`
-- Route handlers in `src/api.rs`
-- Database operations in `src/db.rs`
-
-### Dependencies
-
-Before adding new dependencies, check if existing ones can handle the use case:
-- Serialization: `serde`
-- HTTP: `axum`, `tower`, `hyper`
-- Database: `sqlx`
-- Email: `lettre`
-- Templates: `handlebars`
-- PDF: `printpdf`
-- Excel: `simple_excel_writer`
-- Dates: `chrono`, `chrono-tz`
-- Validation: `iban_validate`, `hcaptcha`
-
-## Environment Setup
-
-The application requires environment variables (loaded from `.env` in development):
-- `DATABASE_URL`: PostgreSQL connection string
-- `CAPTCHA_SECRET`: hCaptcha secret key
-- Various secrets managed via `src/logic/secrets.rs`
-
-Run with `cargo run` for local development server on port 8080.
+Single-context repo: read `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
