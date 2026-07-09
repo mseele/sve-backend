@@ -5,7 +5,7 @@ use crate::models::{
     ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
     MembershipApplication, NewsSubscription, NewsTopic, PartialEvent,
 };
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use axum::body::Body;
 use axum::extract::{self, FromRequestParts, Path, Query, State};
 use axum::http::{
@@ -17,8 +17,10 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
-use chrono::NaiveDate;
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
+use chrono::{NaiveDate, Utc};
+use jsonwebtoken::{
+    Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, decode_header,
+};
 use lambda_http::request::RequestContext;
 use serde::de;
 use serde::{Deserialize, Serialize};
@@ -137,10 +139,7 @@ where
 }
 
 pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Result<Router> {
-    let mut jwks_cache = JwksCache::new();
-    jwks_cache.keys =
-        fetch_jwks(&http_client, "https://www.googleapis.com/oauth2/v3/certs").await?;
-    let jwks = Arc::new(RwLock::new(jwks_cache));
+    let jwks = Arc::new(RwLock::new(JwksCache::new()));
 
     let state = AppState {
         pg_pool,
@@ -152,6 +151,7 @@ pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Res
         ],
         allowed_domain: "sv-eutingen.de".to_string(),
         task_api_key: secrets::get("TASK_API_KEY").await?,
+        session_secret: secrets::get("SESSION_SECRET").await?,
     };
 
     Ok(Router::new()
@@ -184,6 +184,10 @@ pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Res
                 .nest(
                     "/membership",
                     Router::new().route("/application", post(membership_application)),
+                )
+                .nest(
+                    "/auth",
+                    Router::new().route("/session", post(exchange_session)),
                 )
                 .nest(
                     "/tasks",
@@ -259,6 +263,7 @@ struct Claims {
     email: String,
     hd: Option<String>, // Hosted domain (Google Workspace domain)
     exp: usize,
+    iat: usize,
 }
 
 #[derive(Clone)]
@@ -269,6 +274,7 @@ struct AppState {
     allowed_emails: Vec<String>,
     allowed_domain: String,
     task_api_key: String,
+    session_secret: String,
 }
 
 #[derive(Clone)]
@@ -311,66 +317,15 @@ async fn auth_middleware_fn(
         None => return (StatusCode::UNAUTHORIZED, "Invalid Authorization header").into_response(),
     };
 
-    let header = match decode_header(token) {
-        Ok(h) => h,
-        Err(_) => return (StatusCode::UNAUTHORIZED, "Invalid JWT header").into_response(),
-    };
-
-    let kid = match header.kid {
-        Some(k) => k,
-        None => return (StatusCode::UNAUTHORIZED, "Missing kid in JWT").into_response(),
-    };
-
-    let decoding_key = {
-        let needs_refresh = {
-            let jwks_cache = state.jwks.read().await;
-            jwks_cache.is_expired() || !jwks_cache.keys.contains_key(&kid)
-        };
-        if needs_refresh {
-            tracing::info!("Refreshing JWKS cache (expired or missing kid: {})", kid);
-            match fetch_jwks(
-                &state.http_client,
-                "https://www.googleapis.com/oauth2/v3/certs",
-            )
-            .await
-            {
-                Ok(new_keys) => {
-                    let mut jwks_cache = state.jwks.write().await;
-                    jwks_cache.keys = new_keys;
-                    jwks_cache.last_updated = std::time::Instant::now();
-                }
-                Err(e) => {
-                    tracing::error!("Failed to refresh JWKS: {:?}", e);
-                    return (StatusCode::INTERNAL_SERVER_ERROR, "JWKS refresh failed")
-                        .into_response();
-                }
-            }
-        }
-        let jwks_cache = state.jwks.read().await;
-        match jwks_cache.keys.get(&kid).cloned() {
-            Some(k) => k,
-            None => return (StatusCode::UNAUTHORIZED, "Unknown JWT key").into_response(),
-        }
-    };
-
-    let mut validation = Validation::new(Algorithm::RS256);
-    // Since we trust Google's signature verification,
-    // the audience check is redundant here.
-    validation.validate_aud = false;
-    let token_data = match decode::<Claims>(token, &decoding_key, &validation) {
-        Ok(t) => t,
+    let claims = match verify_session_jwt(token, &state.session_secret) {
+        Ok(c) => c,
         Err(e) => {
-            tracing::warn!("JWT decode error: {:?}", e);
-            return (StatusCode::UNAUTHORIZED, "Invalid JWT").into_response();
+            tracing::warn!("Session JWT verification failed: {:?}", e);
+            return (StatusCode::UNAUTHORIZED, "Invalid session token").into_response();
         }
     };
 
-    let claims = token_data.claims;
-
-    // Restrict access to specific emails or domain
-    if !state.allowed_emails.contains(&claims.email)
-        && claims.hd.as_deref() != Some(&state.allowed_domain)
-    {
+    if !authorize(&claims, &state.allowed_emails, &state.allowed_domain) {
         return (StatusCode::FORBIDDEN, "Access denied").into_response();
     }
 
@@ -419,6 +374,109 @@ struct Jwk {
     kid: Option<String>,
     n: Option<String>,
     e: Option<String>,
+}
+
+// auth: session JWT exchange
+
+#[derive(Deserialize)]
+struct SessionExchangeRequest {
+    google_token: String,
+}
+
+#[derive(Serialize)]
+struct SessionExchangeResponse {
+    token: String,
+}
+
+async fn exchange_session(
+    State(state): State<AppState>,
+    Json(req): Json<SessionExchangeRequest>,
+) -> Response {
+    let claims = match verify_google_token(&req.google_token, &state).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("Google token verification failed: {:?}", e);
+            return (StatusCode::UNAUTHORIZED, "Invalid Google token").into_response();
+        }
+    };
+
+    if !authorize(&claims, &state.allowed_emails, &state.allowed_domain) {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    }
+
+    match mint_session_jwt(&claims.email, claims.hd.as_deref(), &state.session_secret) {
+        Ok(token) => Json(SessionExchangeResponse { token }).into_response(),
+        Err(e) => {
+            tracing::error!("Failed to mint session JWT: {:?}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to issue session").into_response()
+        }
+    }
+}
+
+async fn verify_google_token(token: &str, state: &AppState) -> Result<Claims> {
+    let header = decode_header(token)?;
+    let kid = header.kid.ok_or_else(|| anyhow!("Missing kid in JWT"))?;
+
+    let decoding_key = {
+        let needs_refresh = {
+            let jwks_cache = state.jwks.read().await;
+            jwks_cache.is_expired() || !jwks_cache.keys.contains_key(&kid)
+        };
+        if needs_refresh {
+            tracing::info!("Refreshing JWKS cache (expired or missing kid: {})", kid);
+            let new_keys = fetch_jwks(
+                &state.http_client,
+                "https://www.googleapis.com/oauth2/v3/certs",
+            )
+            .await?;
+            let mut jwks_cache = state.jwks.write().await;
+            jwks_cache.keys = new_keys;
+            jwks_cache.last_updated = std::time::Instant::now();
+        }
+        let jwks_cache = state.jwks.read().await;
+        jwks_cache
+            .keys
+            .get(&kid)
+            .cloned()
+            .ok_or_else(|| anyhow!("Unknown JWT key"))?
+    };
+
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.validate_aud = false;
+    let token_data = decode::<Claims>(token, &decoding_key, &validation)?;
+    Ok(token_data.claims)
+}
+
+fn mint_session_jwt(email: &str, hd: Option<&str>, secret: &str) -> Result<String> {
+    let now = Utc::now().timestamp() as usize;
+    let claims = Claims {
+        email: email.to_string(),
+        hd: hd.map(|s| s.to_string()),
+        exp: now + 30 * 24 * 60 * 60,
+        iat: now,
+    };
+    let token = jsonwebtoken::encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )?;
+    Ok(token)
+}
+
+fn verify_session_jwt(token: &str, secret: &str) -> Result<Claims> {
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.validate_aud = false;
+    validation.validate_exp = true;
+    let token_data = decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )?;
+    Ok(token_data.claims)
+}
+
+fn authorize(claims: &Claims, allowed_emails: &[String], allowed_domain: &str) -> bool {
+    allowed_emails.contains(&claims.email) || claims.hd.as_deref() == Some(allowed_domain)
 }
 
 // events
@@ -895,5 +953,90 @@ async fn validate_captcha(
             err: anyhow::anyhow!("Captcha invalid: {:?}", response.error_codes()),
             response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn test_secret() -> String {
+        "test-secret-key-that-is-at-least-32-bytes!".to_string()
+    }
+
+    #[test]
+    fn test_session_jwt_round_trip() {
+        let secret = test_secret();
+        let token =
+            mint_session_jwt("admin@sv-eutingen.de", Some("sv-eutingen.de"), &secret).unwrap();
+        let claims = verify_session_jwt(&token, &secret).unwrap();
+        assert_eq!(claims.email, "admin@sv-eutingen.de");
+        assert_eq!(claims.hd.as_deref(), Some("sv-eutingen.de"));
+        assert!(claims.exp > claims.iat);
+        assert_eq!(claims.exp - claims.iat, 30 * 24 * 60 * 60);
+    }
+
+    #[test]
+    fn test_verify_rejects_expired_session_jwt() {
+        let secret = test_secret();
+        let claims = Claims {
+            email: "admin@sv-eutingen.de".to_string(),
+            hd: Some("sv-eutingen.de".to_string()),
+            exp: 1,
+            iat: 0,
+        };
+        let token = jsonwebtoken::encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .unwrap();
+        assert!(verify_session_jwt(&token, &secret).is_err());
+    }
+
+    #[test]
+    fn test_verify_rejects_bad_signature() {
+        let secret = test_secret();
+        let wrong_secret = "a-completely-different-secret-key!".to_string();
+        let token =
+            mint_session_jwt("admin@sv-eutingen.de", Some("sv-eutingen.de"), &secret).unwrap();
+        assert!(verify_session_jwt(&token, &wrong_secret).is_err());
+    }
+
+    #[test]
+    fn test_authorize_allows_allowlisted_email() {
+        let claims = Claims {
+            email: "fitness@sv-eutingen.de".to_string(),
+            hd: None,
+            exp: 0,
+            iat: 0,
+        };
+        let allowed_emails = vec!["fitness@sv-eutingen.de".to_string()];
+        assert!(authorize(&claims, &allowed_emails, "sv-eutingen.de"));
+    }
+
+    #[test]
+    fn test_authorize_allows_matching_hosted_domain() {
+        let claims = Claims {
+            email: "someone@sv-eutingen.de".to_string(),
+            hd: Some("sv-eutingen.de".to_string()),
+            exp: 0,
+            iat: 0,
+        };
+        let allowed_emails = vec!["fitness@sv-eutingen.de".to_string()];
+        assert!(authorize(&claims, &allowed_emails, "sv-eutingen.de"));
+    }
+
+    #[test]
+    fn test_authorize_rejects_unknown_email_and_mismatched_domain() {
+        let claims = Claims {
+            email: "random@example.com".to_string(),
+            hd: Some("example.com".to_string()),
+            exp: 0,
+            iat: 0,
+        };
+        let allowed_emails = vec!["fitness@sv-eutingen.de".to_string()];
+        assert!(!authorize(&claims, &allowed_emails, "sv-eutingen.de"));
     }
 }
