@@ -39,6 +39,8 @@ struct Secrets {
     pub sepa_creditor_name: String,
     #[serde(default, rename = "SEPA_CREDITOR_IBAN")]
     pub sepa_creditor_iban: String,
+    #[serde(rename = "SESSION_SECRET")]
+    pub session_secret: String,
 }
 
 /// Loads a secret from an environment variable if present, otherwise from AWS Secrets Manager.
@@ -57,6 +59,7 @@ pub async fn get(key: &str) -> Result<String> {
         "EMAIL_ACCOUNTS" => Ok(secrets.email_accounts),
         "SEPA_CREDITOR_NAME" => Ok(secrets.sepa_creditor_name),
         "SEPA_CREDITOR_IBAN" => Ok(secrets.sepa_creditor_iban),
+        "SESSION_SECRET" => Ok(secrets.session_secret),
         _ => Err(anyhow!("Unknown secret key: {}", key)),
     }
 }
