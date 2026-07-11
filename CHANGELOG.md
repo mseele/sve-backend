@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.11.1] - 2026-07-11
+
+### Bug Fixes
+
+- Correct sepa xml creation
+
 ## [2.11.0] - 2026-07-09
 
 ### Features
