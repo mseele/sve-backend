@@ -105,7 +105,7 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::Start(BytesStart::new("CstmrDrctDbtInitn")))?;
 
     writer.write_event(XmlEvent::Start(BytesStart::new("GrpHdr")))?;
-    let msg_id = Uuid::new_v4().to_string();
+    let msg_id = Uuid::new_v4().simple().to_string();
     write_element(&mut writer, "MsgId", &msg_id)?;
     write_element(
         &mut writer,
@@ -126,7 +126,7 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::End(BytesEnd::new("GrpHdr")))?;
 
     writer.write_event(XmlEvent::Start(BytesStart::new("PmtInf")))?;
-    let pmt_inf_id = Uuid::new_v4().to_string();
+    let pmt_inf_id = Uuid::new_v4().simple().to_string();
     write_element(&mut writer, "PmtInfId", &pmt_inf_id)?;
     write_element(&mut writer, "PmtMtd", "DD")?;
     write_element(&mut writer, "NbOfTxs", &bookings.len().to_string())?;
@@ -334,5 +334,18 @@ mod tests {
         assert!(xml.contains("<NbOfTxs>1</NbOfTxs>"));
         assert!(xml.contains("<MndtId>SEPA-PAY123</MndtId>"));
         assert!(xml.contains("<Ustrd>Teilnahmegebühr Test Event</Ustrd>"));
+
+        // Validate against the canonical pain.008.001.02 XSD
+        // (bundled at src/assets/pain.008.001.02.xsd) using the uppsala crate.
+        let schema_xml = include_str!("../assets/pain.008.001.02.xsd");
+        let schema = uppsala::parse(schema_xml).expect("parse XSD");
+        let doc = uppsala::parse(&xml).expect("parse generated XML");
+        let validator =
+            uppsala::xsd::XsdValidator::from_schema(&schema).expect("compile XSD schema");
+        let errors = validator.validate(&doc);
+        assert!(
+            errors.is_empty(),
+            "SEPA XML failed pain.008.001.02 XSD validation: {errors:?}"
+        );
     }
 }

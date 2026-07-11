@@ -88,6 +88,7 @@ jsonwebtoken = { version = "10.4.0", features = ["aws_lc_rs"] }
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 mockall = "0.14.0"
+uppsala = "0.9.0"
 
 [profile.release]
 lto = "fat"               # Enable Link Time Optimization with maximum optimization
