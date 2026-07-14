@@ -21,11 +21,11 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
 mini-moka = "0.10.3"
 axum =  "0.8.9"
-http-body-util = "0.1.3"
+http-body-util = "0.1.4"
 hyper = "1.10.1"
 tower = "0.5.3"
 tower-http = { version = "0.7.0", features = ["trace", "cors"] }
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 mime = "0.3.17"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
@@ -48,7 +48,7 @@ lettre = { version = "0.11.22", default-features = false, features = [
   "tokio1-rustls-tls",
   "tracing",
 ] }
-regex = "1.12.4"
+regex = "1.13.0"
 lazy_static = "1.5.0"
 csv = "1.4.0"
 encoding = "0.2.33"
@@ -62,12 +62,12 @@ sqlx = { version = "0.9.0", features = [
 ] }
 itertools = "0.15.0"
 harsh = "0.2.2"
-handlebars = "6.4.1"
+handlebars = "6.4.3"
 simple_excel_writer = { version = "0.2.0", features = ["chrono"] }
-printpdf = { version = "0.9.1", features = ["svg", "jpeg"] }
+printpdf = { version = "0.11.1", features = ["svg", "jpeg"] }
 image = "0.25.10"
 cfg = "0.10.1"
-lambda_http = { version = "1.2.1", default-features = false, features = [
+lambda_http = { version = "1.3.0", default-features = false, features = [
   "apigw_http",
 ] }
 tower-service = "0.3.3"
@@ -75,21 +75,21 @@ urlencoding = "2.1.3"
 iban_validate = "5.0.1"
 fints-institute-db = "1.5.0"
 num-traits = "0.2.19"
-quick-xml = "0.40.1"
-uuid = { version = "1.23.3", features = ["v4"] }
+quick-xml = "0.41.0"
+uuid = { version = "1.23.5", features = ["v4"] }
 dotenvy = "0.15.7"
-aws-config = "1.8.18"
-aws-sdk-secretsmanager = "1.108.0"
+aws-config = "1.9.0"
+aws-sdk-secretsmanager = "1.109.0"
 once_cell = "1.21.4"
-rustls = "0.23.40"
-hcaptcha = { version = "3.2.3", default-features = false, features = ["rustls-backend"] }
+rustls = "0.23.42"
+hcaptcha = { version = "3.2.4", default-features = false, features = ["rustls-backend"] }
 jsonwebtoken = { version = "10.4.0", features = ["aws_lc_rs"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
-mockall = "0.14.0"
+mockall = "0.15.0"
 uppsala = "0.9.0"
-zip = "0.5.13"
+zip = "8.6.0"
 
 [profile.release]
 lto = "fat"               # Enable Link Time Optimization with maximum optimization
