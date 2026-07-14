@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.12.0] - 2026-07-14
+
+### Features
+
+- Price-relevant custom field multiplies booking total
+
 ## [2.11.1] - 2026-07-11
 
 ### Bug Fixes
