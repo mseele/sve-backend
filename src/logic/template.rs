@@ -39,7 +39,7 @@ impl<'a> BookingTemplateData<'a> {
             lastname: booking.last_name.trim(),
             name: event.name.trim(),
             location: event.location.trim(),
-            price: booking.price(event).to_euro(),
+            price: booking.total_price(event).to_euro(),
             dates: format_dates(&event.dates),
             payment_details: format_payment_details(
                 &event.payment_account,

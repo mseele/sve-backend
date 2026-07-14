@@ -117,6 +117,7 @@ fn create_sheet(
         sheet_writer.append_row(row)?;
 
         for value in subscribers {
+            let price = value.total_price(event).to_euro();
             let mut row = Row::new();
             row.add_cell(value.id.to_string());
             row.add_cell(value.created.naive_utc());
@@ -127,7 +128,7 @@ fn create_sheet(
             row.add_cell(value.email);
             row.add_cell(opt(value.phone));
             row.add_cell(bool(value.member));
-            row.add_cell(event.price(value.member).to_euro());
+            row.add_cell(price);
             row.add_cell(value.payment_id);
             match event.payment_method {
                 PaymentMethod::BankTransfer => {
@@ -843,4 +844,94 @@ fn _create_participation_confirmation(
         warn!("PDF warning (participation confirmation): {:?}", w);
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Cursor, Read};
+
+    use bigdecimal::BigDecimal;
+    use chrono::Utc;
+    use zip::ZipArchive;
+
+    use crate::models::{
+        Event, EventCustomField, EventCustomFieldType, EventSubscription, EventType,
+        LifecycleStatus, PaymentMethod,
+    };
+
+    #[test]
+    fn test_export_price_relevant_field() {
+        let custom_field = EventCustomField::new(
+            1,
+            String::from("Anzahl"),
+            EventCustomFieldType::Number,
+            None,
+            None,
+            true,
+        );
+
+        let event = Event::new(
+            1,
+            Utc::now(),
+            None,
+            EventType::Fitness,
+            LifecycleStatus::Published,
+            String::from("Test Event"),
+            0,
+            String::from("short description"),
+            String::from("description"),
+            String::from("image"),
+            false,
+            vec![],
+            None,
+            60,
+            10,
+            5,
+            BigDecimal::from(20),
+            BigDecimal::from(25),
+            None,
+            String::from("location"),
+            String::from("booking_template"),
+            None,
+            None,
+            None,
+            false,
+            vec![custom_field],
+            PaymentMethod::BankTransfer,
+        );
+
+        let subscription = EventSubscription::new(
+            1,
+            Utc::now(),
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Musterstraße 1"),
+            String::from("12345 Musterstadt"),
+            String::from("max@example.com"),
+            Some(String::from("0123456789")),
+            true,
+            true,
+            String::from("PAY-123"),
+            None,
+            None,
+            None,
+            None,
+            vec![String::from("3")],
+        );
+
+        let (_filename, bytes) = super::export(event, vec![subscription], vec![]).unwrap();
+
+        let cursor = Cursor::new(&bytes);
+        let mut archive = ZipArchive::new(cursor).unwrap();
+        let mut content = String::new();
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).unwrap();
+            if file.name().ends_with(".xml") || file.name().ends_with(".rels") {
+                file.read_to_string(&mut content).unwrap();
+            }
+        }
+
+        assert!(content.contains("Betrag"));
+        assert!(content.contains("60,00"));
+    }
 }

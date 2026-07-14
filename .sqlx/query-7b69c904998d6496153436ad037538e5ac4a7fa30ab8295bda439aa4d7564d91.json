@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, custom_value_1)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Bool",
+        "Bool",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7b69c904998d6496153436ad037538e5ac4a7fa30ab8295bda439aa4d7564d91"
+}

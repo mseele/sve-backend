@@ -116,7 +116,7 @@ pub(crate) fn generate_sepa_xml(
 
     let ctrl_sum: f64 = bookings
         .iter()
-        .map(|(sub, _)| event.price(sub.member).to_f64().unwrap_or(0.0))
+        .map(|(sub, _)| sub.total_price(event).to_f64().unwrap_or(0.0))
         .sum();
     write_element(&mut writer, "CtrlSum", &format!("{:.2}", ctrl_sum))?;
 
@@ -167,7 +167,7 @@ pub(crate) fn generate_sepa_xml(
     write_element(&mut writer, "ChrgBr", "SLEV")?;
 
     for (sub, bic) in bookings {
-        let price = event.price(sub.member);
+        let price = sub.total_price(event);
         let mandate_ref = format!("SEPA-{}", sub.payment_id);
         let sign_date = sub.created.format("%Y-%m-%d").to_string();
 
@@ -232,10 +232,15 @@ pub(crate) fn generate_sepa_xml(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::models::{Event, EventSubscription, EventType, LifecycleStatus, PaymentMethod};
     use bigdecimal::BigDecimal;
     use chrono::Utc;
+
+    use crate::models::{
+        Event, EventCustomField, EventCustomFieldType, EventSubscription, EventType,
+        LifecycleStatus, PaymentMethod,
+    };
+
+    use super::*;
 
     #[test]
     fn test_validate_iban_str() {
@@ -347,5 +352,76 @@ mod tests {
             errors.is_empty(),
             "SEPA XML failed pain.008.001.02 XSD validation: {errors:?}"
         );
+    }
+
+    #[test]
+    fn test_generate_sepa_xml_with_price_relevant_field() {
+        let event = Event::new(
+            1,
+            Utc::now(),
+            None,
+            EventType::Events,
+            LifecycleStatus::Published,
+            "Test Event".to_string(),
+            0,
+            "Short".to_string(),
+            "Desc".to_string(),
+            "img.png".to_string(),
+            false,
+            vec![],
+            None,
+            60,
+            10,
+            5,
+            BigDecimal::from(20),
+            BigDecimal::from(25),
+            None,
+            "Location".to_string(),
+            "Template".to_string(),
+            None,
+            None,
+            None,
+            false,
+            vec![EventCustomField::new(
+                1,
+                "Anzahl".to_string(),
+                EventCustomFieldType::Number,
+                None,
+                None,
+                true,
+            )],
+            PaymentMethod::SepaDirectDebit,
+        );
+
+        let subscriber = EventSubscription::new(
+            1,
+            Utc::now(),
+            "Max".to_string(),
+            "Mustermann".to_string(),
+            "Teststr 1".to_string(),
+            "Teststadt".to_string(),
+            "max@test.com".to_string(),
+            None,
+            true,
+            true,
+            "PAY123".to_string(),
+            None,
+            None,
+            Some("DE89370400440532013000".to_string()),
+            None,
+            vec![String::from("3")],
+        );
+
+        let xml = generate_sepa_xml(
+            &event,
+            &[(subscriber, "COBADEFFXXX".to_string())],
+            "Test Creditor",
+            "DE89370400440532013000",
+            "COBADEFFXXX",
+        )
+        .unwrap();
+
+        assert!(xml.contains(r#"<InstdAmt Ccy="EUR">60.00</InstdAmt>"#));
+        assert!(xml.contains("<CtrlSum>60.00</CtrlSum>"));
     }
 }

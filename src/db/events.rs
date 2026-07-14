@@ -254,7 +254,8 @@ SELECT
 	ecf.name,
 	ecf.type,
 	ecf.min_value,
-	ecf.max_value
+	ecf.max_value,
+	ecf.price_relevant
 FROM
 	events e
 LEFT JOIN event_custom_fields ecf ON
@@ -288,6 +289,7 @@ ORDER BY
                 row.try_get("type")?,
                 row.try_get("min_value")?,
                 row.try_get("max_value")?,
+                row.try_get("price_relevant")?,
             ));
     }
 
@@ -393,6 +395,12 @@ pub(crate) async fn write_event(
     pool: &PgPool,
     partial_event: PartialEvent,
 ) -> Result<(Event, Option<Vec<DateTime<Utc>>>)> {
+    if let Some(custom_fields) = &partial_event.custom_fields
+        && custom_fields.iter().filter(|cf| cf.price_relevant).count() > 1
+    {
+        bail!("At most one price-relevant custom field is allowed per event");
+    }
+
     match partial_event.id {
         Some(id) => update_event(pool, &id, partial_event).await,
         None => Ok((save_new_event(pool, partial_event).await?, None)),
@@ -820,7 +828,8 @@ SELECT
 	ecf.name,
 	ecf.type AS "cf_type: EventCustomFieldType",
 	ecf.min_value,
-	ecf.max_value
+	ecf.max_value,
+	ecf.price_relevant
 FROM
 	events e
 LEFT JOIN event_custom_fields ecf ON
@@ -833,7 +842,16 @@ WHERE
     AND ecf.id IS NOT NULL"#,
         event_id.get_ref()
     )
-    .map(|row| EventCustomField::new(row.id, row.name, row.cf_type, row.min_value, row.max_value))
+    .map(|row| {
+        EventCustomField::new(
+            row.id,
+            row.name,
+            row.cf_type,
+            row.min_value,
+            row.max_value,
+            row.price_relevant,
+        )
+    })
     .fetch_all(conn)
     .await?;
 
@@ -1039,10 +1057,15 @@ fn map_event(row: &PgRow) -> Result<Event> {
 
 #[cfg(test)]
 mod db_integration_tests {
-    use super::*;
-    use crate::models::{EventType, LifecycleStatus, PartialEvent, PaymentMethod};
     use anyhow::Result;
     use chrono::{DateTime, Utc};
+
+    use crate::models::{
+        EventCustomField, EventCustomFieldType, EventType, LifecycleStatus, PartialEvent,
+        PaymentMethod,
+    };
+
+    use super::*;
 
     #[sqlx::test]
     async fn test_write_and_get_event(pool: PgPool) -> Result<()> {
@@ -1205,6 +1228,80 @@ mod db_integration_tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("Cannot change payment_method after bookings exist"));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_write_event_rejects_multiple_price_relevant_fields(pool: PgPool) -> Result<()> {
+        let cf1 = query!(
+            r#"INSERT INTO event_custom_fields (name, type, price_relevant)
+               VALUES ('Anzahl', 'Number', true)
+               RETURNING id"#
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        let cf2 = query!(
+            r#"INSERT INTO event_custom_fields (name, type, price_relevant)
+               VALUES ('Personen', 'Number', true)
+               RETURNING id"#
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        let custom_fields = vec![
+            EventCustomField::new(
+                cf1.id,
+                "Anzahl".to_string(),
+                EventCustomFieldType::Number,
+                None,
+                None,
+                true,
+            ),
+            EventCustomField::new(
+                cf2.id,
+                "Personen".to_string(),
+                EventCustomFieldType::Number,
+                None,
+                None,
+                true,
+            ),
+        ];
+
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Draft),
+            name: Some("Two price-relevant fields".to_string()),
+            sort_index: Some(0),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(60),
+            max_subscribers: Some(10),
+            max_waiting_list: Some(5),
+            price_member: Some("10.00".parse().unwrap()),
+            price_non_member: Some("15.00".parse().unwrap()),
+            location: Some("Gym".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            custom_fields: Some(custom_fields),
+            ..Default::default()
+        };
+
+        let result = write_event(&pool, partial).await;
+        assert!(
+            result.is_err(),
+            "write_event should reject more than one price-relevant custom field"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("At most one price-relevant custom field is allowed per event"),
+            "unexpected error: {err}"
+        );
 
         Ok(())
     }

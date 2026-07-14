@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT custom_value_1 FROM v_event_bookings WHERE event_id = $1 LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "custom_value_1",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "v_event_bookings",
+            "name": "custom_value_1"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "412997619c0b5d005a780db50252aded1bf21cae350f5247d18476f1c459fd2f"
+}

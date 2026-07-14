@@ -170,11 +170,24 @@ impl Event {
         }
     }
 
-    pub(crate) fn price(&self, is_member: bool) -> &BigDecimal {
-        match is_member {
-            true => &self.price_member,
-            false => &self.price_non_member,
-        }
+    /// Total booking price: base price multiplied by the value of the
+    /// single price-relevant custom field (if any).  Missing or
+    /// unparseable values fall back to the base price — the booking-time
+    /// validation path raises the user-facing error.
+    pub(crate) fn total_price(&self, is_member: bool, custom_values: &[String]) -> BigDecimal {
+        BookingCustomFieldValues::from_event_fields(&self.custom_fields, custom_values).total_price(
+            &self.price_member,
+            &self.price_non_member,
+            is_member,
+        )
+    }
+
+    /// Returns the parsed `i32` value of the price-relevant custom field,
+    /// or `None` if there is no price-relevant field or the value is
+    /// missing/unparseable.
+    pub(crate) fn price_relevant_multiplier(&self, custom_values: &[String]) -> Option<i32> {
+        BookingCustomFieldValues::from_event_fields(&self.custom_fields, custom_values)
+            .price_relevant_multiplier()
     }
 
     pub(crate) fn subject_prefix(&self) -> String {
@@ -375,6 +388,7 @@ pub(crate) struct EventCustomField {
     pub(crate) cf_type: EventCustomFieldType,
     pub(crate) min_value: Option<i32>,
     pub(crate) max_value: Option<i32>,
+    pub(crate) price_relevant: bool,
 }
 
 impl EventCustomField {
@@ -384,6 +398,7 @@ impl EventCustomField {
         cf_type: EventCustomFieldType,
         min_value: Option<i32>,
         max_value: Option<i32>,
+        price_relevant: bool,
     ) -> Self {
         Self {
             id,
@@ -391,7 +406,66 @@ impl EventCustomField {
             cf_type,
             min_value,
             max_value,
+            price_relevant,
         }
+    }
+}
+
+/// The custom values supplied with a booking together with the
+/// price-relevance metadata of their fields.  Bundling the two avoids
+/// passing parallel `[Option<String>; 4]` / `[bool; 4]` arrays around.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct BookingCustomFieldValues {
+    pub(crate) values: [Option<String>; 4],
+    pub(crate) price_relevant: [bool; 4],
+}
+
+impl BookingCustomFieldValues {
+    pub(crate) fn new(values: [Option<String>; 4], price_relevant: [bool; 4]) -> Self {
+        Self {
+            values,
+            price_relevant,
+        }
+    }
+
+    pub(crate) fn from_event_fields(custom_fields: &[EventCustomField], values: &[String]) -> Self {
+        let mut result = Self::default();
+        for (i, field) in custom_fields.iter().enumerate().take(4) {
+            result.price_relevant[i] = field.price_relevant;
+            result.values[i] = values.get(i).cloned();
+        }
+        result
+    }
+
+    /// Total price based on the member/non-member base price and the
+    /// value of the single price-relevant custom field (if any).  Missing
+    /// or unparseable values fall back to the base price.
+    pub(crate) fn total_price(
+        &self,
+        price_member: &BigDecimal,
+        price_non_member: &BigDecimal,
+        is_member: bool,
+    ) -> BigDecimal {
+        let base = match is_member {
+            true => price_member,
+            false => price_non_member,
+        };
+
+        match self.price_relevant_multiplier() {
+            Some(n) => base * BigDecimal::from(n),
+            None => base.clone(),
+        }
+    }
+
+    /// Returns the parsed `i32` value of the price-relevant custom field,
+    /// or `None` if there is no price-relevant field or the value is
+    /// missing/unparseable.
+    pub(crate) fn price_relevant_multiplier(&self) -> Option<i32> {
+        self.price_relevant
+            .iter()
+            .position(|&price_relevant| price_relevant)
+            .and_then(|i| self.values[i].as_ref())
+            .and_then(|v| v.parse::<i32>().ok())
     }
 }
 
@@ -449,8 +523,8 @@ impl EventBooking {
         self.member.unwrap_or(false)
     }
 
-    pub(crate) fn price<'a>(&'a self, event: &'a Event) -> &'a BigDecimal {
-        event.price(self.is_member())
+    pub(crate) fn total_price(&self, event: &Event) -> BigDecimal {
+        event.total_price(self.is_member(), &self.custom_values)
     }
 }
 
@@ -584,6 +658,10 @@ impl EventSubscription {
             comment,
             custom_values,
         }
+    }
+
+    pub(crate) fn total_price(&self, event: &Event) -> BigDecimal {
+        event.total_price(self.member, &self.custom_values)
     }
 }
 
@@ -1091,23 +1169,221 @@ mod tests {
         );
 
         let event = new_event("59.0", "69");
-        let price = member.price(&event);
-        assert_eq!(price, &BigDecimal::from_i8(59).unwrap());
+        let price = member.total_price(&event);
+        assert_eq!(price, BigDecimal::from_i8(59).unwrap());
         assert_eq!(price.to_euro(), "59,00 €");
-        let price = no_member.price(&event);
-        assert_eq!(price, &BigDecimal::from_i8(69).unwrap());
+        let price = no_member.total_price(&event);
+        assert_eq!(price, BigDecimal::from_i8(69).unwrap());
         assert_eq!(price.to_euro(), "69,00 €");
 
         let event = new_event("5.99", "9.99");
-        let price = member.price(&event);
-        assert_eq!(price, &BigDecimal::from_str("5.99").unwrap());
+        let price = member.total_price(&event);
+        assert_eq!(price, BigDecimal::from_str("5.99").unwrap());
         assert_eq!(price.to_euro(), "5,99 €");
-        let price = no_member.price(&event);
-        assert_eq!(price, &BigDecimal::from_str("9.99").unwrap());
+        let price = no_member.total_price(&event);
+        assert_eq!(price, BigDecimal::from_str("9.99").unwrap());
         assert_eq!(price.to_euro(), "9,99 €");
     }
 
+    #[test]
+    fn test_total_price() {
+        let price_relevant_field = EventCustomField::new(
+            0,
+            String::from("Anzahl"),
+            EventCustomFieldType::Number,
+            None,
+            None,
+            true,
+        );
+
+        let event =
+            new_event_with_custom_fields("25.0", "25.0", vec![price_relevant_field.clone()]);
+
+        // base × 8 = 200.00 (weinwanderung case)
+        let booking = EventBooking::new(
+            0,
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            Some(true),
+            None,
+            None,
+            vec![String::from("8")],
+            None,
+        );
+        let price = booking.total_price(&event);
+        assert_eq!(price, BigDecimal::from(200));
+        assert_eq!(price.to_euro(), "200,00 €");
+
+        // missing value -> base price
+        let booking_missing = EventBooking::new(
+            0,
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            Some(true),
+            None,
+            None,
+            Vec::new(),
+            None,
+        );
+        let price = booking_missing.total_price(&event);
+        assert_eq!(price, BigDecimal::from(25));
+
+        // unparseable value -> base price
+        let booking_unparseable = EventBooking::new(
+            0,
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            Some(true),
+            None,
+            None,
+            vec![String::from("abc")],
+            None,
+        );
+        let price = booking_unparseable.total_price(&event);
+        assert_eq!(price, BigDecimal::from(25));
+
+        // value = 0 -> 0.00
+        let booking_zero = EventBooking::new(
+            0,
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            Some(true),
+            None,
+            None,
+            vec![String::from("0")],
+            None,
+        );
+        let price = booking_zero.total_price(&event);
+        assert_eq!(price, BigDecimal::from(0));
+        assert_eq!(price.to_euro(), "0,00 €");
+
+        // base unchanged when no field is price-relevant
+        let event_no_pr = new_event("59.0", "69");
+        let booking_no_pr = EventBooking::new(
+            0,
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            Some(true),
+            None,
+            None,
+            vec![String::from("8")],
+            None,
+        );
+        let price = booking_no_pr.total_price(&event_no_pr);
+        assert_eq!(price, BigDecimal::from_i8(59).unwrap());
+    }
+
+    #[test]
+    fn test_subscription_total_price() {
+        let price_relevant_field = EventCustomField::new(
+            0,
+            String::from("Anzahl"),
+            EventCustomFieldType::Number,
+            None,
+            None,
+            true,
+        );
+
+        let event =
+            new_event_with_custom_fields("25.0", "25.0", vec![price_relevant_field.clone()]);
+
+        // base × 3 = 75.00
+        let sub = EventSubscription::new(
+            0,
+            Utc::now(),
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            true,
+            true,
+            String::from("pay-1"),
+            None,
+            None,
+            None,
+            None,
+            vec![String::from("3")],
+        );
+        assert_eq!(sub.total_price(&event), BigDecimal::from(75));
+
+        // missing value -> base price
+        let sub_missing = EventSubscription::new(
+            0,
+            Utc::now(),
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            true,
+            true,
+            String::from("pay-2"),
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+        );
+        assert_eq!(sub_missing.total_price(&event), BigDecimal::from(25));
+
+        // no price-relevant field -> base price
+        let event_no_pr = new_event("59.0", "69");
+        let sub_no_pr = EventSubscription::new(
+            0,
+            Utc::now(),
+            String::from("first_name"),
+            String::from("last_name"),
+            String::from("street"),
+            String::from("city"),
+            String::from("email"),
+            None,
+            true,
+            true,
+            String::from("pay-3"),
+            None,
+            None,
+            None,
+            None,
+            vec![String::from("8")],
+        );
+        assert_eq!(
+            sub_no_pr.total_price(&event_no_pr),
+            BigDecimal::from_i8(59).unwrap()
+        );
+    }
+
     fn new_event(price_member: &str, price_non_member: &str) -> Event {
+        new_event_with_custom_fields(price_member, price_non_member, Vec::new())
+    }
+
+    fn new_event_with_custom_fields(
+        price_member: &str,
+        price_non_member: &str,
+        custom_fields: Vec<EventCustomField>,
+    ) -> Event {
         Event::new(
             0,
             Utc::now(),
@@ -1134,7 +1410,7 @@ mod tests {
             None,
             None,
             false,
-            Vec::new(),
+            custom_fields,
             PaymentMethod::BankTransfer,
         )
     }

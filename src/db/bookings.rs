@@ -6,10 +6,33 @@ use sqlx::{PgConnection, PgPool, Postgres, QueryBuilder, Row, query, query_scala
 
 use super::events::fetch_event;
 use crate::models::{
-    Event, EventBooking, EventCounter, EventCustomField, EventCustomFieldType, EventId,
-    EventSubscription, EventType, LifecycleStatus, PaymentMethod, SepaPaymentNotAllowed,
-    UnpaidEventBooking, VerifyPaymentBookingRecord,
+    BookingCustomFieldValues, Event, EventBooking, EventCounter, EventCustomField,
+    EventCustomFieldType, EventId, EventSubscription, EventType, LifecycleStatus, PaymentMethod,
+    SepaPaymentNotAllowed, UnpaidEventBooking, VerifyPaymentBookingRecord,
 };
+
+async fn fetch_price_relevant_flags(
+    pool: &PgPool,
+    custom_field_ids: &HashSet<i32>,
+) -> Result<HashMap<i32, bool>> {
+    if custom_field_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut query_builder: QueryBuilder<Postgres> =
+        QueryBuilder::new("SELECT id, price_relevant FROM event_custom_fields WHERE id IN(");
+    let mut separated = query_builder.separated(", ");
+    for id in custom_field_ids {
+        separated.push_bind(id);
+    }
+    separated.push_unseparated(")");
+
+    let rows = query_builder.build().fetch_all(pool).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| (row.get("id"), row.get("price_relevant")))
+        .collect())
+}
 
 pub(crate) async fn get_bookings_to_verify_payment(
     pool: &PgPool,
@@ -21,10 +44,17 @@ SELECT
     b.id,
     e.name AS event_name,
     CONCAT (s.first_name, ' ', s.last_name) AS full_name,
-    CASE WHEN s.member IS TRUE
-        THEN e.price_member
-        ELSE e.price_non_member
-    END as price,
+    e.price_member,
+    e.price_non_member,
+    s.member,
+    b.custom_value_1,
+    b.custom_value_2,
+    b.custom_value_3,
+    b.custom_value_4,
+    e.custom_field_1,
+    e.custom_field_2,
+    e.custom_field_3,
+    e.custom_field_4,
     b.payment_id,
     b.canceled,
     b.enrolled,
@@ -47,22 +77,80 @@ WHERE
 ORDER BY
     b.created"#,
     );
-    let result = query_builder
-        .build()
+    let rows = query_builder.build().fetch_all(pool).await?;
+
+    let mut custom_field_ids = HashSet::new();
+    let custom_field_columns = [
+        "custom_field_1",
+        "custom_field_2",
+        "custom_field_3",
+        "custom_field_4",
+    ];
+    for row in &rows {
+        for column in custom_field_columns {
+            if let Some(id) = row.try_get::<Option<i32>, _>(column)? {
+                custom_field_ids.insert(id);
+            }
+        }
+    }
+
+    let price_relevant_by_id = fetch_price_relevant_flags(pool, &custom_field_ids).await?;
+
+    let result = rows
+        .into_iter()
         .map(|row| {
+            let custom_values = [
+                row.try_get::<Option<String>, _>("custom_value_1")
+                    .ok()
+                    .flatten(),
+                row.try_get::<Option<String>, _>("custom_value_2")
+                    .ok()
+                    .flatten(),
+                row.try_get::<Option<String>, _>("custom_value_3")
+                    .ok()
+                    .flatten(),
+                row.try_get::<Option<String>, _>("custom_value_4")
+                    .ok()
+                    .flatten(),
+            ];
+            let custom_field_ids = [
+                row.try_get::<Option<i32>, _>("custom_field_1")
+                    .ok()
+                    .flatten(),
+                row.try_get::<Option<i32>, _>("custom_field_2")
+                    .ok()
+                    .flatten(),
+                row.try_get::<Option<i32>, _>("custom_field_3")
+                    .ok()
+                    .flatten(),
+                row.try_get::<Option<i32>, _>("custom_field_4")
+                    .ok()
+                    .flatten(),
+            ];
+            let price_relevant_flags = std::array::from_fn(|i| {
+                custom_field_ids[i]
+                    .and_then(|id| price_relevant_by_id.get(&id).copied())
+                    .unwrap_or(false)
+            });
+            let price = BookingCustomFieldValues::new(custom_values, price_relevant_flags)
+                .total_price(
+                    &row.get("price_member"),
+                    &row.get("price_non_member"),
+                    row.get("member"),
+                );
+
             VerifyPaymentBookingRecord::new(
                 row.get("id"),
                 row.get("event_name"),
                 row.get("full_name"),
-                row.get("price"),
+                price,
                 row.get("payment_id"),
                 row.get("canceled"),
                 row.get("enrolled"),
                 row.get("payment_confirmed_at"),
             )
         })
-        .fetch_all(pool)
-        .await?;
+        .collect();
 
     Ok(result)
 }
@@ -78,7 +166,7 @@ pub(crate) async fn get_event_bookings_without_payment(
         String,
     )>,
 > {
-    let result = query!(
+    let rows = query!(
         r#"
 SELECT
     e.id AS event_id,
@@ -90,10 +178,17 @@ SELECT
     s.first_name,
     s.last_name,
     s.email,
-    CASE WHEN s.member IS TRUE
-        THEN e.price_member
-        ELSE e.price_non_member
-    END as price,
+    e.price_member,
+    e.price_non_member,
+    s.member,
+    b.custom_value_1,
+    b.custom_value_2,
+    b.custom_value_3,
+    b.custom_value_4,
+    e.custom_field_1,
+    e.custom_field_2,
+    e.custom_field_3,
+    e.custom_field_4,
     b.payment_id,
     b.payment_reminder_sent
 FROM
@@ -124,28 +219,69 @@ ORDER BY
     b.created"#,
         event_type as EventType
     )
-    .map(|row| {
-        (
-            UnpaidEventBooking::new(
-                row.event_id.into(),
-                row.event_name,
-                row.id,
-                row.created,
-                row.first_name,
-                row.last_name,
-                row.email,
-                row.price.unwrap(),
-                row.payment_id,
-                None,
-                row.payment_reminder_sent,
-            ),
-            row.created,
-            row.first_event_date,
-            row.event_template,
-        )
-    })
     .fetch_all(pool)
     .await?;
+
+    let mut custom_field_ids = HashSet::new();
+    for row in &rows {
+        for id in [
+            row.custom_field_1,
+            row.custom_field_2,
+            row.custom_field_3,
+            row.custom_field_4,
+        ]
+        .iter()
+        .flatten()
+        {
+            custom_field_ids.insert(*id);
+        }
+    }
+
+    let price_relevant_by_id = fetch_price_relevant_flags(pool, &custom_field_ids).await?;
+
+    let result = rows
+        .into_iter()
+        .map(|row| {
+            let custom_values = [
+                row.custom_value_1.clone(),
+                row.custom_value_2.clone(),
+                row.custom_value_3.clone(),
+                row.custom_value_4.clone(),
+            ];
+            let custom_field_ids = [
+                row.custom_field_1,
+                row.custom_field_2,
+                row.custom_field_3,
+                row.custom_field_4,
+            ];
+            let price_relevant_flags = std::array::from_fn(|i| {
+                custom_field_ids[i]
+                    .and_then(|id| price_relevant_by_id.get(&id).copied())
+                    .unwrap_or(false)
+            });
+            let price = BookingCustomFieldValues::new(custom_values, price_relevant_flags)
+                .total_price(&row.price_member, &row.price_non_member, row.member);
+
+            (
+                UnpaidEventBooking::new(
+                    row.event_id.into(),
+                    row.event_name,
+                    row.id,
+                    row.created,
+                    row.first_name,
+                    row.last_name,
+                    row.email,
+                    price,
+                    row.payment_id,
+                    None,
+                    row.payment_reminder_sent,
+                ),
+                row.created,
+                row.first_event_date,
+                row.event_template,
+            )
+        })
+        .collect();
 
     Ok(result)
 }
@@ -251,12 +387,22 @@ SELECT
     name,
     type AS "cf_type: EventCustomFieldType",
     min_value,
-    max_value
+    max_value,
+    price_relevant
 FROM
     event_custom_fields
 "#
     )
-    .map(|row| EventCustomField::new(row.id, row.name, row.cf_type, row.min_value, row.max_value))
+    .map(|row| {
+        EventCustomField::new(
+            row.id,
+            row.name,
+            row.cf_type,
+            row.min_value,
+            row.max_value,
+            row.price_relevant,
+        )
+    })
     .fetch_all(pool)
     .await?;
 
@@ -1013,11 +1159,15 @@ pub(crate) async fn mark_sepa_exported(conn: &mut PgConnection, booking_ids: &[i
 
 #[cfg(test)]
 mod db_integration_tests {
-    use super::*;
-    use crate::models::{EventType, LifecycleStatus, PartialEvent, PaymentMethod};
-    use anyhow::Result;
-    use chrono::{DateTime, Utc};
     use std::collections::HashMap;
+
+    use anyhow::Result;
+    use bigdecimal::BigDecimal;
+    use chrono::{DateTime, Utc};
+
+    use crate::models::{EventType, LifecycleStatus, PartialEvent, PaymentMethod};
+
+    use super::*;
 
     #[sqlx::test]
     async fn test_get_and_cancel_booking(pool: PgPool) -> Result<()> {
@@ -1719,6 +1869,262 @@ mod db_integration_tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("mark_as_paid can only be called with BankTransfer bookings"));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_verify_payment_total_price_with_price_relevant_field(pool: PgPool) -> Result<()> {
+        use crate::models::EventCustomField;
+        use crate::models::EventCustomFieldType;
+
+        // create a price-relevant custom field
+        let cf_row = query!(
+            r#"INSERT INTO event_custom_fields (name, type, price_relevant)
+               VALUES ('Anzahl', 'Number', true)
+               RETURNING id"#
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Weinwanderung".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("25.00".parse().unwrap()),
+            price_non_member: Some("30.00".parse().unwrap()),
+            location: Some("Weingut".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("DE1234".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            custom_fields: Some(vec![EventCustomField::new(
+                cf_row.id,
+                "Anzahl".to_string(),
+                EventCustomFieldType::Number,
+                None,
+                None,
+                true,
+            )]),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        // subscriber with custom_value_1 = "3" → price = 25 × 3 = 75
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Max",
+            "Mustermann",
+            "Teststr 1",
+            "Vienna",
+            "max@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'max@example.com'"#)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, custom_value_1)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_pr_001",
+            "3"
+        )
+        .execute(&pool)
+        .await?;
+
+        let pay_id = "pay_pr_001".to_string();
+        let mut payment_ids = HashSet::new();
+        payment_ids.insert(&pay_id);
+        let bookings = get_bookings_to_verify_payment(&pool, payment_ids).await?;
+        assert_eq!(bookings.len(), 1);
+        assert_eq!(bookings[0].price, BigDecimal::from(75));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_verify_payment_base_price_without_price_relevant_field(
+        pool: PgPool,
+    ) -> Result<()> {
+        let partial = PartialEvent {
+            event_type: Some(EventType::Fitness),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Yoga".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(60),
+            max_subscribers: Some(10),
+            max_waiting_list: Some(5),
+            price_member: Some("15.00".parse().unwrap()),
+            price_non_member: Some("20.00".parse().unwrap()),
+            location: Some("Studio".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("DE1234".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Jane",
+            "Doe",
+            "Main St",
+            "Vienna",
+            "jane@example.com",
+            None::<String>,
+            false
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'jane@example.com'"#)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id)
+            VALUES ($1, $2, $3, $4, $5, $6)"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_base_001"
+        )
+        .execute(&pool)
+        .await?;
+
+        let pay_id = "pay_base_001".to_string();
+        let mut payment_ids = HashSet::new();
+        payment_ids.insert(&pay_id);
+        let bookings = get_bookings_to_verify_payment(&pool, payment_ids).await?;
+        assert_eq!(bookings.len(), 1);
+        assert_eq!(bookings[0].price, "20.00".parse::<BigDecimal>().unwrap());
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_unpaid_bookings_total_price_with_price_relevant_field(
+        pool: PgPool,
+    ) -> Result<()> {
+        use crate::models::EventCustomField;
+        use crate::models::EventCustomFieldType;
+
+        let cf_row = query!(
+            r#"INSERT INTO event_custom_fields (name, type, price_relevant)
+               VALUES ('Anzahl', 'Number', true)
+               RETURNING id"#
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Published),
+            name: Some("Weinwanderung".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short".to_string()),
+            description: Some("Full".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(90),
+            max_subscribers: Some(20),
+            max_waiting_list: Some(5),
+            price_member: Some("25.00".parse().unwrap()),
+            price_non_member: Some("30.00".parse().unwrap()),
+            location: Some("Weingut".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("DE1234".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            payment_method: Some(PaymentMethod::BankTransfer),
+            custom_fields: Some(vec![EventCustomField::new(
+                cf_row.id,
+                "Anzahl".to_string(),
+                EventCustomFieldType::Number,
+                None,
+                None,
+                true,
+            )]),
+            ..Default::default()
+        };
+
+        let (event, _) = crate::db::events::write_event(&pool, partial).await?;
+        let event_id = event.id;
+
+        query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Max",
+            "Mustermann",
+            "Teststr 1",
+            "Vienna",
+            "max@example.com",
+            None::<String>,
+            true
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row =
+            query!(r#"SELECT id FROM event_subscribers WHERE email = 'max@example.com'"#)
+                .fetch_one(&pool)
+                .await?;
+        let subscriber_id = subscriber_row.id;
+
+        // booking with custom_value_1 = "4" → price = 25 × 4 = 100
+        query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at, custom_value_1)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            event_id.get_ref(),
+            subscriber_id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_unpr_001",
+            None::<DateTime<Utc>>,
+            "4"
+        )
+        .execute(&pool)
+        .await?;
+
+        let unpaid = get_event_bookings_without_payment(&pool, EventType::Events).await?;
+        assert_eq!(unpaid.len(), 1);
+        assert_eq!(unpaid[0].0.price, BigDecimal::from(100));
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\nSELECT\n\tecf.id,\n\tecf.name,\n\tecf.type AS \"cf_type: EventCustomFieldType\",\n\tecf.min_value,\n\tecf.max_value\nFROM\n\tevents e\nLEFT JOIN event_custom_fields ecf ON\n\tecf.id = any(array[e.custom_field_1,\n\te.custom_field_2,\n\te.custom_field_3,\n\te.custom_field_4])\nWHERE\n\te.id = $1\n    AND ecf.id IS NOT NULL",
+  "query": "\nSELECT\n    id,\n    name,\n    type AS \"cf_type: EventCustomFieldType\",\n    min_value,\n    max_value,\n    price_relevant\nFROM\n    event_custom_fields\n",
   "describe": {
     "columns": [
       {
@@ -67,20 +67,30 @@
             "name": "max_value"
           }
         }
+      },
+      {
+        "ordinal": 5,
+        "name": "price_relevant",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "event_custom_fields",
+            "name": "price_relevant"
+          }
+        }
       }
     ],
     "parameters": {
-      "Left": [
-        "Int4"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
       false,
       false,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "4de0b9e51e426cb953d7f78f1760254d1acc8e708ad2cb95e8dac2f7b726aa5a"
+  "hash": "f0592dc0892eea501bae82a5caa46cc350ef3fd4ff5cd939a23b37d5a0d859df"
 }

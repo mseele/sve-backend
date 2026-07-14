@@ -650,6 +650,13 @@ async fn book_event(
         booking.iban = None;
     }
 
+    let price_multiplier = event.price_relevant_multiplier(&booking.custom_values);
+    if event.custom_fields.iter().any(|cf| cf.price_relevant) && price_multiplier.is_none() {
+        bail!(ValidationError::new(
+            "Bitte gib eine gültige Anzahl ein.".to_string()
+        ));
+    }
+
     let booking_result = db::book_event(pool, &booking).await?;
     let booking_response = match booking_result {
         BookingResult::Booked(event, counter, payment_id) => {
@@ -1169,7 +1176,7 @@ pub(crate) async fn send_participation_confirmation(
     let mut messages = Vec::new();
     for subscriber in subscribers {
         if subscriber.enrolled {
-            let price = event.price(subscriber.member).to_euro();
+            let price = subscriber.total_price(&event).to_euro();
 
             let bytes = export::create_participation_confirmation(
                 subscriber.first_name.clone(),
@@ -1212,10 +1219,11 @@ pub(crate) async fn send_participation_confirmation(
 mod tests {
     use std::str::FromStr;
 
-    use super::*;
     use bigdecimal::{BigDecimal, FromPrimitive};
     use chrono::{NaiveDate, Utc};
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[test]
     fn test_create_prebooking_link() {
@@ -1715,14 +1723,16 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 
 #[cfg(test)]
 mod events_integration_tests {
-    use super::*;
-    use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent, PaymentMethod};
-    use crate::test_utils::{mock_email_sender, noop_mock};
     use anyhow::Result;
     use bigdecimal::BigDecimal;
     use chrono::{Duration, Utc};
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
+
+    use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent, PaymentMethod};
+    use crate::test_utils::{mock_email_sender, mock_email_sender_capturing, noop_mock};
+
+    use super::*;
 
     fn mock_email_sender_times(
         accounts: Vec<(crate::models::EmailType, &str)>,
@@ -1779,6 +1789,10 @@ mod events_integration_tests {
     }
 
     fn make_booking(event_id: EventId) -> EventBooking {
+        make_booking_with_values(event_id, vec![])
+    }
+
+    fn make_booking_with_values(event_id: EventId, custom_values: Vec<String>) -> EventBooking {
         EventBooking {
             event_id,
             first_name: "Max".to_string(),
@@ -1790,10 +1804,58 @@ mod events_integration_tests {
             member: Some(true),
             updates: Some(false),
             comments: None,
-            custom_values: vec![],
+            custom_values,
             token: None,
             iban: None,
         }
+    }
+
+    async fn weinwanderung_event(pool: &PgPool) -> Result<Event> {
+        use crate::models::{EventCustomField, EventCustomFieldType};
+
+        let cf_row = sqlx::query!(
+            r#"INSERT INTO event_custom_fields (name, type, price_relevant)
+               VALUES ('Anzahl', 'Number', true)
+               RETURNING id"#
+        )
+        .fetch_one(pool)
+        .await?;
+        let cf = EventCustomField::new(
+            cf_row.id,
+            "Anzahl".to_string(),
+            EventCustomFieldType::Number,
+            None,
+            None,
+            true,
+        );
+
+        let event = db::write_event(
+            pool,
+            PartialEvent {
+                event_type: Some(EventType::Events),
+                lifecycle_status: Some(LifecycleStatus::Published),
+                name: Some("Weinwanderung".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Full".to_string()),
+                image: Some("test.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![Utc::now() + Duration::try_days(30).unwrap()]),
+                duration_in_minutes: Some(120),
+                max_subscribers: Some(20),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(25)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Weingut".to_string()),
+                booking_template: Some("Hallo {{firstname}}, Preis: {{price}}".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                custom_fields: Some(vec![cf]),
+                ..Default::default()
+            },
+        )
+        .await?;
+        Ok(event.0)
     }
 
     #[sqlx::test]
@@ -2344,6 +2406,68 @@ mod events_integration_tests {
             ),
             "Expected NotASepaEvent, got: {:?}",
             sepa_err
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_booking_price_relevant_custom_field(pool: PgPool) -> Result<()> {
+        use crate::models::EmailType;
+
+        let event = weinwanderung_event(&pool).await?;
+
+        // Book with custom_values = ["3"] → total = 25 × 3 = 75
+        let booking = make_booking_with_values(event.id, vec!["3".to_string()]);
+
+        let (mock_sender, captured) =
+            mock_email_sender_capturing(vec![(EmailType::Events, "test@example.com")]);
+
+        let response = super::booking(&pool, booking, &mock_sender).await;
+        assert!(response.success, "Booking should succeed");
+
+        // Verify confirmation email shows 75,00 € (25 × 3)
+        let messages = captured.lock().unwrap();
+        assert_eq!(messages.len(), 1, "One confirmation email should be sent");
+        let formatted = messages[0].formatted();
+        let body = String::from_utf8_lossy(&formatted);
+        assert!(
+            body.contains("75,00"),
+            "Email body should show 75,00 € — got: {body}"
+        );
+
+        // Verify booking persisted with custom_value_1 = "3"
+        let persisted = sqlx::query!(
+            r#"SELECT custom_value_1 FROM v_event_bookings WHERE event_id = $1 LIMIT 1"#,
+            event.id.get_ref()
+        )
+        .fetch_one(&pool)
+        .await?;
+        assert_eq!(persisted.custom_value_1.as_deref(), Some("3"));
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_booking_price_relevant_custom_field_validation(pool: PgPool) -> Result<()> {
+        let event = weinwanderung_event(&pool).await?;
+
+        // Missing value for the price-relevant field: rejected before any email is
+        // sent. noop_mock has no expectations, so any email call would panic —
+        // proving the validation branch fires before the confirmation-email path.
+        let missing = make_booking_with_values(event.id, vec![]);
+        let response = super::booking(&pool, missing, &noop_mock()).await;
+        assert!(
+            !response.success,
+            "Booking with a missing price-relevant value should be rejected"
+        );
+
+        // Non-numeric value: also rejected before any email is sent.
+        let non_numeric = make_booking_with_values(event.id, vec!["abc".to_string()]);
+        let response = super::booking(&pool, non_numeric, &noop_mock()).await;
+        assert!(
+            !response.success,
+            "Booking with a non-numeric price-relevant value should be rejected"
         );
 
         Ok(())
