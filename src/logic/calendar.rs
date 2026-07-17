@@ -46,7 +46,7 @@ pub(crate) async fn renew_watch(client: &CalendarClient) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logic::secrets::EnvSecretProvider;
+    use crate::logic::secrets::ConsolidatedAwsSecretProvider;
     use std::sync::Arc;
 
     fn init_crypto() {
@@ -58,7 +58,7 @@ mod tests {
     async fn test_appointments() {
         init_crypto();
 
-        let client = CalendarClient::new(Arc::new(EnvSecretProvider));
+        let client = CalendarClient::new(Arc::new(ConsolidatedAwsSecretProvider::new()));
         let result = appointments(&client).await;
         assert!(result.is_ok(), "appointments() failed: {:?}", result.err());
     }
@@ -67,7 +67,7 @@ mod tests {
     async fn test_renew_watch() {
         init_crypto();
 
-        let client = CalendarClient::new(Arc::new(EnvSecretProvider));
+        let client = CalendarClient::new(Arc::new(ConsolidatedAwsSecretProvider::new()));
         let result = renew_watch(&client).await;
         assert!(result.is_ok(), "renew_watch() failed: {:?}", result.err());
     }
