@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.12.2] - 2026-07-17
+
+### Bug Fixes
+
+- Correct env regression
+
 ## [2.12.1] - 2026-07-17
 
 ### Bug Fixes
