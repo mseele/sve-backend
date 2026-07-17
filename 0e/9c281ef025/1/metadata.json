@@ -1,0 +1,108 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "0e9c281ef025",
+  "session_id": "ses_08e9bf0fbffeoYcuyasnCPqVaN",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-17T19:36:01.844895Z",
+  "branch": "feature/email-gateway-seal",
+  "checkpoints_count": 3,
+  "save_step_count": 3,
+  "files_touched": [
+    "src/logic/banking.rs"
+  ],
+  "agent": "OpenCode",
+  "model": "glm-5.2",
+  "turn_id": "241de729e7c0",
+  "checkpoint_transcript_start": 50,
+  "transcript_lines_at_start": 50,
+  "compact_transcript_start": 50,
+  "token_usage": {
+    "input_tokens": 242852,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 518272,
+    "output_tokens": 6883,
+    "api_call_count": 9
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-17T19:36:01.78902Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 2,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 2,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 168,
+      "user_lines_removed": 229,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "src/email.rs": 75,
+        "src/logic/contact.rs": 28,
+        "src/logic/news.rs": 11,
+        "src/models.rs": 20,
+        "src/test_utils.rs": 34
+      },
+      "user_removed_per_file": {
+        "src/email.rs": 45,
+        "src/logic/contact.rs": 79,
+        "src/logic/news.rs": 8,
+        "src/models.rs": 5,
+        "src/test_utils.rs": 92
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 18,
+      "user_lines_removed": 45,
+      "agent_lines_added": 208,
+      "agent_lines_removed": 250,
+      "user_added_per_file": {
+        "src/api.rs": 3,
+        "src/logic/events.rs": 1,
+        "src/logic/membership.rs": 3,
+        "src/logic/tasks.rs": 11
+      },
+      "user_removed_per_file": {
+        "src/api.rs": 3,
+        "src/logic/events.rs": 1,
+        "src/logic/membership.rs": 3,
+        "src/logic/tasks.rs": 38
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 96,
+      "user_lines_removed": 74,
+      "agent_lines_added": 254,
+      "agent_lines_removed": 319,
+      "user_added_per_file": {
+        "src/email.rs": 3,
+        "src/logic/banking.rs": 2,
+        "src/logic/contact.rs": 1,
+        "src/logic/events.rs": 62,
+        "src/logic/membership.rs": 11,
+        "src/logic/tasks.rs": 1,
+        "src/test_utils.rs": 16
+      },
+      "user_removed_per_file": {
+        "src/email.rs": 11,
+        "src/logic/banking.rs": 2,
+        "src/logic/contact.rs": 1,
+        "src/logic/events.rs": 38,
+        "src/logic/membership.rs": 10,
+        "src/logic/tasks.rs": 1,
+        "src/test_utils.rs": 11
+      }
+    }
+  ]
+}

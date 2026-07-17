@@ -3,7 +3,7 @@
   "checkpoint_id": "0e9c281ef025",
   "strategy": "manual-commit",
   "branch": "feature/email-gateway-seal",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": [
     "src/logic/banking.rs"
   ],
@@ -14,13 +14,20 @@
       "compact_transcript": "/0e/9c281ef025/0/transcript.jsonl",
       "content_hash": "/0e/9c281ef025/0/content_hash.txt",
       "prompt": "/0e/9c281ef025/0/prompt.txt"
+    },
+    {
+      "metadata": "/0e/9c281ef025/1/metadata.json",
+      "transcript": "/0e/9c281ef025/1/full.jsonl",
+      "compact_transcript": "/0e/9c281ef025/1/transcript.jsonl",
+      "content_hash": "/0e/9c281ef025/1/content_hash.txt",
+      "prompt": "/0e/9c281ef025/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 315040,
+    "input_tokens": 557892,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 10364416,
-    "output_tokens": 39753,
-    "api_call_count": 144
+    "cache_read_tokens": 10882688,
+    "output_tokens": 46636,
+    "api_call_count": 153
   }
 }
