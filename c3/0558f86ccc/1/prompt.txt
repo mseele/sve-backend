@@ -1,0 +1,1 @@
+this is the new exported file ~/Downloads/sepa-sepa-test-kurs-2026-07-17.xml. verify it should now work
