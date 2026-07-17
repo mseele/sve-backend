@@ -1,0 +1,1 @@
+we've implemented a sepa export (example file ~/Downloads/sepa-sepa-test-kurs-2026-07-11.xml) but it seems that the format is wrong - its not working in the . this is a file that works: ~/Downloads/2026-07-17_CDC_DE28642910100034469001_EUR_1120325.xml. analyze that is different and where the problem is.

@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "3fdc6c4fda91",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    ".env.example",
+    "src/logic/banking.rs",
+    "src/logic/events.rs",
+    "src/logic/secrets.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/3f/dc6c4fda91/0/metadata.json",
+      "transcript": "/3f/dc6c4fda91/0/full.jsonl",
+      "compact_transcript": "/3f/dc6c4fda91/0/transcript.jsonl",
+      "content_hash": "/3f/dc6c4fda91/0/content_hash.txt",
+      "prompt": "/3f/dc6c4fda91/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 135990,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3011443,
+    "output_tokens": 17199,
+    "api_call_count": 48
+  }
+}

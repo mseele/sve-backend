@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "3fdc6c4fda91",
+  "session_id": "ses_08e9bf0fbffeoYcuyasnCPqVaN",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-17T18:54:57.153295Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [
+    ".env.example",
+    "src/logic/banking.rs",
+    "src/logic/events.rs",
+    "src/logic/secrets.rs"
+  ],
+  "agent": "OpenCode",
+  "model": "glm-5.2",
+  "turn_id": "be34947221b4",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 135990,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3011443,
+    "output_tokens": 17199,
+    "api_call_count": 48
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-17T18:54:57.12192Z",
+    "agent_lines": 49,
+    "agent_removed": 4,
+    "human_added": 0,
+    "human_modified": 2,
+    "human_removed": 0,
+    "total_committed": 51,
+    "total_lines_changed": 55,
+    "agent_percentage": 96.36363636363636,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 267,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".opencode/plugins/entire.ts": 267
+      }
+    }
+  ]
+}
