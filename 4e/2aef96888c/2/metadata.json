@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "4e2aef96888c",
+  "session_id": "ses_08e668e64ffedeTIasdOcyEce5",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-17T20:12:03.317447Z",
+  "branch": "feature/email-gateway-seal",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/api.rs",
+    "src/logic/events.rs",
+    "src/logic/events/mod.rs",
+    "src/logic/events/notifications.rs",
+    "src/logic/tasks.rs",
+    "src/test_utils.rs"
+  ],
+  "agent": "OpenCode",
+  "model": "glm-5.2",
+  "turn_id": "f420510af1ab",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 353946,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 14200320,
+    "output_tokens": 55245,
+    "api_call_count": 154
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-17T20:12:03.250936Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 2149,
+    "human_removed": 486,
+    "total_committed": 0,
+    "total_lines_changed": 2635,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 2587,
+      "user_lines_removed": 2551,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "src/api.rs": 1,
+        "src/logic/events/mod.rs": 2070,
+        "src/logic/events/notifications.rs": 475,
+        "src/logic/tasks.rs": 4,
+        "src/test_utils.rs": 37
+      },
+      "user_removed_per_file": {
+        "src/api.rs": 1,
+        "src/logic/events.rs": 2547,
+        "src/logic/tasks.rs": 3
+      }
+    }
+  ]
+}
