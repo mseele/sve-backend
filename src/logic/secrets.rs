@@ -30,6 +30,7 @@ pub(crate) enum SecretKey {
     EmailAccounts,
     SepaCreditorName,
     SepaCreditorIban,
+    SepaCreditorId,
     SessionSecret,
 }
 
@@ -43,6 +44,7 @@ impl SecretKey {
             Self::EmailAccounts => "EMAIL_ACCOUNTS",
             Self::SepaCreditorName => "SEPA_CREDITOR_NAME",
             Self::SepaCreditorIban => "SEPA_CREDITOR_IBAN",
+            Self::SepaCreditorId => "SEPA_CREDITOR_ID",
             Self::SessionSecret => "SESSION_SECRET",
         }
     }
@@ -80,6 +82,8 @@ struct Secrets {
     sepa_creditor_name: String,
     #[serde(default, rename = "SEPA_CREDITOR_IBAN")]
     sepa_creditor_iban: String,
+    #[serde(default, rename = "SEPA_CREDITOR_ID")]
+    sepa_creditor_id: String,
     #[serde(rename = "SESSION_SECRET")]
     session_secret: String,
 }
@@ -160,6 +164,7 @@ impl SecretProvider for ConsolidatedAwsSecretProvider {
             SecretKey::EmailAccounts => Ok(secrets.email_accounts),
             SecretKey::SepaCreditorName => Ok(secrets.sepa_creditor_name),
             SecretKey::SepaCreditorIban => Ok(secrets.sepa_creditor_iban),
+            SecretKey::SepaCreditorId => Ok(secrets.sepa_creditor_id),
             SecretKey::SessionSecret => Ok(secrets.session_secret),
         }
     }

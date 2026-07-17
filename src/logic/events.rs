@@ -265,8 +265,9 @@ pub(crate) async fn export_sepa_xml(
 
     let creditor_name = secrets.get(SecretKey::SepaCreditorName).await?;
     let creditor_iban = secrets.get(SecretKey::SepaCreditorIban).await?;
+    let creditor_id = secrets.get(SecretKey::SepaCreditorId).await?;
 
-    if creditor_name.is_empty() || creditor_iban.is_empty() {
+    if creditor_name.is_empty() || creditor_iban.is_empty() || creditor_id.is_empty() {
         return Err(anyhow::Error::from(SepaExportError::ConfigIncomplete));
     }
     let creditor_bic = banking::lookup_bic(&creditor_iban)
@@ -307,6 +308,7 @@ pub(crate) async fn export_sepa_xml(
         &creditor_name,
         &creditor_iban,
         &creditor_bic,
+        &creditor_id,
     )?;
 
     let booking_ids: Vec<i32> = bookings.iter().map(|b| b.id).collect();

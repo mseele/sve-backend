@@ -87,6 +87,7 @@ pub(crate) fn generate_sepa_xml(
     creditor_name: &str,
     creditor_iban: &str,
     creditor_bic: &str,
+    creditor_id: &str,
 ) -> Result<String> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
@@ -95,6 +96,10 @@ pub(crate) fn generate_sepa_xml(
     let doc_attrs = vec![
         ("xmlns", "urn:iso:std:iso:20022:tech:xsd:pain.008.001.02"),
         ("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance"),
+        (
+            "xsi:schemaLocation",
+            "urn:iso:std:iso:20022:tech:xsd:pain.008.001.02 pain.008.001.02.xsd",
+        ),
     ];
     let mut doc = BytesStart::new("Document");
     for (k, v) in &doc_attrs {
@@ -110,7 +115,7 @@ pub(crate) fn generate_sepa_xml(
     write_element(
         &mut writer,
         "CreDtTm",
-        &Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string(),
+        &Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
     )?;
     write_element(&mut writer, "NbOfTxs", &bookings.len().to_string())?;
 
@@ -129,6 +134,7 @@ pub(crate) fn generate_sepa_xml(
     let pmt_inf_id = Uuid::new_v4().simple().to_string();
     write_element(&mut writer, "PmtInfId", &pmt_inf_id)?;
     write_element(&mut writer, "PmtMtd", "DD")?;
+    write_element(&mut writer, "BtchBookg", "true")?;
     write_element(&mut writer, "NbOfTxs", &bookings.len().to_string())?;
     write_element(&mut writer, "CtrlSum", &format!("{:.2}", ctrl_sum))?;
 
@@ -139,7 +145,10 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::Start(BytesStart::new("LclInstrm")))?;
     write_element(&mut writer, "Cd", "CORE")?;
     writer.write_event(XmlEvent::End(BytesEnd::new("LclInstrm")))?;
-    write_element(&mut writer, "SeqTp", "FRST")?;
+    write_element(&mut writer, "SeqTp", "RCUR")?;
+    writer.write_event(XmlEvent::Start(BytesStart::new("CtgyPurp")))?;
+    write_element(&mut writer, "Cd", "OTHR")?;
+    writer.write_event(XmlEvent::End(BytesEnd::new("CtgyPurp")))?;
     writer.write_event(XmlEvent::End(BytesEnd::new("PmtTpInf")))?;
 
     write_element(
@@ -156,6 +165,7 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::Start(BytesStart::new("Id")))?;
     write_element(&mut writer, "IBAN", creditor_iban)?;
     writer.write_event(XmlEvent::End(BytesEnd::new("Id")))?;
+    write_element(&mut writer, "Ccy", "EUR")?;
     writer.write_event(XmlEvent::End(BytesEnd::new("CdtrAcct")))?;
 
     writer.write_event(XmlEvent::Start(BytesStart::new("CdtrAgt")))?;
@@ -165,6 +175,19 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::End(BytesEnd::new("CdtrAgt")))?;
 
     write_element(&mut writer, "ChrgBr", "SLEV")?;
+
+    writer.write_event(XmlEvent::Start(BytesStart::new("CdtrSchmeId")))?;
+    writer.write_event(XmlEvent::Start(BytesStart::new("Id")))?;
+    writer.write_event(XmlEvent::Start(BytesStart::new("PrvtId")))?;
+    writer.write_event(XmlEvent::Start(BytesStart::new("Othr")))?;
+    write_element(&mut writer, "Id", creditor_id)?;
+    writer.write_event(XmlEvent::Start(BytesStart::new("SchmeNm")))?;
+    write_element(&mut writer, "Prtry", "SEPA")?;
+    writer.write_event(XmlEvent::End(BytesEnd::new("SchmeNm")))?;
+    writer.write_event(XmlEvent::End(BytesEnd::new("Othr")))?;
+    writer.write_event(XmlEvent::End(BytesEnd::new("PrvtId")))?;
+    writer.write_event(XmlEvent::End(BytesEnd::new("Id")))?;
+    writer.write_event(XmlEvent::End(BytesEnd::new("CdtrSchmeId")))?;
 
     for (sub, bic) in bookings {
         let price = sub.total_price(event);
@@ -188,6 +211,7 @@ pub(crate) fn generate_sepa_xml(
         writer.write_event(XmlEvent::Start(BytesStart::new("MndtRltdInf")))?;
         write_element(&mut writer, "MndtId", &mandate_ref)?;
         write_element(&mut writer, "DtOfSgntr", &sign_date)?;
+        write_element(&mut writer, "AmdmntInd", "false")?;
         writer.write_event(XmlEvent::End(BytesEnd::new("MndtRltdInf")))?;
         writer.write_event(XmlEvent::End(BytesEnd::new("DrctDbtTx")))?;
 
@@ -317,19 +341,25 @@ mod tests {
             "Test Creditor",
             "DE89370400440532013000",
             "COBADEFFXXX",
+            "DE98ZZZ00000000001",
         )
         .unwrap();
 
         assert!(xml.contains(r#"xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.02""#));
+        assert!(xml.contains("xsi:schemaLocation"));
         assert!(xml.contains("<CstmrDrctDbtInitn>"));
         assert!(xml.contains("<GrpHdr>"));
         assert!(xml.contains("<PmtInf>"));
         assert!(xml.contains("<PmtMtd>DD</PmtMtd>"));
+        assert!(xml.contains("<BtchBookg>true</BtchBookg>"));
         assert!(xml.contains("<Cd>SEPA</Cd>"));
         assert!(xml.contains("<Cd>CORE</Cd>"));
-        assert!(xml.contains("<SeqTp>FRST</SeqTp>"));
+        assert!(xml.contains("<SeqTp>RCUR</SeqTp>"));
+        assert!(xml.contains("<CtgyPurp>"));
+        assert!(xml.contains("<Cd>OTHR</Cd>"));
         assert!(xml.contains("<Nm>Test Creditor</Nm>"));
         assert!(xml.contains("<IBAN>DE89370400440532013000</IBAN>"));
+        assert!(xml.contains("<Ccy>EUR</Ccy>"));
         assert!(xml.contains("<BIC>COBADEFFXXX</BIC>"));
         assert!(xml.contains("<EndToEndId>SEPA-PAY123</EndToEndId>"));
         assert!(xml.contains("<InstdAmt Ccy=\"EUR\">20.00</InstdAmt>"));
@@ -338,7 +368,15 @@ mod tests {
         assert!(xml.contains("<CtrlSum>20.00</CtrlSum>"));
         assert!(xml.contains("<NbOfTxs>1</NbOfTxs>"));
         assert!(xml.contains("<MndtId>SEPA-PAY123</MndtId>"));
+        assert!(xml.contains("<AmdmntInd>false</AmdmntInd>"));
         assert!(xml.contains("<Ustrd>Teilnahmegebühr Test Event</Ustrd>"));
+        assert!(xml.contains("<CdtrSchmeId>"));
+        assert!(xml.contains("<Id>DE98ZZZ00000000001</Id>"));
+        assert!(xml.contains("<Prtry>SEPA</Prtry>"));
+        assert!(
+            xml.contains("Z</CreDtTm>"),
+            "CreDtTm should use a Z-suffix UTC timestamp"
+        );
 
         // Validate against the canonical pain.008.001.02 XSD
         // (bundled at src/assets/pain.008.001.02.xsd) using the uppsala crate.
@@ -418,6 +456,7 @@ mod tests {
             "Test Creditor",
             "DE89370400440532013000",
             "COBADEFFXXX",
+            "DE54ZZZ00000299406",
         )
         .unwrap();
 
