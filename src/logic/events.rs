@@ -1,29 +1,31 @@
-use super::csv::PaymentRecord;
-use super::{banking, export, secrets, template};
-use crate::db::BookingResult;
-use crate::email;
-use crate::error::ValidationError;
-use crate::models::{
-    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventEmail,
-    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent,
-    PaymentMethod, ToEuro, UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
-};
-use crate::{db, hashids};
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap, HashSet};
+
 use anyhow::{Context, Result, anyhow, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{DecoderTrap, all::ISO_8859_1};
-
 use lazy_static::lazy_static;
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, MultiPart, SinglePart};
 use regex::Regex;
 use sqlx::PgPool;
-use std::collections::hash_map::Entry;
-use std::collections::{BTreeMap, HashMap, HashSet};
 use tracing::{error, info, warn};
+
+use super::csv::PaymentRecord;
+use super::{banking, export, template};
+use crate::db::BookingResult;
+use crate::email;
+use crate::error::ValidationError;
+use crate::logic::secrets::{SecretKey, SecretProvider};
+use crate::models::{
+    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventEmail,
+    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent,
+    PaymentMethod, ToEuro, UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
+};
+use crate::{db, hashids};
 
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
@@ -155,7 +157,7 @@ pub(crate) async fn verify_payments(
 ) -> Result<Vec<VerifyPaymentResult>> {
     let bytes = STANDARD
         .decode(&csv)
-        .with_context(|| format!("Error decoding the cvs content: {}", &csv))?;
+        .with_context(|| format!("Error decoding the cvs content: {}", csv))?;
     let csv = match ISO_8859_1.decode(&bytes, DecoderTrap::Strict) {
         Ok(value) => value,
         Err(e) => bail!("Decoding csv content with ISO 8859: {}", e.into_owned()),
@@ -246,7 +248,11 @@ pub(crate) async fn update_payment(
     db::update_payment(pool, booking_id, update_payment).await
 }
 
-pub(crate) async fn export_sepa_xml(pool: &PgPool, event_id: EventId) -> Result<(String, String)> {
+pub(crate) async fn export_sepa_xml(
+    pool: &PgPool,
+    event_id: EventId,
+    secrets: &dyn SecretProvider,
+) -> Result<(String, String)> {
     use crate::models::SepaExportError;
 
     let event = db::get_event(pool, &event_id, false)
@@ -257,8 +263,8 @@ pub(crate) async fn export_sepa_xml(pool: &PgPool, event_id: EventId) -> Result<
         return Err(anyhow::Error::from(SepaExportError::NotASepaEvent));
     }
 
-    let creditor_name = secrets::get("SEPA_CREDITOR_NAME").await?;
-    let creditor_iban = secrets::get("SEPA_CREDITOR_IBAN").await?;
+    let creditor_name = secrets.get(SecretKey::SepaCreditorName).await?;
+    let creditor_iban = secrets.get(SecretKey::SepaCreditorIban).await?;
 
     if creditor_name.is_empty() || creditor_iban.is_empty() {
         return Err(anyhow::Error::from(SepaExportError::ConfigIncomplete));
@@ -718,7 +724,7 @@ async fn pre_book_event(
     email_sender: &impl email::EmailSender,
 ) -> Result<BookingResponse> {
     let ids = hashids::decode(&hash)
-        .with_context(|| format!("Error decoding the prebooking hash {} into ids", &hash))?;
+        .with_context(|| format!("Error decoding the prebooking hash {} into ids", hash))?;
 
     if ids.len() != 2 {
         bail!(
@@ -1729,6 +1735,7 @@ mod events_integration_tests {
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
 
+    use crate::logic::secrets::MockSecretProvider;
     use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent, PaymentMethod};
     use crate::test_utils::{mock_email_sender, mock_email_sender_capturing, noop_mock};
 
@@ -2395,7 +2402,9 @@ mod events_integration_tests {
         )
         .await?;
 
-        let result = export_sepa_xml(&pool, event.id).await;
+        // No expectations on the mock: the non-SEPA path returns before reading
+        // any secrets, so calling `get` would panic the test.
+        let result = export_sepa_xml(&pool, event.id, &MockSecretProvider::new()).await;
         assert!(result.is_err(), "Should fail for non-SEPA events");
         let err = result.unwrap_err();
         let sepa_err = err.downcast_ref::<crate::models::SepaExportError>();
@@ -2405,6 +2414,39 @@ mod events_integration_tests {
                 Some(crate::models::SepaExportError::NotASepaEvent)
             ),
             "Expected NotASepaEvent, got: {:?}",
+            sepa_err
+        );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_export_sepa_xml_config_incomplete(pool: PgPool) -> Result<()> {
+        let event = create_test_event_with_payment_method(
+            &pool,
+            LifecycleStatus::Published,
+            PaymentMethod::SepaDirectDebit,
+        )
+        .await?;
+
+        // Mock returns empty creditor config. Runs with no env vars set and no
+        // AWS access — the SecretProvider seam lets us exercise the SEPA path
+        // without touching the outside world.
+        let mut mock_secrets = MockSecretProvider::new();
+        mock_secrets
+            .expect_get()
+            .returning(|_| Box::pin(async { Ok(String::new()) }));
+
+        let result = export_sepa_xml(&pool, event.id, &mock_secrets).await;
+        assert!(result.is_err(), "Should fail with incomplete SEPA config");
+        let err = result.unwrap_err();
+        let sepa_err = err.downcast_ref::<crate::models::SepaExportError>();
+        assert!(
+            matches!(
+                sepa_err,
+                Some(crate::models::SepaExportError::ConfigIncomplete)
+            ),
+            "Expected ConfigIncomplete, got: {:?}",
             sepa_err
         );
 

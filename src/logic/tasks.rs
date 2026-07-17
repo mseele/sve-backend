@@ -1,11 +1,11 @@
-use super::calendar;
-use super::events;
-use crate::email::EmailSender;
-use crate::models::EventId;
-use crate::models::EventType;
 use anyhow::Result;
 use sqlx::PgPool;
 use tracing::{error, info};
+
+use super::{calendar, events};
+use crate::calendar::CalendarClient;
+use crate::email::EmailSender;
+use crate::models::{EventId, EventType};
 
 pub(crate) async fn check_email_connectivity(email_sender: &impl EmailSender) {
     match email_sender.test_connection().await {
@@ -14,8 +14,8 @@ pub(crate) async fn check_email_connectivity(email_sender: &impl EmailSender) {
     }
 }
 
-pub(crate) async fn renew_calendar_watch() {
-    match calendar::renew_watch().await {
+pub(crate) async fn renew_calendar_watch(client: &CalendarClient) {
+    match calendar::renew_watch(client).await {
         Ok(_) => info!("Calendar watch has been renewed"),
         Err(e) => error!("Error renewing calendar watch: {}", e),
     }

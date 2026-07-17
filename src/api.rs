@@ -1,10 +1,11 @@
-use crate::email::RealEmailSender;
-use crate::error::ValidationError;
-use crate::logic::{calendar, contact, events, export, membership, news, secrets, tasks};
-use crate::models::{
-    ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
-    MembershipApplication, NewsSubscription, NewsTopic, PartialEvent,
-};
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
+use std::fmt::Debug;
+use std::fmt::{self, Display};
+use std::net::IpAddr;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use axum::body::Body;
 use axum::extract::{self, FromRequestParts, Path, Query, State};
@@ -25,16 +26,19 @@ use lambda_http::request::RequestContext;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fmt::Debug;
-use std::fmt::{self, Display};
-use std::net::IpAddr;
-use std::str::FromStr;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error};
 use urlencoding::encode;
+
+use crate::calendar::CalendarClient;
+use crate::email::RealEmailSender;
+use crate::error::ValidationError;
+use crate::logic::secrets::{SecretKey, SecretProvider};
+use crate::logic::{calendar, contact, events, export, membership, news, tasks};
+use crate::models::{
+    ContactMessage, Email, EventBooking, EventEmail, EventId, EventType, LifecycleStatus,
+    MembershipApplication, NewsSubscription, NewsTopic, PartialEvent,
+};
 
 pub(crate) struct ResponseError {
     err: anyhow::Error,
@@ -138,8 +142,15 @@ where
     }
 }
 
-pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Result<Router> {
+pub(crate) async fn router(
+    pg_pool: PgPool,
+    http_client: reqwest::Client,
+    secrets: Arc<dyn SecretProvider>,
+) -> Result<Router> {
     let jwks = Arc::new(RwLock::new(JwksCache::new()));
+
+    let email_sender = RealEmailSender::new(secrets.clone());
+    let calendar_client = CalendarClient::new(secrets.clone());
 
     let state = AppState {
         pg_pool,
@@ -150,8 +161,11 @@ pub(crate) async fn router(pg_pool: PgPool, http_client: reqwest::Client) -> Res
             "events@sv-eutingen.de".to_string(),
         ],
         allowed_domain: "sv-eutingen.de".to_string(),
-        task_api_key: secrets::get("TASK_API_KEY").await?,
-        session_secret: secrets::get("SESSION_SECRET").await?,
+        task_api_key: secrets.get(SecretKey::TaskApiKey).await?,
+        session_secret: secrets.get(SecretKey::SessionSecret).await?,
+        secrets,
+        email_sender,
+        calendar_client,
     };
 
     Ok(Router::new()
@@ -275,6 +289,9 @@ struct AppState {
     allowed_domain: String,
     task_api_key: String,
     session_secret: String,
+    secrets: Arc<dyn SecretProvider>,
+    email_sender: RealEmailSender,
+    calendar_client: CalendarClient,
 }
 
 #[derive(Clone)]
@@ -590,8 +607,8 @@ async fn booking(
     ClientIp(ip): ClientIp,
     extract::Json(booking): extract::Json<EventBooking>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&booking.token, ip).await?;
-    let response = events::booking(&state.pg_pool, booking, &RealEmailSender).await;
+    validate_captcha(&booking.token, ip, &*state.secrets).await?;
+    let response = events::booking(&state.pg_pool, booking, &state.email_sender).await;
     Ok(Json(response))
 }
 
@@ -599,7 +616,7 @@ async fn prebooking(
     State(state): State<AppState>,
     Path(hash): Path<String>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let response = events::prebooking(&state.pg_pool, hash, &RealEmailSender).await;
+    let response = events::prebooking(&state.pg_pool, hash, &state.email_sender).await;
     Ok(Json(response))
 }
 
@@ -614,7 +631,7 @@ async fn prebooking_iban(
     Json(payload): Json<IbanPayload>,
 ) -> Result<impl IntoResponse, ResponseError> {
     let response =
-        events::prebook_with_iban(&state.pg_pool, &hash, payload.iban, &RealEmailSender).await?;
+        events::prebook_with_iban(&state.pg_pool, &hash, payload.iban, &state.email_sender).await?;
     Ok(Json(response))
 }
 
@@ -622,7 +639,7 @@ async fn update(
     State(state): State<AppState>,
     extract::Json(partial_event): extract::Json<PartialEvent>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let event = events::update(&state.pg_pool, partial_event, &RealEmailSender).await?;
+    let event = events::update(&state.pg_pool, partial_event, &state.email_sender).await?;
     Ok(Json(event))
 }
 
@@ -683,7 +700,7 @@ async fn cancel_event_booking(
     State(state): State<AppState>,
     Path(booking_id): Path<i32>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    events::cancel_booking(&state.pg_pool, booking_id, &RealEmailSender).await?;
+    events::cancel_booking(&state.pg_pool, booking_id, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -709,25 +726,26 @@ async fn export_sepa_xml(
 ) -> Result<impl IntoResponse, ResponseError> {
     use crate::models::SepaExportError;
 
-    let (filename, xml) = match events::export_sepa_xml(&state.pg_pool, event_id).await {
-        Ok(result) => result,
-        Err(e) => {
-            if let Some(sepa_err) = e.downcast_ref::<SepaExportError>() {
-                let status = match sepa_err {
-                    SepaExportError::NotASepaEvent => StatusCode::BAD_REQUEST,
-                    SepaExportError::NoBookingsAvailable => StatusCode::CONFLICT,
-                    SepaExportError::BicLookupFailed(_) => StatusCode::UNPROCESSABLE_ENTITY,
-                    SepaExportError::ConfigIncomplete => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-                let message = e.to_string();
-                return Err(ResponseError {
-                    err: e,
-                    response: Some((status, message)),
-                });
+    let (filename, xml) =
+        match events::export_sepa_xml(&state.pg_pool, event_id, &*state.secrets).await {
+            Ok(result) => result,
+            Err(e) => {
+                if let Some(sepa_err) = e.downcast_ref::<SepaExportError>() {
+                    let status = match sepa_err {
+                        SepaExportError::NotASepaEvent => StatusCode::BAD_REQUEST,
+                        SepaExportError::NoBookingsAvailable => StatusCode::CONFLICT,
+                        SepaExportError::BicLookupFailed(_) => StatusCode::UNPROCESSABLE_ENTITY,
+                        SepaExportError::ConfigIncomplete => StatusCode::INTERNAL_SERVER_ERROR,
+                    };
+                    let message = e.to_string();
+                    return Err(ResponseError {
+                        err: e,
+                        response: Some((status, message)),
+                    });
+                }
+                return Err(e.into());
             }
-            return Err(e.into());
-        }
-    };
+        };
 
     Ok(Response::builder()
         .header("Content-Type", "application/xml")
@@ -746,8 +764,8 @@ async fn subscribe(
     ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&subscription.token, ip).await?;
-    news::subscribe(&state.pg_pool, subscription, &RealEmailSender).await?;
+    validate_captcha(&subscription.token, ip, &*state.secrets).await?;
+    news::subscribe(&state.pg_pool, subscription, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -756,7 +774,7 @@ async fn unsubscribe(
     ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&subscription.token, ip).await?;
+    validate_captcha(&subscription.token, ip, &*state.secrets).await?;
     news::unsubscribe(&state.pg_pool, subscription).await?;
     Ok(StatusCode::OK)
 }
@@ -781,8 +799,8 @@ async fn subscribers(
 
 // calendar
 
-async fn appointments() -> Result<impl IntoResponse, ResponseError> {
-    let result = calendar::appointments().await?;
+async fn appointments(State(state): State<AppState>) -> Result<impl IntoResponse, ResponseError> {
+    let result = calendar::appointments(&state.calendar_client).await?;
     Ok(Json(result))
 }
 
@@ -812,11 +830,12 @@ struct EmailsBody {
 }
 
 async fn message(
+    State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     Json(message): Json<ContactMessage>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&message.token, ip).await?;
-    contact::message(message, &RealEmailSender).await?;
+    validate_captcha(&message.token, ip, &*state.secrets).await?;
+    contact::message(message, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -825,9 +844,9 @@ async fn emails(
     extract::Json(body): extract::Json<EmailsBody>,
 ) -> Result<impl IntoResponse, ResponseError> {
     if let Some(emails) = body.emails {
-        contact::emails(emails, &RealEmailSender).await?;
+        contact::emails(emails, &state.email_sender).await?;
     } else if let Some(event) = body.event {
-        events::send_event_email(&state.pg_pool, event, &RealEmailSender).await?;
+        events::send_event_email(&state.pg_pool, event, &state.email_sender).await?;
     }
     Ok(StatusCode::OK)
 }
@@ -839,34 +858,38 @@ async fn membership_application(
     ClientIp(ip): ClientIp,
     extract::Json(application): extract::Json<MembershipApplication>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&application.token, ip).await?;
-    membership::application(&state.pg_pool, application, &RealEmailSender).await?;
+    validate_captcha(&application.token, ip, &*state.secrets).await?;
+    membership::application(&state.pg_pool, application, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 
 // tasks
 
-async fn check_email_connectivity() -> Result<impl IntoResponse, ResponseError> {
-    tasks::check_email_connectivity(&RealEmailSender).await;
+async fn check_email_connectivity(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ResponseError> {
+    tasks::check_email_connectivity(&state.email_sender).await;
     Ok(StatusCode::OK)
 }
 
-async fn renew_calendar_watch() -> Result<impl IntoResponse, ResponseError> {
-    tasks::renew_calendar_watch().await;
+async fn renew_calendar_watch(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ResponseError> {
+    tasks::renew_calendar_watch(&state.calendar_client).await;
     Ok(StatusCode::OK)
 }
 
 async fn send_event_reminders(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_event_reminders(&state.pg_pool, &RealEmailSender).await;
+    tasks::send_event_reminders(&state.pg_pool, &state.email_sender).await;
     Ok(StatusCode::OK)
 }
 
 async fn close_finished_events(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::close_finished_events(&state.pg_pool, &RealEmailSender).await;
+    tasks::close_finished_events(&state.pg_pool, &state.email_sender).await;
     Ok(StatusCode::OK)
 }
 
@@ -874,7 +897,7 @@ async fn send_payment_reminders(
     State(state): State<AppState>,
     Path(event_type): Path<EventType>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_payment_reminders(&state.pg_pool, event_type, &RealEmailSender).await?;
+    tasks::send_payment_reminders(&state.pg_pool, event_type, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -882,7 +905,7 @@ async fn send_participation_confirmation(
     State(state): State<AppState>,
     Path(event_id): Path<EventId>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::send_participation_confirmation(&state.pg_pool, event_id, &RealEmailSender).await?;
+    tasks::send_participation_confirmation(&state.pg_pool, event_id, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 
@@ -902,13 +925,14 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
 async fn validate_captcha(
     token: &Option<String>,
     client_ip: Option<IpAddr>,
+    secrets: &dyn SecretProvider,
 ) -> Result<(), ResponseError> {
     let token = token.as_ref().ok_or_else(|| ResponseError {
         err: anyhow::anyhow!("No captcha token provided"),
         response: Some((StatusCode::BAD_REQUEST, "Captcha token is required.".into())),
     })?;
 
-    let secret = &secrets::get("CAPTCHA_SECRET").await?;
+    let secret = &secrets.get(SecretKey::CaptchaSecret).await?;
 
     let captcha = hcaptcha::Captcha::new(token.as_str()).map_err(|e| ResponseError {
         err: anyhow::anyhow!("Failed to create captcha: {:?}", e),

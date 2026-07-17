@@ -33,10 +33,11 @@ mod hashids {
     }
 }
 
+use std::{future::Future, pin::Pin, sync::Arc};
+
 use axum::{http::HeaderValue, response::IntoResponse};
 use http_body_util::BodyExt;
 use lambda_http::Error;
-use std::{future::Future, pin::Pin};
 use tower::{Layer, ServiceBuilder};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -45,6 +46,8 @@ use tower_http::{
 use tower_service::Service;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
+
+use crate::logic::secrets::{ConsolidatedAwsSecretProvider, SecretProvider};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -61,10 +64,11 @@ async fn main() -> Result<(), Error> {
         .install_default()
         .expect("Failed to install rustls crypto provider");
 
-    let pool = db::init_pool().await?;
+    let secrets: Arc<dyn SecretProvider> = Arc::new(ConsolidatedAwsSecretProvider::new());
+    let pool = db::init_pool(&*secrets).await?;
     let http_client = reqwest::Client::new();
 
-    let app = api::router(pool, http_client).await?.layer(
+    let app = api::router(pool, http_client, secrets).await?.layer(
         ServiceBuilder::new().layer(
             TraceLayer::new_for_http()
                 .on_request(DefaultOnRequest::new().level(Level::INFO))
