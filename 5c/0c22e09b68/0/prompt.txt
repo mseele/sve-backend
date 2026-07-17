@@ -1,0 +1,19 @@
+ci/cd failed on tests: failures:
+
+---- logic::calendar::tests::test_appointments stdout ----
+
+thread 'logic::calendar::tests::test_appointments' (11581) panicked at src/logic/calendar.rs:63:9:
+appointments() failed: Some(Error loading credentials: Missing env var: GOOGLE_CREDS)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- logic::calendar::tests::test_renew_watch stdout ----
+
+thread 'logic::calendar::tests::test_renew_watch' (11582) panicked at src/logic/calendar.rs:72:9:
+renew_watch() failed: Some(Error loading credentials: Missing env var: GOOGLE_CREDS)
+
+
+failures:
+    logic::calendar::tests::test_appointments
+    logic::calendar::tests::test_renew_watch
+
+test result: FAILED. 93 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 103.94s
