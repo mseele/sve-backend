@@ -3,10 +3,9 @@
   "checkpoint_id": "4e2aef96888c",
   "session_id": "ses_08e525664ffe5WsdZ9ETvniEnG",
   "strategy": "manual-commit",
-  "created_at": "2026-07-17T20:12:00.276505Z",
+  "created_at": "2026-07-17T20:16:42.637929Z",
   "branch": "feature/email-gateway-seal",
   "checkpoints_count": 1,
-  "save_step_count": 1,
   "files_touched": [
     "src/api.rs",
     "src/logic/events.rs",
@@ -18,58 +17,29 @@
   "agent": "OpenCode",
   "model": "glm-5.2",
   "turn_id": "7a21528a88a9",
-  "compact_transcript_start": 0,
+  "checkpoint_transcript_start": 23,
+  "transcript_lines_at_start": 23,
+  "compact_transcript_start": 23,
   "token_usage": {
-    "input_tokens": 62023,
+    "input_tokens": 0,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 388160,
-    "output_tokens": 5029,
-    "api_call_count": 22
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
   },
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-07-17T20:12:00.259614Z",
+    "calculated_at": "2026-07-17T20:16:42.62217Z",
     "agent_lines": 0,
     "agent_removed": 0,
-    "human_added": 1584,
-    "human_modified": 2635,
+    "human_added": 0,
+    "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 1584,
-    "total_lines_changed": 4219,
+    "total_committed": 0,
+    "total_lines_changed": 0,
     "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 2587,
-      "user_lines_removed": 2551,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        "src/api.rs": 1,
-        "src/logic/events/mod.rs": 2070,
-        "src/logic/events/notifications.rs": 475,
-        "src/logic/tasks.rs": 4,
-        "src/test_utils.rs": 37
-      },
-      "user_removed_per_file": {
-        "src/api.rs": 1,
-        "src/logic/events.rs": 2547,
-        "src/logic/tasks.rs": 3
-      }
-    },
-    {
-      "checkpoint_number": 2,
-      "user_lines_added": 2070,
-      "user_lines_removed": 0,
-      "agent_lines_added": 517,
-      "agent_lines_removed": 2551,
-      "user_added_per_file": {
-        "src/logic/events/mod.rs": 2070
-      }
-    }
-  ]
+  }
 }
