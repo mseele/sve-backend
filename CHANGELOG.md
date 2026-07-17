@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.12.1] - 2026-07-17
+
+### Bug Fixes
+
+- Correct sepa xml export format
+
+### Features
+
+- Carve SecretProvider seam for testable secrets
+
 ## [2.12.0] - 2026-07-14
 
 ### Features
