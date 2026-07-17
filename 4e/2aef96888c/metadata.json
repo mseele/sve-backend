@@ -3,7 +3,7 @@
   "checkpoint_id": "4e2aef96888c",
   "strategy": "manual-commit",
   "branch": "feature/email-gateway-seal",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "src/api.rs",
     "src/logic/events.rs",
@@ -19,13 +19,20 @@
       "compact_transcript": "/4e/2aef96888c/0/transcript.jsonl",
       "content_hash": "/4e/2aef96888c/0/content_hash.txt",
       "prompt": "/4e/2aef96888c/0/prompt.txt"
+    },
+    {
+      "metadata": "/4e/2aef96888c/1/metadata.json",
+      "transcript": "/4e/2aef96888c/1/full.jsonl",
+      "compact_transcript": "/4e/2aef96888c/1/transcript.jsonl",
+      "content_hash": "/4e/2aef96888c/1/content_hash.txt",
+      "prompt": "/4e/2aef96888c/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 62023,
+    "input_tokens": 114897,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 388160,
-    "output_tokens": 5029,
-    "api_call_count": 22
+    "cache_read_tokens": 634688,
+    "output_tokens": 9857,
+    "api_call_count": 35
   }
 }
