@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.8.42",
+  "checkpoint_id": "0e9c281ef025",
+  "strategy": "manual-commit",
+  "branch": "feature/email-gateway-seal",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/logic/banking.rs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0e/9c281ef025/0/metadata.json",
+      "transcript": "/0e/9c281ef025/0/full.jsonl",
+      "compact_transcript": "/0e/9c281ef025/0/transcript.jsonl",
+      "content_hash": "/0e/9c281ef025/0/content_hash.txt",
+      "prompt": "/0e/9c281ef025/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 315040,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 10364416,
+    "output_tokens": 39753,
+    "api_call_count": 144
+  }
+}
