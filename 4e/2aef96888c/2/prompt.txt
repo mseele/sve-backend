@@ -1,15 +1,1 @@
-Implement the work described by the user in the spec or tickets.
-
-Use /tdd where possible, at pre-agreed seams.
-
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
-
-Once done, use /code-review to review the work.
-
-Commit your work to the current branch.
-
-
-Base directory for this skill: /Users/mseele/.agents/skills/implement
-Relative paths in this skill (e.g., scripts/, references/) are relative to this base directory.
-
-#77
+continue
