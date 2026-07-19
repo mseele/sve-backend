@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.12.4] - 2026-07-19
+
+### Bug Fixes
+
+- Enhance IBAN validation to strip whitespace and add regression tests
+
 ## [2.12.2] - 2026-07-17
 
 ### Bug Fixes
