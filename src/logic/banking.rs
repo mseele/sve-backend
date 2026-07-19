@@ -12,7 +12,11 @@ use crate::error::ValidationError;
 use crate::models::{Event, EventSubscription};
 
 pub(crate) fn validate_iban(raw: &str) -> Result<iban::Iban, ValidationError> {
-    let normalized = raw.to_uppercase();
+    let normalized: String = raw
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_uppercase();
     normalized.parse().map_err(|_| {
         warn!("IBAN validation failed for input: {}", normalized);
         ValidationError::new("Bitte gib eine gültige IBAN ein.")
@@ -282,6 +286,26 @@ mod tests {
 
         let result = validate_iban_str("DE00000000000000000000");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_iban_str_strips_arbitrary_whitespace() {
+        // Regression: production inputs with trailing whitespace or non-ISO
+        // groupings (e.g. groups of 3, leading "DE ") must be accepted as long
+        // as the stripped IBAN is valid. The `iban` crate only tolerates the
+        // canonical 4-char paper grouping, so we must strip all whitespace.
+        let cases = [
+            ("DE98642910100036522007 ", "DE98642910100036522007"),
+            ("DE32 642 910 100 034 586 008", "DE32642910100034586008"),
+            ("DE 65 6425 1060 0000 7558 81", "DE65642510600000755881"),
+            ("DE 65 6425 1060 0000 755881", "DE65642510600000755881"),
+            ("  de98\t6429\n1010\r0036 522007 ", "DE98642910100036522007"),
+        ];
+        for (input, expected) in cases {
+            let result = validate_iban_str(input)
+                .unwrap_or_else(|e| panic!("expected valid IBAN for {input:?}: {e:?}"));
+            assert_eq!(result, expected, "wrong normalization for {input:?}");
+        }
     }
 
     #[test]
