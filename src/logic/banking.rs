@@ -220,7 +220,7 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::Start(BytesStart::new("LclInstrm")))?;
     write_element(&mut writer, "Cd", "CORE")?;
     writer.write_event(XmlEvent::End(BytesEnd::new("LclInstrm")))?;
-    let seq_tp = SepaSequenceType::Recurring;
+    let seq_tp = SepaSequenceType::OneOff;
     write_element(&mut writer, "SeqTp", seq_tp.as_ref())?;
     writer.write_event(XmlEvent::Start(BytesStart::new("CtgyPurp")))?;
     write_element(&mut writer, "Cd", "OTHR")?;
