@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.15.6] - 2026-07-26
+
+### Bug Fixes
+
+- Update SEPA sequence type in tests from Recurring to OneOff
+
 ## [2.12.5] - 2026-07-26
 
 ### Bug Fixes
