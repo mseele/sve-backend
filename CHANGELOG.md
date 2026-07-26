@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.12.5] - 2026-07-26
+
+### Bug Fixes
+
+- Implement SEPA banking day calculations
+- Update SEPA sequence type from Recurring to OneOff in XML generation
+
 ## [2.12.4] - 2026-07-19
 
 ### Bug Fixes
