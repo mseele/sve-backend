@@ -511,7 +511,7 @@ mod tests {
         assert!(xml.contains("<BtchBookg>true</BtchBookg>"));
         assert!(xml.contains("<Cd>SEPA</Cd>"));
         assert!(xml.contains("<Cd>CORE</Cd>"));
-        assert!(xml.contains("<SeqTp>RCUR</SeqTp>"));
+        assert!(xml.contains("<SeqTp>OOFF</SeqTp>"));
         assert!(xml.contains("<CtgyPurp>"));
         assert!(xml.contains("<Cd>OTHR</Cd>"));
         assert!(xml.contains("<Nm>Test Creditor</Nm>"));
