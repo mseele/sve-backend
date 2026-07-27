@@ -169,11 +169,11 @@ pub(crate) fn generate_sepa_xml(
     writer.write_event(XmlEvent::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
 
     let doc_attrs = vec![
-        ("xmlns", "urn:iso:std:iso:20022:tech:xsd:pain.008.001.02"),
+        ("xmlns", "urn:iso:std:iso:20022:tech:xsd:pain.008.001.08"),
         ("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance"),
         (
             "xsi:schemaLocation",
-            "urn:iso:std:iso:20022:tech:xsd:pain.008.001.02 pain.008.001.02.xsd",
+            "urn:iso:std:iso:20022:tech:xsd:pain.008.001.08 pain.008.001.08.xsd",
         ),
     ];
     let mut doc = BytesStart::new("Document");
@@ -247,7 +247,7 @@ pub(crate) fn generate_sepa_xml(
 
     writer.write_event(XmlEvent::Start(BytesStart::new("CdtrAgt")))?;
     writer.write_event(XmlEvent::Start(BytesStart::new("FinInstnId")))?;
-    write_element(&mut writer, "BIC", creditor_bic)?;
+    write_element(&mut writer, "BICFI", creditor_bic)?;
     writer.write_event(XmlEvent::End(BytesEnd::new("FinInstnId")))?;
     writer.write_event(XmlEvent::End(BytesEnd::new("CdtrAgt")))?;
 
@@ -294,7 +294,7 @@ pub(crate) fn generate_sepa_xml(
 
         writer.write_event(XmlEvent::Start(BytesStart::new("DbtrAgt")))?;
         writer.write_event(XmlEvent::Start(BytesStart::new("FinInstnId")))?;
-        write_element(&mut writer, "BIC", bic)?;
+        write_element(&mut writer, "BICFI", bic)?;
         writer.write_event(XmlEvent::End(BytesEnd::new("FinInstnId")))?;
         writer.write_event(XmlEvent::End(BytesEnd::new("DbtrAgt")))?;
 
@@ -502,7 +502,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(xml.contains(r#"xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.02""#));
+        assert!(xml.contains(r#"xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08""#));
         assert!(xml.contains("xsi:schemaLocation"));
         assert!(xml.contains("<CstmrDrctDbtInitn>"));
         assert!(xml.contains("<GrpHdr>"));
@@ -517,7 +517,7 @@ mod tests {
         assert!(xml.contains("<Nm>Test Creditor</Nm>"));
         assert!(xml.contains("<IBAN>DE89370400440532013000</IBAN>"));
         assert!(xml.contains("<Ccy>EUR</Ccy>"));
-        assert!(xml.contains("<BIC>COBADEFFXXX</BIC>"));
+        assert!(xml.contains("<BICFI>COBADEFFXXX</BICFI>"));
         assert!(xml.contains("<EndToEndId>SEPA-PAY123</EndToEndId>"));
         assert!(xml.contains("<InstdAmt Ccy=\"EUR\">20.00</InstdAmt>"));
         assert!(xml.contains("<Nm>Max Mustermann</Nm>"));
@@ -554,9 +554,9 @@ mod tests {
             "ReqdColltnDt must be today + SEPA CORE RCUR lead time, got {coll_dt}"
         );
 
-        // Validate against the canonical pain.008.001.02 XSD
-        // (bundled at src/assets/pain.008.001.02.xsd) using the uppsala crate.
-        let schema_xml = include_str!("../assets/pain.008.001.02.xsd");
+        // Validate against the canonical pain.008.001.08 XSD
+        // (bundled at src/assets/pain.008.001.08.xsd) using the uppsala crate.
+        let schema_xml = include_str!("../assets/pain.008.001.08.xsd");
         let schema = uppsala::parse(schema_xml).expect("parse XSD");
         let doc = uppsala::parse(&xml).expect("parse generated XML");
         let validator =
@@ -564,7 +564,7 @@ mod tests {
         let errors = validator.validate(&doc);
         assert!(
             errors.is_empty(),
-            "SEPA XML failed pain.008.001.02 XSD validation: {errors:?}"
+            "SEPA XML failed pain.008.001.08 XSD validation: {errors:?}"
         );
     }
 
