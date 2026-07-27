@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.15.7] - 2026-07-27
+
+### Bug Fixes
+
+- Update SEPA XML generation to version pain.008.001.08
+
 ## [2.15.6] - 2026-07-26
 
 ### Bug Fixes
