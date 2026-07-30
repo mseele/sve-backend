@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.15.8] - 2026-07-30
+
+### Bug Fixes
+
+- Improve error handling
+
 ## [2.15.7] - 2026-07-27
 
 ### Bug Fixes
