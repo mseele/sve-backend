@@ -1,3 +1,4 @@
+use crate::error::ConflictError;
 use crate::models::{
     Event, EventCounter, EventCustomField, EventCustomFieldType, EventId, EventSubscription,
     EventType, LifecycleStatus, PartialEvent, PaymentMethod,
@@ -431,7 +432,10 @@ async fn update_event(
         match row {
             Some(row) => {
                 if row.has_bookings.unwrap_or(false) && new_method != &row.payment_method {
-                    bail!("Cannot change payment_method after bookings exist");
+                    return Err(ConflictError::new(
+                        "Cannot change payment_method after bookings exist",
+                    )
+                    .into());
                 }
             }
             None => bail!("Error fetching event with id '{}'", id),

@@ -725,8 +725,16 @@ async fn pre_book_event(
     provided_iban: Option<String>,
     email_sender: &impl email::EmailSender,
 ) -> Result<BookingResponse> {
-    let ids = hashids::decode(&hash)
-        .with_context(|| format!("Error decoding the prebooking hash {} into ids", hash))?;
+    let ids = match hashids::decode(&hash) {
+        Ok(ids) => ids,
+        Err(e) => {
+            warn!(
+                "Prebooking failed because hash '{}' could not be decoded: {:?}",
+                hash, e
+            );
+            return Ok(BookingResponse::failure("Ungültiger Buchungscode."));
+        }
+    };
 
     if ids.len() != 2 {
         bail!(

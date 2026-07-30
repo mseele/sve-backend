@@ -32,7 +32,7 @@ use urlencoding::encode;
 
 use crate::calendar::CalendarClient;
 use crate::email::RealEmailSender;
-use crate::error::ValidationError;
+use crate::error::{ConflictError, ValidationError};
 use crate::logic::secrets::{SecretKey, SecretProvider};
 use crate::logic::{calendar, contact, events, export, membership, news, tasks};
 use crate::models::{
@@ -87,6 +87,15 @@ impl From<anyhow::Error> for ResponseError {
             return ResponseError {
                 err,
                 response: Some((StatusCode::BAD_REQUEST, message)),
+            };
+        }
+        if let Some(message) = err
+            .downcast_ref::<ConflictError>()
+            .map(|v| v.message.clone())
+        {
+            return ResponseError {
+                err,
+                response: Some((StatusCode::CONFLICT, message)),
             };
         }
         ResponseError {

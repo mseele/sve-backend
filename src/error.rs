@@ -28,3 +28,31 @@ impl Debug for ValidationError {
 }
 
 impl Error for ValidationError {}
+
+pub(crate) struct ConflictError {
+    pub(crate) message: String,
+}
+
+impl ConflictError {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+impl Display for ConflictError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl Debug for ConflictError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ConflictError")
+            .field("message", &self.message)
+            .finish()
+    }
+}
+
+impl Error for ConflictError {}
