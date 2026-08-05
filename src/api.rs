@@ -818,12 +818,17 @@ async fn appointments(State(state): State<AppState>) -> Result<impl IntoResponse
     Ok(Json(result))
 }
 
-async fn notifications(headers: HeaderMap) -> Result<impl IntoResponse, ResponseError> {
+async fn notifications(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ResponseError> {
     let header_key = "X-Goog-Channel-Id";
     let channel_id = headers.get(header_key);
     if let Some(channel_id) = channel_id {
+        let hook =
+            calendar::NetlifyDeployHook::new(state.http_client.clone());
         match channel_id.to_str() {
-            Ok(channel_id) => calendar::notifications(channel_id).await?,
+            Ok(channel_id) => calendar::notifications(channel_id, &hook).await?,
             Err(e) => error!(
                 "Could not parse header '{}' into a str: {:?}",
                 header_key, e
