@@ -31,7 +31,7 @@ use tracing::{debug, error};
 use urlencoding::encode;
 
 use crate::calendar::CalendarClient;
-use crate::email::RealEmailSender;
+use crate::email::RealEmailGateway;
 use crate::error::{ConflictError, ValidationError};
 use crate::logic::secrets::{SecretKey, SecretProvider};
 use crate::logic::{calendar, contact, events, export, membership, news, tasks};
@@ -158,7 +158,7 @@ pub(crate) async fn router(
 ) -> Result<Router> {
     let jwks = Arc::new(RwLock::new(JwksCache::new()));
 
-    let email_sender = RealEmailSender::new(secrets.clone());
+    let email_sender = RealEmailGateway::new(secrets.clone());
     let calendar_client = CalendarClient::new(secrets.clone());
 
     let state = AppState {
@@ -299,7 +299,7 @@ struct AppState {
     task_api_key: String,
     session_secret: String,
     secrets: Arc<dyn SecretProvider>,
-    email_sender: RealEmailSender,
+    email_sender: RealEmailGateway,
     calendar_client: CalendarClient,
 }
 

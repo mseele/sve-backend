@@ -65,9 +65,9 @@ pub(crate) async fn get_event_counters(pool: &PgPool, beta: bool) -> Result<Vec<
 pub(crate) async fn booking(
     pool: &PgPool,
     booking: EventBooking,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> BookingResponse {
-    match book_event(pool, booking, email_sender).await {
+    match book_event(pool, booking, email_gateway).await {
         Ok(response) => response,
         Err(e) => {
             if let Some(validation_err) = e.downcast_ref::<ValidationError>() {
@@ -84,18 +84,18 @@ pub(crate) async fn prebook_with_iban(
     pool: &PgPool,
     hash: &str,
     iban: String,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<BookingResponse> {
     let normalized = banking::validate_iban_str(&iban)?;
-    pre_book_event(pool, hash.to_string(), Some(normalized), email_sender).await
+    pre_book_event(pool, hash.to_string(), Some(normalized), email_gateway).await
 }
 
 pub(crate) async fn prebooking(
     pool: &PgPool,
     hash: String,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> BookingResponse {
-    match pre_book_event(pool, hash, None, email_sender).await {
+    match pre_book_event(pool, hash, None, email_gateway).await {
         Ok(response) => response,
         Err(e) => {
             error!("Prebooking failed: {:?}", e);
@@ -107,7 +107,7 @@ pub(crate) async fn prebooking(
 pub(crate) async fn update(
     pool: &PgPool,
     partial_event: PartialEvent,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<Event> {
     let (event, removed_dates) = db::write_event(pool, partial_event).await?;
     if let Some(removed_dates) = removed_dates
@@ -127,7 +127,7 @@ pub(crate) async fn update(
             EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
         };
 
-        let email_account = event.get_associated_email_account(email_sender).await?;
+        let email_account = event.get_associated_email_account(email_gateway).await?;
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
@@ -137,11 +137,13 @@ pub(crate) async fn update(
 
             messages.push(
                 Email::new(message_type, booking.email, subject.clone(), body, None)
-                    .into_message(&email_account)?,
+                    .into_message(&email_account, email_gateway)?,
             );
         }
 
-        email_sender.send_messages(&email_account, messages).await?;
+        email_gateway
+            .send_messages(&email_account, messages)
+            .await?;
     }
     Ok(event)
 }
@@ -328,12 +330,12 @@ pub(crate) async fn export_sepa_xml(
 pub(crate) async fn cancel_booking(
     pool: &PgPool,
     booking_id: i32,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<()> {
     let (event, canceled_booking, waiting_list_booking) =
         db::cancel_event_booking(pool, booking_id).await?;
 
-    let email_account = event.get_associated_email_account(email_sender).await?;
+    let email_account = event.get_associated_email_account(email_gateway).await?;
     let mut messages = Vec::new();
 
     // create cancellation confirmation email
@@ -344,9 +346,10 @@ pub(crate) async fn cancel_booking(
     };
     let body = template::render_booking(body, &canceled_booking, &event, None, None, None)?;
     messages.push(
-        crate::email::new_message_builder(&email_account)?
+        email_gateway
+            .build_message(&email_account)?
             .to(canceled_booking.email.parse()?)
-            .bcc(crate::email::mailbox(&email_account)?)
+            .bcc(email_account.address.parse()?)
             .subject(subject)
             .singlepart(SinglePart::plain(body))?,
     );
@@ -364,15 +367,18 @@ pub(crate) async fn cancel_booking(
         )?;
 
         messages.push(
-            crate::email::new_message_builder(&email_account)?
+            email_gateway
+                .build_message(&email_account)?
                 .to(new_booking.email.parse()?)
-                .bcc(crate::email::mailbox(&email_account)?)
+                .bcc(email_account.address.parse()?)
                 .subject(subject)
                 .singlepart(SinglePart::plain(body))?,
         );
     }
 
-    email_sender.send_messages(&email_account, messages).await?;
+    email_gateway
+        .send_messages(&email_account, messages)
+        .await?;
 
     Ok(())
 }
@@ -380,7 +386,7 @@ pub(crate) async fn cancel_booking(
 pub(crate) async fn send_event_email(
     pool: &PgPool,
     data: EventEmail,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<()> {
     if !data.bookings && !data.waiting_list {
         bail!("Either bookings or waiting list option need to be selected to send an event email.")
@@ -408,7 +414,7 @@ pub(crate) async fn send_event_email(
         .await?
         .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
 
-    let email_account = event.get_associated_email_account(email_sender).await?;
+    let email_account = event.get_associated_email_account(email_gateway).await?;
     let message_type: MessageType = event.event_type.into();
     let mut messages = Vec::new();
 
@@ -446,11 +452,13 @@ pub(crate) async fn send_event_email(
                 body,
                 attachments,
             )
-            .into_message(&email_account)?,
+            .into_message(&email_account, email_gateway)?,
         );
     }
 
-    email_sender.send_messages(&email_account, messages).await?;
+    email_gateway
+        .send_messages(&email_account, messages)
+        .await?;
 
     Ok(())
 }
@@ -458,7 +466,7 @@ pub(crate) async fn send_event_email(
 /// send a reminder email for each events that starts next week
 pub(crate) async fn send_event_reminders(
     pool: &PgPool,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<usize> {
     // get all events where a event reminder should be send to the subscribers
     let events = db::get_reminder_events(pool).await?;
@@ -466,7 +474,7 @@ pub(crate) async fn send_event_reminders(
     // process each event
     for event in &events {
         // prepare for message generation
-        let email_account = event.get_associated_email_account(email_sender).await?;
+        let email_account = event.get_associated_email_account(email_gateway).await?;
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
@@ -497,12 +505,14 @@ pub(crate) async fn send_event_reminders(
                         body,
                         None,
                     )
-                    .into_message(&email_account)?,
+                    .into_message(&email_account, email_gateway)?,
                 );
             }
 
             // send reminder emails to all event subribers
-            email_sender.send_messages(&email_account, messages).await?;
+            email_gateway
+                .send_messages(&email_account, messages)
+                .await?;
 
             // mark reminder has been sent to the event
             // (to avoid duplicate sending of reminder emails)
@@ -518,7 +528,7 @@ pub(crate) async fn send_event_reminders(
 pub(crate) async fn send_payment_reminders(
     pool: &PgPool,
     event_type: EventType,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<usize> {
     // get unpaid bookings and filter for bookings that are due with payment
     let bookings = get_unpaid_bookings(pool, event_type)
@@ -528,7 +538,7 @@ pub(crate) async fn send_payment_reminders(
         .collect::<Vec<_>>();
 
     // prepare for message generation
-    let email_account = email_sender.get_account_by_type(event_type.into()).await?;
+    let email_account = email_gateway.account_by_type(event_type.into()).await?;
     let message_type: MessageType = event_type.into();
     let mut messages = Vec::new();
 
@@ -565,12 +575,14 @@ pub(crate) async fn send_payment_reminders(
                 body,
                 None,
             )
-            .into_message(&email_account)?,
+            .into_message(&email_account, email_gateway)?,
         );
     }
 
     // send reminder emails to all bookings due with payment
-    email_sender.send_messages(&email_account, messages).await?;
+    email_gateway
+        .send_messages(&email_account, messages)
+        .await?;
 
     // mark payment reminder has been sent to the bookings
     // (to avoid duplicate sending of reminder emails)
@@ -587,7 +599,7 @@ pub(crate) async fn send_payment_reminders(
 /// send the attendee confirmation email, and move the event to status 'Closed'.
 pub(crate) async fn close_finished_running_events(
     pool: &PgPool,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<usize> {
     let mut count = 0;
 
@@ -600,13 +612,13 @@ pub(crate) async fn close_finished_running_events(
                 lifecycle_status: Some(LifecycleStatus::Finished),
                 ..Default::default()
             },
-            email_sender,
+            email_gateway,
         )
         .await?;
 
         // send confirmation emails for fitness events
         if matches!(event.event_type, EventType::Fitness) {
-            send_participation_confirmation(pool, event_id, email_sender).await?;
+            send_participation_confirmation(pool, event_id, email_gateway).await?;
         }
 
         // move event into status closed
@@ -617,7 +629,7 @@ pub(crate) async fn close_finished_running_events(
                 lifecycle_status: Some(LifecycleStatus::Closed),
                 ..Default::default()
             },
-            email_sender,
+            email_gateway,
         )
         .await?;
 
@@ -638,7 +650,7 @@ fn into_lifecycle_status(beta: bool) -> LifecycleStatus {
 async fn book_event(
     pool: &PgPool,
     mut booking: EventBooking,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<BookingResponse> {
     let event = db::get_event(pool, &booking.event_id, false)
         .await?
@@ -675,7 +687,7 @@ async fn book_event(
                 counter,
                 true,
                 payment_id,
-                email_sender,
+                email_gateway,
             )
             .await?
         }
@@ -687,7 +699,7 @@ async fn book_event(
                 counter,
                 false,
                 payment_id,
-                email_sender,
+                email_gateway,
             )
             .await?
         }
@@ -723,7 +735,7 @@ async fn pre_book_event(
     pool: &PgPool,
     hash: String,
     provided_iban: Option<String>,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<BookingResponse> {
     let ids = match hashids::decode(&hash) {
         Ok(ids) => ids,
@@ -778,7 +790,7 @@ async fn pre_book_event(
                 counter,
                 true,
                 payment_id,
-                email_sender,
+                email_gateway,
             )
             .await?
         }
@@ -791,7 +803,7 @@ async fn pre_book_event(
                 counter,
                 false,
                 payment_id,
-                email_sender,
+                email_gateway,
             )
             .await?
         }
@@ -824,10 +836,10 @@ async fn process_booking(
     counter: Vec<EventCounter>,
     booked: bool,
     payment_id: String,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<BookingResponse> {
-    subscribe_to_updates(pool, booking, &event, email_sender).await?;
-    send_booking_mail(booking, &event, booked, payment_id, email_sender).await?;
+    subscribe_to_updates(pool, booking, &event, email_gateway).await?;
+    send_booking_mail(booking, &event, booked, payment_id, email_gateway).await?;
     info!("Booking of Event {} was successfull", booking.event_id);
     let message = if booked {
         "Die Buchung war erfolgreich. Du bekommst in den nächsten Minuten eine Bestätigung per E-Mail."
@@ -841,14 +853,14 @@ async fn subscribe_to_updates(
     pool: &PgPool,
     booking: &EventBooking,
     event: &Event,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<()> {
     // only subscribe to updates if updates field is true
     if !booking.updates.unwrap_or(false) {
         return Ok(());
     }
     let subscription = NewsSubscription::new(booking.email.clone(), vec![event.event_type.into()]);
-    super::news::subscribe_to_news(pool, subscription, false, email_sender).await?;
+    super::news::subscribe_to_news(pool, subscription, false, email_gateway).await?;
 
     Ok(())
 }
@@ -858,9 +870,9 @@ async fn send_booking_mail(
     event: &Event,
     booked: bool,
     payment_id: String,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<()> {
-    let email_account = event.get_associated_email_account(email_sender).await?;
+    let email_account = event.get_associated_email_account(email_gateway).await?;
     let subject;
     let template: &str;
     let opt_payment_id;
@@ -897,13 +909,16 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
         )
     }
 
-    let message = crate::email::new_message_builder(&email_account)?
+    let message = email_gateway
+        .build_message(&email_account)?
         .to(booking.email.parse()?)
-        .bcc(crate::email::mailbox(&email_account)?)
+        .bcc(email_account.address.parse()?)
         .subject(subject)
         .singlepart(SinglePart::plain(body))?;
 
-    email_sender.send_message(&email_account, message).await?;
+    email_gateway
+        .send_messages(&email_account, vec![message])
+        .await?;
 
     Ok(())
 }
@@ -1141,7 +1156,7 @@ pub(super) fn calculate_payday(
 pub(crate) async fn send_participation_confirmation(
     pool: &PgPool,
     event_id: EventId,
-    email_sender: &impl email::EmailSender,
+    email_gateway: &impl email::EmailGateway,
 ) -> Result<usize> {
     // fetch the event with all subscribers
     let mut event = db::get_event(pool, &event_id, true)
@@ -1187,7 +1202,7 @@ pub(crate) async fn send_participation_confirmation(
     let dates = format!("{dates_len} x {} Minuten", event.duration_in_minutes);
 
     // send an email per participant
-    let email_account = event.get_associated_email_account(email_sender).await?;
+    let email_account = event.get_associated_email_account(email_gateway).await?;
     let subject = format!("{} Teilnahmebestätigung", event.subject_prefix());
     let mut messages = Vec::new();
     for subscriber in subscribers {
@@ -1207,7 +1222,8 @@ pub(crate) async fn send_participation_confirmation(
 
             let body = template::render_participation_confirmation(template, &event, &subscriber)?;
 
-            let message = crate::email::new_message_builder(&email_account)?
+            let message = email_gateway
+                .build_message(&email_account)?
                 .to(subscriber.email.parse()?)
                 .subject(subject.clone())
                 .multipart(
@@ -1225,7 +1241,9 @@ pub(crate) async fn send_participation_confirmation(
 
     let count = messages.len();
     if count > 0 {
-        email_sender.send_messages(&email_account, messages).await?;
+        email_gateway
+            .send_messages(&email_account, messages)
+            .await?;
     }
 
     Ok(count)
@@ -1742,38 +1760,15 @@ mod events_integration_tests {
     use anyhow::Result;
     use bigdecimal::BigDecimal;
     use chrono::{Duration, Utc};
+    use lettre::Message;
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
 
     use crate::logic::secrets::MockSecretProvider;
     use crate::models::{EventBooking, EventType, LifecycleStatus, PartialEvent, PaymentMethod};
-    use crate::test_utils::{mock_email_sender, mock_email_sender_capturing, noop_mock};
+    use crate::test_utils::mock_email_gateway;
 
     use super::*;
-
-    fn mock_email_sender_times(
-        accounts: Vec<(crate::models::EmailType, &str)>,
-        times: usize,
-    ) -> crate::email::MockEmailSender {
-        use crate::email::MockEmailSender;
-        use crate::models::EmailAccount;
-        let mut mock = MockEmailSender::new();
-        for (email_type, address) in accounts {
-            let account = EmailAccount::new_for_test(email_type.clone(), address);
-            mock.expect_get_account_by_type()
-                .withf(move |t| t == &email_type)
-                .times(times)
-                .returning(move |_| {
-                    let account = account.clone();
-                    Box::pin(async move { Ok(account) })
-                });
-        }
-        mock.expect_send_message()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
-        mock.expect_send_messages()
-            .returning(|_, _| Box::pin(async { Ok(()) }));
-        mock
-    }
 
     async fn create_test_event(pool: &PgPool, status: LifecycleStatus) -> Result<Event> {
         let now = Utc::now();
@@ -1880,7 +1875,7 @@ mod events_integration_tests {
         let event = create_test_event(&pool, LifecycleStatus::Draft)
             .await
             .unwrap();
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let booking_data = make_booking(event.id);
 
         let response = super::booking(&pool, booking_data, &mock_sender).await;
@@ -1917,7 +1912,7 @@ mod events_integration_tests {
         .await
         .unwrap();
 
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let booking_data = make_booking(event.0.id);
         let response = super::booking(&pool, booking_data, &mock_sender).await;
         assert!(!response.success);
@@ -1925,14 +1920,14 @@ mod events_integration_tests {
 
     #[sqlx::test]
     async fn test_prebooking_invalid_hash(pool: PgPool) {
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let response = prebooking(&pool, "invalid_hash".to_string(), &mock_sender).await;
         assert!(!response.success);
     }
 
     #[sqlx::test]
     async fn test_cancel_nonexistent_booking(pool: PgPool) {
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let result = cancel_booking(&pool, 99999, &mock_sender).await;
         assert!(result.is_err());
     }
@@ -1940,7 +1935,7 @@ mod events_integration_tests {
     #[sqlx::test]
     async fn test_update_event(pool: PgPool) -> Result<()> {
         let event = create_test_event(&pool, LifecycleStatus::Draft).await?;
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
 
         let updated = update(
             &pool,
@@ -1960,7 +1955,7 @@ mod events_integration_tests {
     #[sqlx::test]
     async fn test_update_event_with_removed_dates_no_bookings(pool: PgPool) -> Result<()> {
         let event = create_test_event(&pool, LifecycleStatus::Published).await?;
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
 
         // Update with empty dates (removing all dates) - should not send emails since no bookings
         let updated = update(
@@ -1980,7 +1975,7 @@ mod events_integration_tests {
 
     #[sqlx::test]
     async fn test_send_event_reminders_empty_db(pool: PgPool) -> Result<()> {
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let count = send_event_reminders(&pool, &mock_sender).await?;
         assert_eq!(count, 0);
         Ok(())
@@ -2015,7 +2010,7 @@ mod events_integration_tests {
         )
         .await?;
 
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let result = send_participation_confirmation(&pool, event.0.id, &mock_sender).await;
         assert!(result.is_err(), "Should fail for Events type");
         let err_msg = format!("{:?}", result.unwrap_err());
@@ -2053,7 +2048,7 @@ mod events_integration_tests {
         )
         .await?;
 
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
         let result = send_participation_confirmation(&pool, event.0.id, &mock_sender).await;
         assert!(result.is_err());
         Ok(())
@@ -2079,10 +2074,11 @@ mod events_integration_tests {
             iban: None,
         };
 
-        let mock_sender = mock_email_sender(vec![(
+        let mock_sender = mock_email_gateway(vec![(
             crate::models::EmailType::Fitness,
             "test@example.com",
-        )]);
+        )])
+        .0;
 
         send_booking_mail(&booking, &event, true, "PAY123".to_string(), &mock_sender).await?;
 
@@ -2109,10 +2105,11 @@ mod events_integration_tests {
             iban: None,
         };
 
-        let mock_sender = mock_email_sender(vec![(
+        let mock_sender = mock_email_gateway(vec![(
             crate::models::EmailType::Fitness,
             "test@example.com",
-        )]);
+        )])
+        .0;
 
         send_booking_mail(&booking, &event, false, "PAY123".to_string(), &mock_sender).await?;
 
@@ -2121,10 +2118,11 @@ mod events_integration_tests {
 
     #[sqlx::test]
     async fn test_send_payment_reminders(pool: PgPool) -> Result<()> {
-        let mock_sender = mock_email_sender(vec![(
+        let mock_sender = mock_email_gateway(vec![(
             crate::models::EmailType::Fitness,
             "test@example.com",
-        )]);
+        )])
+        .0;
 
         let result = send_payment_reminders(&pool, EventType::Fitness, &mock_sender).await;
         if let Err(e) = &result {
@@ -2181,10 +2179,11 @@ mod events_integration_tests {
             PaymentMethod::SepaDirectDebit,
         )
         .await?;
-        let mock_sender = mock_email_sender(vec![(
+        let mock_sender = mock_email_gateway(vec![(
             crate::models::EmailType::Fitness,
             "test@example.com",
-        )]);
+        )])
+        .0;
 
         let mut booking_data = make_booking(event.id);
         booking_data.iban = Some("DE89 3704 0044 0532 0130 00".to_string());
@@ -2211,7 +2210,7 @@ mod events_integration_tests {
             PaymentMethod::SepaDirectDebit,
         )
         .await?;
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
 
         let booking_data = make_booking(event.id);
         // iban is None by default
@@ -2230,10 +2229,11 @@ mod events_integration_tests {
             PaymentMethod::BankTransfer,
         )
         .await?;
-        let mock_sender = mock_email_sender(vec![(
+        let mock_sender = mock_email_gateway(vec![(
             crate::models::EmailType::Fitness,
             "test@example.com",
-        )]);
+        )])
+        .0;
 
         let mut booking_data = make_booking(event.id);
         booking_data.iban = Some("DE89370400440532013000".to_string());
@@ -2259,7 +2259,7 @@ mod events_integration_tests {
             PaymentMethod::SepaDirectDebit,
         )
         .await?;
-        let mock_sender = noop_mock();
+        let mock_sender = mock_email_gateway(vec![]).0;
 
         // Insert a subscriber directly (no prior SEPA booking with IBAN)
         let subscriber_row = sqlx::query!(
@@ -2303,10 +2303,10 @@ mod events_integration_tests {
             PaymentMethod::SepaDirectDebit,
         )
         .await?;
-        let mock_sender = mock_email_sender_times(
-            vec![(crate::models::EmailType::Fitness, "test@example.com")],
-            2,
-        );
+        let (mock_sender, _) = mock_email_gateway(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
 
         // First booking with IBAN to establish subscriber
         let mut booking_data = make_booking(event1.id);
@@ -2354,10 +2354,10 @@ mod events_integration_tests {
             PaymentMethod::SepaDirectDebit,
         )
         .await?;
-        let mock_sender = mock_email_sender_times(
-            vec![(crate::models::EmailType::Fitness, "test@example.com")],
-            2,
-        );
+        let (mock_sender, _) = mock_email_gateway(vec![(
+            crate::models::EmailType::Fitness,
+            "test@example.com",
+        )]);
 
         // First booking to establish subscriber
         let mut booking_data = make_booking(event1.id);
@@ -2473,13 +2473,19 @@ mod events_integration_tests {
         let booking = make_booking_with_values(event.id, vec!["3".to_string()]);
 
         let (mock_sender, captured) =
-            mock_email_sender_capturing(vec![(EmailType::Events, "test@example.com")]);
+            mock_email_gateway(vec![(EmailType::Events, "test@example.com")]);
 
         let response = super::booking(&pool, booking, &mock_sender).await;
         assert!(response.success, "Booking should succeed");
 
         // Verify confirmation email shows 75,00 € (25 × 3)
-        let messages = captured.lock().unwrap();
+        let messages: Vec<Message> = captured
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|(_, msgs)| msgs)
+            .cloned()
+            .collect();
         assert_eq!(messages.len(), 1, "One confirmation email should be sent");
         let formatted = messages[0].formatted();
         let body = String::from_utf8_lossy(&formatted);
@@ -2505,10 +2511,10 @@ mod events_integration_tests {
         let event = weinwanderung_event(&pool).await?;
 
         // Missing value for the price-relevant field: rejected before any email is
-        // sent. noop_mock has no expectations, so any email call would panic —
+        // sent. An empty mock has no expectations, so any email call would panic —
         // proving the validation branch fires before the confirmation-email path.
         let missing = make_booking_with_values(event.id, vec![]);
-        let response = super::booking(&pool, missing, &noop_mock()).await;
+        let response = super::booking(&pool, missing, &mock_email_gateway(vec![]).0).await;
         assert!(
             !response.success,
             "Booking with a missing price-relevant value should be rejected"
@@ -2516,7 +2522,7 @@ mod events_integration_tests {
 
         // Non-numeric value: also rejected before any email is sent.
         let non_numeric = make_booking_with_values(event.id, vec!["abc".to_string()]);
-        let response = super::booking(&pool, non_numeric, &noop_mock()).await;
+        let response = super::booking(&pool, non_numeric, &mock_email_gateway(vec![]).0).await;
         assert!(
             !response.success,
             "Booking with a non-numeric price-relevant value should be rejected"

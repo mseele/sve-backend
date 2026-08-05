@@ -2,7 +2,7 @@ use super::banking;
 use super::csv;
 use super::news;
 use super::template;
-use crate::email::EmailSender;
+use crate::email::EmailGateway;
 use crate::models::EmailAccount;
 use crate::models::EmailType;
 use crate::models::MembershipApplication;
@@ -20,7 +20,7 @@ use sqlx::PgPool;
 pub(crate) async fn application(
     pool: &PgPool,
     membership_application: MembershipApplication,
-    email_sender: &impl EmailSender,
+    email_gateway: &impl EmailGateway,
 ) -> Result<()> {
     let bank_account = banking::validate_iban(&membership_application.iban)?;
 
@@ -33,20 +33,26 @@ pub(crate) async fn application(
                 vec![NewsTopic::General],
             ),
             false,
-            email_sender,
+            email_gateway,
         )
         .await?;
     }
 
     // send emails
-    let email_account = email_sender
-        .get_account_by_type(EmailType::Mitglieder)
-        .await?;
+    let email_account = email_gateway.account_by_type(EmailType::Mitglieder).await?;
     let messages = vec![
-        create_welcome_email(&email_account, &membership_application)?,
-        create_internal_email(&email_account, membership_application, bank_account).await?,
+        create_welcome_email(&email_account, &membership_application, email_gateway)?,
+        create_internal_email(
+            &email_account,
+            membership_application,
+            bank_account,
+            email_gateway,
+        )
+        .await?,
     ];
-    email_sender.send_messages(&email_account, messages).await?;
+    email_gateway
+        .send_messages(&email_account, messages)
+        .await?;
 
     Ok(())
 }
@@ -54,11 +60,13 @@ pub(crate) async fn application(
 fn create_welcome_email(
     email_account: &EmailAccount,
     membership_application: &MembershipApplication,
+    email_gateway: &impl EmailGateway,
 ) -> Result<Message> {
     let template = include_str!("../../templates/membership_application.txt");
     let body = template::render_membership_application(template, membership_application)?;
 
-    let message = crate::email::new_message_builder(email_account)?
+    let message = email_gateway
+        .build_message(email_account)?
         .to(membership_application.email.parse()?)
         .subject("Willkomen beim SV Eutingen 1947 e.V.")
         .singlepart(SinglePart::plain(body))?;
@@ -220,6 +228,7 @@ async fn create_internal_email(
     email_account: &EmailAccount,
     membership_application: MembershipApplication,
     bank_account: Iban,
+    email_gateway: &impl EmailGateway,
 ) -> Result<Message> {
     let bic = banking::lookup_bic(bank_account.electronic_str())
         .await
@@ -235,7 +244,8 @@ async fn create_internal_email(
 
     let attachment: String = csv::write_membership_application(membership_application)?;
 
-    let message = crate::email::new_message_builder(email_account)?
+    let message = email_gateway
+        .build_message(email_account)?
         .to("mitglieder@sv-eutingen.de".parse()?)
         .subject("Neuer Mitgliedsantrag")
         .multipart(
@@ -254,7 +264,7 @@ async fn create_internal_email(
 mod tests {
     use super::*;
     use crate::models::EmailType;
-    use crate::test_utils::mock_email_sender_capturing_batch;
+    use crate::test_utils::mock_email_gateway;
     use iban::Iban;
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
@@ -378,10 +388,8 @@ mod tests {
             .parse::<Iban>()
             .expect("Valid IBAN");
 
-        let (mock_sender, captured) = mock_email_sender_capturing_batch(vec![(
-            EmailType::Mitglieder,
-            "mitglieder@sv-eutingen.de",
-        )]);
+        let (mock_sender, captured) =
+            mock_email_gateway(vec![(EmailType::Mitglieder, "mitglieder@sv-eutingen.de")]);
 
         let result = application(&pool, membership_application, &mock_sender).await;
         assert!(result.is_ok());
@@ -419,10 +427,8 @@ mod tests {
             .parse::<Iban>()
             .expect("Valid IBAN");
 
-        let (mock_sender, captured) = mock_email_sender_capturing_batch(vec![(
-            EmailType::Mitglieder,
-            "mitglieder@sv-eutingen.de",
-        )]);
+        let (mock_sender, captured) =
+            mock_email_gateway(vec![(EmailType::Mitglieder, "mitglieder@sv-eutingen.de")]);
 
         let result = application(&pool, membership_application, &mock_sender).await;
         assert!(result.is_ok());

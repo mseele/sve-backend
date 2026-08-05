@@ -1,4 +1,4 @@
-use crate::email::EmailSender;
+use crate::email::EmailGateway;
 use crate::models::{ContactMessage, Email, EmailType};
 use anyhow::Result;
 use lettre::message::SinglePart;
@@ -28,15 +28,16 @@ fn build_contact_body(contact_message: &ContactMessage) -> String {
 
 pub(crate) async fn message(
     contact_message: ContactMessage,
-    email_sender: &impl EmailSender,
+    email_gateway: &impl EmailGateway,
 ) -> Result<()> {
-    let email_account = email_sender
-        .get_account_by_type(contact_message.message_type.into())
+    let email_account = email_gateway
+        .account_by_type(contact_message.message_type.into())
         .await?;
 
     let body = build_contact_body(&contact_message);
 
-    let message = crate::email::new_message_builder(&email_account)?
+    let message = email_gateway
+        .build_message(&email_account)?
         .subject(format!(
             "[Kontakt@Web] Nachricht von {}",
             contact_message.name
@@ -45,26 +46,28 @@ pub(crate) async fn message(
         .reply_to(contact_message.email.parse()?)
         .singlepart(SinglePart::plain(body))?;
 
-    email_sender.send_message(&email_account, message).await?;
+    email_gateway
+        .send_messages(&email_account, vec![message])
+        .await?;
 
     info!("Info message has been send successfully");
 
     Ok(())
 }
 
-pub(crate) async fn emails(emails: Vec<Email>, email_sender: &impl EmailSender) -> Result<()> {
+pub(crate) async fn emails(emails: Vec<Email>, email_gateway: &impl EmailGateway) -> Result<()> {
     let mut grouped_emails: HashMap<EmailType, Vec<Email>> = HashMap::new();
     for email in emails {
         let email_type = email.message_type.into();
         grouped_emails.entry(email_type).or_default().push(email);
     }
     for (email_type, emails) in grouped_emails {
-        let from = email_sender.get_account_by_type(email_type).await?;
+        let from = email_gateway.account_by_type(email_type).await?;
         let messages = emails
             .into_iter()
-            .map(|email| email.into_message(&from))
+            .map(|email| email.into_message(&from, email_gateway))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        email_sender.send_messages(&from, messages).await?;
+        email_gateway.send_messages(&from, messages).await?;
     }
 
     Ok(())
@@ -74,7 +77,7 @@ pub(crate) async fn emails(emails: Vec<Email>, email_sender: &impl EmailSender) 
 mod tests {
     use super::*;
     use crate::models::EmailType;
-    use crate::test_utils::{mock_email_sender_capturing, mock_email_sender_capturing_batch};
+    use crate::test_utils::mock_email_gateway;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -160,7 +163,7 @@ mod tests {
             ),
         ];
 
-        let (mock_sender, captured) = mock_email_sender_capturing_batch(vec![
+        let (mock_sender, captured) = mock_email_gateway(vec![
             (EmailType::Info, "info@sv-eutingen.de"),
             (EmailType::Events, "events@sv-eutingen.de"),
         ]);
@@ -187,7 +190,7 @@ mod tests {
     #[tokio::test]
     async fn test_message_sends_to_correct_account() {
         let (mock_sender, captured) =
-            mock_email_sender_capturing(vec![(EmailType::Info, "info@sv-eutingen.de")]);
+            mock_email_gateway(vec![(EmailType::Info, "info@sv-eutingen.de")]);
 
         let contact_message = ContactMessage {
             name: "Max Mustermann".to_string(),

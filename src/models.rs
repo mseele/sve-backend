@@ -196,16 +196,9 @@ impl Event {
 
     pub(crate) async fn get_associated_email_account(
         &self,
-        email_sender: &impl email::EmailSender,
+        email_gateway: &impl email::EmailGateway,
     ) -> Result<EmailAccount> {
-        match &self.alt_email_address {
-            Some(email_address) => email_sender.get_account_by_address(email_address).await,
-            None => {
-                email_sender
-                    .get_account_by_type(self.event_type.into())
-                    .await
-            }
-        }
+        email_gateway.account_by_type(self.event_type.into()).await
     }
 }
 
@@ -853,8 +846,13 @@ impl Email {
         }
     }
 
-    pub(crate) fn into_message(self, email_account: &EmailAccount) -> Result<Message> {
-        let message_builder = crate::email::new_message_builder(email_account)?
+    pub(crate) fn into_message(
+        self,
+        email_account: &EmailAccount,
+        email_gateway: &impl email::EmailGateway,
+    ) -> Result<Message> {
+        let message_builder = email_gateway
+            .build_message(email_account)?
             .to(self.to.parse()?)
             .subject(self.subject);
         let message = match self.attachments {

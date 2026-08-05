@@ -1,5 +1,5 @@
 use crate::db;
-use crate::email::EmailSender;
+use crate::email::EmailGateway;
 use crate::models::{NewsSubscription, NewsTopic};
 use anyhow::Result;
 use lettre::message::SinglePart;
@@ -13,9 +13,9 @@ https://www.sv-eutingen.de/newsletter";
 pub(crate) async fn subscribe(
     pool: &PgPool,
     subscription: NewsSubscription,
-    email_sender: &impl EmailSender,
+    email_gateway: &impl EmailGateway,
 ) -> Result<()> {
-    subscribe_to_news(pool, subscription, true, email_sender).await?;
+    subscribe_to_news(pool, subscription, true, email_gateway).await?;
 
     Ok(())
 }
@@ -48,17 +48,20 @@ pub(in crate::logic) async fn subscribe_to_news(
     pool: &PgPool,
     subscription: NewsSubscription,
     send_email: bool,
-    email_sender: &impl EmailSender,
+    email_gateway: &impl EmailGateway,
 ) -> Result<()> {
     let subscription = db::subscribe(pool, subscription).await?;
     if send_email {
-        send_mail(subscription, email_sender).await?
+        send_mail(subscription, email_gateway).await?
     }
 
     Ok(())
 }
 
-async fn send_mail(subscription: NewsSubscription, email_sender: &impl EmailSender) -> Result<()> {
+async fn send_mail(
+    subscription: NewsSubscription,
+    email_gateway: &impl EmailGateway,
+) -> Result<()> {
     let primary_news_topic;
     let multiple_topics;
     if subscription.topics.len() == 1 {
@@ -104,14 +107,15 @@ async fn send_mail(subscription: NewsSubscription, email_sender: &impl EmailSend
         }
     };
 
-    let email_account = email_sender
-        .get_account_by_type(primary_news_topic.into())
+    let email_account = email_gateway
+        .account_by_type(primary_news_topic.into())
         .await?;
-    let message = crate::email::new_message_builder(&email_account)?
+    let message = email_gateway
+        .build_message(&email_account)?
         .header(header::MIME_VERSION_1_0)
         .header(ContentType::TEXT_PLAIN)
         .to(subscription.email.parse()?)
-        .bcc(crate::email::mailbox(&email_account)?)
+        .bcc(email_account.address.parse()?)
         .subject(subject)
         .singlepart(SinglePart::plain(format!(
             "Lieber Interessent/In,
@@ -127,7 +131,9 @@ Herzliche Grüße
             topic, kind, UNSUBSCRIBE_MESSAGE, regards
         )))?;
 
-    email_sender.send_message(&email_account, message).await?;
+    email_gateway
+        .send_messages(&email_account, vec![message])
+        .await?;
 
     Ok(())
 }
@@ -135,17 +141,18 @@ Herzliche Grüße
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::email::MockEmailSender;
+    use crate::email::MockEmailGateway;
     use crate::models::{EmailType, NewsSubscription, NewsTopic};
-    use crate::test_utils::mock_email_sender_capturing;
+    use crate::test_utils::mock_email_gateway;
     use anyhow::Result;
+    use lettre::Message;
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
 
     #[sqlx::test]
     async fn test_subscribe_sends_confirmation_email(pool: PgPool) -> Result<()> {
         let (mock_sender, captured) =
-            mock_email_sender_capturing(vec![(EmailType::Fitness, "fitness@sv-eutingen.de")]);
+            mock_email_gateway(vec![(EmailType::Fitness, "fitness@sv-eutingen.de")]);
 
         let subscription =
             NewsSubscription::new("test@example.com".to_string(), vec![NewsTopic::Fitness]);
@@ -162,15 +169,15 @@ mod tests {
 
     #[sqlx::test]
     async fn test_subscribe_to_news_no_email(pool: PgPool) -> Result<()> {
-        let mut mock_sender = MockEmailSender::new();
+        let mut mock_sender = MockEmailGateway::new();
 
         mock_sender
-            .expect_get_account_by_type()
+            .expect_account_by_type()
             .times(0)
             .returning(|_| Box::pin(async { unreachable!() }));
 
         mock_sender
-            .expect_send_message()
+            .expect_send_messages()
             .times(0)
             .returning(|_, _| Box::pin(async { unreachable!() }));
 
@@ -184,14 +191,20 @@ mod tests {
     #[sqlx::test]
     async fn test_send_mail_single_topic_body(pool: PgPool) -> Result<()> {
         let (mock_sender, captured) =
-            mock_email_sender_capturing(vec![(EmailType::Events, "events@sv-eutingen.de")]);
+            mock_email_gateway(vec![(EmailType::Events, "events@sv-eutingen.de")]);
 
         let subscription =
             NewsSubscription::new("test@example.com".to_string(), vec![NewsTopic::Events]);
         let result = db::subscribe(&pool, subscription).await?;
         send_mail(result, &mock_sender).await?;
 
-        let messages = captured.lock().unwrap();
+        let messages: Vec<Message> = captured
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|(_, msgs)| msgs)
+            .cloned()
+            .collect();
         let message = messages.first().expect("Email should have been sent");
 
         let body_string = message.formatted();
@@ -216,7 +229,7 @@ mod tests {
     #[sqlx::test]
     async fn test_send_mail_multiple_topics_body(pool: PgPool) -> Result<()> {
         let (mock_sender, captured) =
-            mock_email_sender_capturing(vec![(EmailType::Info, "info@sv-eutingen.de")]);
+            mock_email_gateway(vec![(EmailType::Info, "info@sv-eutingen.de")]);
 
         let subscription = NewsSubscription::new(
             "test@example.com".to_string(),
@@ -225,7 +238,13 @@ mod tests {
         let result = db::subscribe(&pool, subscription).await?;
         send_mail(result, &mock_sender).await?;
 
-        let messages = captured.lock().unwrap();
+        let messages: Vec<Message> = captured
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|(_, msgs)| msgs)
+            .cloned()
+            .collect();
         let message = messages.first().expect("Email should have been sent");
 
         let body_string = message.formatted();
