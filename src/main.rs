@@ -66,9 +66,8 @@ async fn main() -> Result<(), Error> {
 
     let secrets: Arc<dyn SecretProvider> = Arc::new(ConsolidatedAwsSecretProvider::new());
     let pool = db::init_pool(&*secrets).await?;
-    let http_client = reqwest::Client::new();
 
-    let app = api::router(pool, http_client, secrets).await?.layer(
+    let app = api::router(pool, secrets).await?.layer(
         ServiceBuilder::new().layer(
             TraceLayer::new_for_http()
                 .on_request(DefaultOnRequest::new().level(Level::INFO))

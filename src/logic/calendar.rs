@@ -26,8 +26,10 @@ pub(crate) struct NetlifyDeployHook {
 }
 
 impl NetlifyDeployHook {
-    pub(crate) fn new(client: Client) -> Self {
-        Self { client }
+    pub(crate) fn new() -> Self {
+        Self {
+            client: Client::new(),
+        }
     }
 }
 

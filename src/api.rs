@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Debug;
 use std::fmt::{self, Display};
@@ -26,7 +26,6 @@ use lambda_http::request::RequestContext;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use tokio::sync::RwLock;
 use tracing::{debug, error};
 use urlencoding::encode;
 
@@ -34,6 +33,7 @@ use crate::calendar::{CalendarApi, GoogleCalendarApi};
 use crate::email::RealEmailGateway;
 use crate::error::{ConflictError, ValidationError};
 use crate::logic::contact::{CaptchaVerifier, HcaptchaVerifier};
+use crate::logic::jwks::{JwksFetcher, RealJwksFetcher};
 use crate::logic::secrets::{SecretKey, SecretProvider};
 use crate::logic::{calendar, contact, events, export, membership, news, tasks};
 use crate::models::{
@@ -154,10 +154,9 @@ where
 
 pub(crate) async fn router(
     pg_pool: PgPool,
-    http_client: reqwest::Client,
     secrets: Arc<dyn SecretProvider>,
 ) -> Result<Router> {
-    let jwks = Arc::new(RwLock::new(JwksCache::new()));
+    let jwks_fetcher: Arc<dyn JwksFetcher> = Arc::new(RealJwksFetcher::new());
 
     let email_sender = RealEmailGateway::new(secrets.clone());
     let calendar_api = Arc::new(GoogleCalendarApi::new(secrets.clone()));
@@ -166,8 +165,7 @@ pub(crate) async fn router(
 
     let state = AppState {
         pg_pool,
-        jwks,
-        http_client: http_client.clone(),
+        jwks_fetcher,
         allowed_emails: vec![
             "fitness@sv-eutingen.de".to_string(),
             "events@sv-eutingen.de".to_string(),
@@ -296,8 +294,7 @@ struct Claims {
 #[derive(Clone)]
 struct AppState {
     pg_pool: PgPool,
-    jwks: Arc<RwLock<JwksCache>>,
-    http_client: reqwest::Client,
+    jwks_fetcher: Arc<dyn JwksFetcher>,
     allowed_emails: Vec<String>,
     allowed_domain: String,
     task_api_key: String,
@@ -306,27 +303,6 @@ struct AppState {
     email_sender: RealEmailGateway,
     calendar_api: Arc<dyn CalendarApi>,
     captcha_verifier: Arc<dyn CaptchaVerifier>,
-}
-
-#[derive(Clone)]
-struct JwksCache {
-    keys: HashMap<String, Arc<DecodingKey>>,
-    last_updated: std::time::Instant,
-    ttl: std::time::Duration,
-}
-
-impl JwksCache {
-    fn new() -> Self {
-        Self {
-            keys: HashMap::new(),
-            last_updated: std::time::Instant::now(),
-            ttl: std::time::Duration::from_secs(24 * 3600), // 24 hours
-        }
-    }
-
-    fn is_expired(&self) -> bool {
-        self.last_updated.elapsed() > self.ttl
-    }
 }
 
 async fn auth_middleware_fn(
@@ -376,37 +352,6 @@ async fn api_key_middleware_fn(
     }
 }
 
-async fn fetch_jwks(
-    client: &reqwest::Client,
-    jwks_url: &str,
-) -> Result<HashMap<String, Arc<DecodingKey>>> {
-    let res = client
-        .get(jwks_url)
-        .send()
-        .await?
-        .json::<HashMap<String, Vec<Jwk>>>()
-        .await?;
-
-    let mut keys = HashMap::new();
-    if let Some(jwks_keys) = res.get("keys") {
-        for key in jwks_keys {
-            if let (Some(kid), Some(n), Some(e)) = (&key.kid, &key.n, &key.e) {
-                let decoding_key = DecodingKey::from_rsa_components(n, e).unwrap();
-                keys.insert(kid.clone(), Arc::new(decoding_key));
-            }
-        }
-    }
-
-    Ok(keys)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Jwk {
-    kid: Option<String>,
-    n: Option<String>,
-    e: Option<String>,
-}
-
 // auth: session JWT exchange
 
 #[derive(Deserialize)]
@@ -423,7 +368,7 @@ async fn exchange_session(
     State(state): State<AppState>,
     Json(req): Json<SessionExchangeRequest>,
 ) -> Response {
-    let claims = match verify_google_token(&req.google_token, &state).await {
+    let claims = match verify_google_token(&req.google_token, &*state.jwks_fetcher).await {
         Ok(c) => c,
         Err(e) => {
             tracing::warn!("Google token verification failed: {:?}", e);
@@ -444,33 +389,11 @@ async fn exchange_session(
     }
 }
 
-async fn verify_google_token(token: &str, state: &AppState) -> Result<Claims> {
+async fn verify_google_token(token: &str, fetcher: &dyn JwksFetcher) -> Result<Claims> {
     let header = decode_header(token)?;
     let kid = header.kid.ok_or_else(|| anyhow!("Missing kid in JWT"))?;
 
-    let decoding_key = {
-        let needs_refresh = {
-            let jwks_cache = state.jwks.read().await;
-            jwks_cache.is_expired() || !jwks_cache.keys.contains_key(&kid)
-        };
-        if needs_refresh {
-            tracing::info!("Refreshing JWKS cache (expired or missing kid: {})", kid);
-            let new_keys = fetch_jwks(
-                &state.http_client,
-                "https://www.googleapis.com/oauth2/v3/certs",
-            )
-            .await?;
-            let mut jwks_cache = state.jwks.write().await;
-            jwks_cache.keys = new_keys;
-            jwks_cache.last_updated = std::time::Instant::now();
-        }
-        let jwks_cache = state.jwks.read().await;
-        jwks_cache
-            .keys
-            .get(&kid)
-            .cloned()
-            .ok_or_else(|| anyhow!("Unknown JWT key"))?
-    };
+    let decoding_key = fetcher.fetch_certs(&kid).await?;
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.validate_aud = false;
@@ -819,14 +742,13 @@ async fn appointments(State(state): State<AppState>) -> Result<impl IntoResponse
 }
 
 async fn notifications(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, ResponseError> {
     let header_key = "X-Goog-Channel-Id";
     let channel_id = headers.get(header_key);
     if let Some(channel_id) = channel_id {
-        let hook =
-            calendar::NetlifyDeployHook::new(state.http_client.clone());
+        let hook = calendar::NetlifyDeployHook::new();
         match channel_id.to_str() {
             Ok(channel_id) => calendar::notifications(channel_id, &hook).await?,
             Err(e) => error!(
@@ -980,11 +902,35 @@ mod tests {
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use serde::Serialize;
 
     use crate::logic::contact::{CaptchaError, MockCaptchaVerifier};
+    use crate::logic::jwks::generate_test_rsa_key;
+    use crate::logic::jwks::FakeJwksFetcher;
+
+    #[derive(Debug, Serialize)]
+    struct GoogleClaimsForTest {
+        email: String,
+        hd: Option<String>,
+        exp: usize,
+        iat: usize,
+    }
 
     fn test_secret() -> String {
         "test-secret-key-that-is-at-least-32-bytes!".to_string()
+    }
+
+    fn mint_google_token(encoding_key: &EncodingKey, email: &str, hd: Option<&str>, kid: &str) -> String {
+        let now = Utc::now().timestamp() as usize;
+        let claims = GoogleClaimsForTest {
+            email: email.to_string(),
+            hd: hd.map(|s| s.to_string()),
+            exp: now + 3600,
+            iat: now,
+        };
+        let mut header = Header::new(Algorithm::RS256);
+        header.kid = Some(kid.to_string());
+        jsonwebtoken::encode(&header, &claims, encoding_key).unwrap()
     }
 
     #[test]
@@ -1144,5 +1090,63 @@ mod tests {
             err.response,
             Some((StatusCode::BAD_REQUEST, "Captcha token is required.".into()))
         );
+    }
+
+    #[tokio::test]
+    async fn verify_google_token_valid_token_succeeds() {
+        let (decoding_key, encoding_key) = generate_test_rsa_key();
+        let kid = "test-kid-1";
+        let token = mint_google_token(&encoding_key, "admin@sv-eutingen.de", Some("sv-eutingen.de"), kid);
+
+        let fetcher = FakeJwksFetcher::new();
+        fetcher.add_key(kid, decoding_key).await;
+
+        let claims = verify_google_token(&token, &fetcher).await.unwrap();
+        assert_eq!(claims.email, "admin@sv-eutingen.de");
+        assert_eq!(claims.hd.as_deref(), Some("sv-eutingen.de"));
+    }
+
+    #[tokio::test]
+    async fn verify_google_token_unknown_kid_returns_error() {
+        let (_decoding_key, encoding_key) = generate_test_rsa_key();
+        let token = mint_google_token(&encoding_key, "admin@sv-eutingen.de", None, "known-kid");
+
+        let fetcher = FakeJwksFetcher::new();
+
+        let result = verify_google_token(&token, &fetcher).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Unknown kid"), "expected 'Unknown kid' in error, got: {err}");
+    }
+
+    #[tokio::test]
+    async fn verify_google_token_cache_refresh_simulated_by_fake_recovery() {
+        let (decoding_key, encoding_key) = generate_test_rsa_key();
+        let kid = "refreshed-kid";
+        let token = mint_google_token(&encoding_key, "admin@sv-eutingen.de", None, kid);
+
+        let fetcher = FakeJwksFetcher::new();
+
+        let result = verify_google_token(&token, &fetcher).await;
+        assert!(result.is_err(), "first call should fail (cache miss)");
+
+        fetcher.add_key(kid, decoding_key).await;
+
+        let claims = verify_google_token(&token, &fetcher).await.unwrap();
+        assert_eq!(claims.email, "admin@sv-eutingen.de");
+    }
+
+    #[tokio::test]
+    async fn verify_google_token_fetcher_error_propagates() {
+        let (_decoding_key, encoding_key) = generate_test_rsa_key();
+        let token = mint_google_token(&encoding_key, "admin@sv-eutingen.de", None, "some-kid");
+
+        let fetcher = FakeJwksFetcher::new();
+        fetcher.set_next_call_error("simulated network failure").await;
+
+        let result = verify_google_token(&token, &fetcher).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("simulated network failure"), "expected network failure in error, got: {err}");
     }
 }
