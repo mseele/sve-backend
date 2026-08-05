@@ -1,31 +1,31 @@
-use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::{Context, Result, anyhow, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use chrono::{DateTime, Duration, Locale, NaiveDate, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{DecoderTrap, all::ISO_8859_1};
 use lazy_static::lazy_static;
-use lettre::message::header::ContentType;
-use lettre::message::{Attachment, MultiPart, SinglePart};
+use lettre::message::SinglePart;
 use regex::Regex;
 use sqlx::PgPool;
 use tracing::{error, info, warn};
 
 use super::csv::PaymentRecord;
-use super::{banking, export, template};
+use super::{banking, template};
 use crate::db::BookingResult;
 use crate::email;
 use crate::error::ValidationError;
 use crate::logic::secrets::{SecretKey, SecretProvider};
 use crate::models::{
-    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventEmail,
+    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField,
     EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent,
     PaymentMethod, ToEuro, UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
+
+pub(crate) mod notifications;
 
 const MESSAGE_FAIL: &str =
     "Leider ist etwas schief gelaufen. Bitte versuche es später noch einmal.";
@@ -123,8 +123,8 @@ pub(crate) async fn update(
 
         let subject = format!("{} Terminänderung {}", event.subject_prefix(), event.name);
         let template = match event.event_type {
-            EventType::Fitness => include_str!("../../templates/schedule_change_fitness.txt"),
-            EventType::Events => include_str!("../../templates/schedule_change_events.txt"),
+            EventType::Fitness => include_str!("../../../templates/schedule_change_fitness.txt"),
+            EventType::Events => include_str!("../../../templates/schedule_change_events.txt"),
         };
 
         let email_account = event.get_associated_email_account(email_gateway).await?;
@@ -342,8 +342,8 @@ pub(crate) async fn cancel_booking(
     // create cancellation confirmation email
     let subject = format!("{} Stornierung Buchung", event.subject_prefix());
     let body = match event.event_type {
-        EventType::Fitness => include_str!("../../templates/cancel_booking_fitness.txt"),
-        EventType::Events => include_str!("../../templates/cancel_booking_events.txt"),
+        EventType::Fitness => include_str!("../../../templates/cancel_booking_fitness.txt"),
+        EventType::Events => include_str!("../../../templates/cancel_booking_events.txt"),
     };
     let body = template::render_booking(body, &canceled_booking, &event, None, None, None)?;
     messages.push(
@@ -384,218 +384,6 @@ pub(crate) async fn cancel_booking(
     Ok(())
 }
 
-pub(crate) async fn send_event_email(
-    pool: &PgPool,
-    data: EventEmail,
-    email_gateway: &impl email::EmailGateway,
-) -> Result<()> {
-    if !data.bookings && !data.waiting_list {
-        bail!("Either bookings or waiting list option need to be selected to send an event email.")
-    }
-    let enrolled = if data.bookings && !data.waiting_list {
-        Some(true)
-    } else if data.waiting_list && !data.bookings {
-        Some(false)
-    } else {
-        None
-    };
-
-    let bookings = db::get_bookings(pool, &data.event_id, enrolled).await?;
-    if bookings.is_empty() {
-        return Ok(());
-    }
-
-    // calculate correct event id
-    let event_id = match &data.prebooking_event_id {
-        Some(event_id) => event_id,
-        None => &data.event_id,
-    };
-
-    let event = db::get_event(pool, event_id, false)
-        .await?
-        .ok_or_else(|| anyhow!("Found no event with id '{}'", event_id))?;
-
-    let email_account = event.get_associated_email_account(email_gateway).await?;
-    let message_type: MessageType = event.event_type.into();
-    let mut messages = Vec::new();
-
-    for (booking, subscriber_id, payment_id) in bookings {
-        let prebooking_link;
-        if let Some(event_id) = data.prebooking_event_id {
-            prebooking_link = Some(create_prebooking_link(
-                event.event_type,
-                event_id,
-                subscriber_id,
-            )?);
-        } else {
-            prebooking_link = None;
-        }
-
-        let body = template::render_booking(
-            &data.body,
-            &booking,
-            &event,
-            Some(payment_id),
-            prebooking_link,
-            None,
-        )?;
-
-        let attachments = data
-            .attachments
-            .as_ref()
-            .map(|attachments| attachments.to_vec());
-
-        messages.push(
-            Email::new(
-                message_type,
-                booking.email,
-                data.subject.clone(),
-                body,
-                attachments,
-            )
-            .into_message(&email_account, email_gateway)?,
-        );
-    }
-
-    email_gateway
-        .send_messages(&email_account, messages)
-        .await?;
-
-    Ok(())
-}
-
-/// send a reminder email for each events that starts next week
-pub(crate) async fn send_event_reminders(
-    pool: &PgPool,
-    email_gateway: &impl email::EmailGateway,
-) -> Result<usize> {
-    // get all events where a event reminder should be send to the subscribers
-    let events = db::get_reminder_events(pool).await?;
-
-    // process each event
-    for event in &events {
-        // prepare for message generation
-        let email_account = event.get_associated_email_account(email_gateway).await?;
-        let message_type: MessageType = event.event_type.into();
-        let mut messages = Vec::new();
-
-        // get the subject and body (depending on the event type)
-        let (subject, body) = match event.event_type {
-            EventType::Fitness => (
-                format!("{} Info zum Kursstart", event.subject_prefix()),
-                include_str!("../../templates/event_reminder_fitness.txt"),
-            ),
-            EventType::Events => (
-                format!("{} Info zum Eventstart", event.subject_prefix()),
-                include_str!("../../templates/event_reminder_events.txt"),
-            ),
-        };
-
-        // iterate all enrolled event subscribers (Option should never be None)
-        if let Some(subscribers) = &event.subscribers {
-            for subscriber in subscribers.iter().filter(|s| s.enrolled) {
-                // render the body for the email...
-                let body = template::render_event_reminder(body, event, subscriber)?;
-
-                // ...and push the email into the messages list
-                messages.push(
-                    Email::new(
-                        message_type,
-                        subscriber.email.clone(),
-                        subject.clone(),
-                        body,
-                        None,
-                    )
-                    .into_message(&email_account, email_gateway)?,
-                );
-            }
-
-            // send reminder emails to all event subribers
-            email_gateway
-                .send_messages(&email_account, messages)
-                .await?;
-
-            // mark reminder has been sent to the event
-            // (to avoid duplicate sending of reminder emails)
-            db::mark_as_reminder_sent(pool, &event.id).await?;
-        }
-    }
-
-    // return the count of events for which the reminder has been send
-    Ok(events.len())
-}
-
-/// send a reminder email for all bookings which are due with payment
-pub(crate) async fn send_payment_reminders(
-    pool: &PgPool,
-    event_type: EventType,
-    email_gateway: &impl email::EmailGateway,
-) -> Result<usize> {
-    // get unpaid bookings and filter for bookings that are due with payment
-    let bookings = get_unpaid_bookings(pool, event_type)
-        .await?
-        .into_iter()
-        .filter(|booking| matches!(booking.due_in_days, Some(due_in_days) if due_in_days < 0))
-        .collect::<Vec<_>>();
-
-    // prepare for message generation
-    let email_account = email_gateway.account_by_type(event_type.into()).await?;
-    let message_type: MessageType = event_type.into();
-    let mut messages = Vec::new();
-
-    // get the subject and body (depending on the event type)
-    let subject = format!("{} Zahlungserinnerung", event_type.subject_prefix());
-    let body = match event_type {
-        EventType::Fitness => include_str!("../../templates/payment_reminder_fitness.txt"),
-        EventType::Events => include_str!("../../templates/payment_reminder_events.txt"),
-    };
-
-    let mut event_cache = HashMap::new();
-    for booking in bookings.iter() {
-        // get the event from the cache of from the database
-        let key = booking.event_id;
-        if let Entry::Vacant(e) = event_cache.entry(key) {
-            let value = db::get_event(pool, &booking.event_id, false)
-                .await?
-                .ok_or_else(|| anyhow!("Event with id '{}' is missing", key))?;
-            e.insert(value);
-        }
-        let event = event_cache
-            .get(&key)
-            .ok_or_else(|| anyhow!("Event with id '{}' is not in the cache", key))?;
-
-        // render the body for the email...
-        let body = template::render_payment_reminder(body, event, booking)?;
-
-        // ...and push the email into the messages list
-        messages.push(
-            Email::new(
-                message_type,
-                booking.email.clone(),
-                subject.clone(),
-                body,
-                None,
-            )
-            .into_message(&email_account, email_gateway)?,
-        );
-    }
-
-    // send reminder emails to all bookings due with payment
-    email_gateway
-        .send_messages(&email_account, messages)
-        .await?;
-
-    // mark payment reminder has been sent to the bookings
-    // (to avoid duplicate sending of reminder emails)
-    let booking_ids = bookings
-        .into_iter()
-        .map(|booking| booking.booking_id)
-        .collect::<Vec<_>>();
-    db::mark_as_payment_reminder_sent(pool, &booking_ids).await?;
-
-    Ok(booking_ids.len())
-}
-
 /// Check that an event has finished. If so, move the event to status 'Finished',
 /// send the attendee confirmation email, and move the event to status 'Closed'.
 pub(crate) async fn close_finished_running_events(
@@ -619,7 +407,7 @@ pub(crate) async fn close_finished_running_events(
 
         // send confirmation emails for fitness events
         if matches!(event.event_type, EventType::Fitness) {
-            send_participation_confirmation(pool, event_id, email_gateway).await?;
+            notifications::send_participation_confirmation(pool, event_id, email_gateway).await?;
         }
 
         // move event into status closed
@@ -884,8 +672,8 @@ async fn send_booking_mail(
     } else {
         subject = format!("{} Bestätigung Warteliste", event.subject_prefix());
         template = match event.event_type {
-            EventType::Fitness => include_str!("../../templates/waiting_list_fitness.txt"),
-            EventType::Events => include_str!("../../templates/waiting_list_events.txt"),
+            EventType::Fitness => include_str!("../../../templates/waiting_list_fitness.txt"),
+            EventType::Events => include_str!("../../../templates/waiting_list_events.txt"),
         };
         opt_payment_id = None;
     }
@@ -924,7 +712,7 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
     Ok(())
 }
 
-fn create_prebooking_link(
+pub(crate) fn create_prebooking_link(
     event_type: EventType,
     event_id: EventId,
     subscriber_id: i32,
@@ -1151,103 +939,6 @@ pub(super) fn calculate_payday(
     }
 
     Ok(payday)
-}
-
-/// send participation confirmation after finished event
-pub(crate) async fn send_participation_confirmation(
-    pool: &PgPool,
-    event_id: EventId,
-    email_gateway: &impl email::EmailGateway,
-) -> Result<usize> {
-    // fetch the event with all subscribers
-    let mut event = db::get_event(pool, &event_id, true)
-        .await?
-        .ok_or_else(|| anyhow!("Error fetching event with id '{}'", event_id.get_ref()))?;
-    let subscribers = event.subscribers.take().ok_or_else(|| {
-        anyhow!(
-            "Subscribers of event with id '{}' are missing",
-            event_id.get_ref()
-        )
-    })?;
-
-    let template = match event.event_type {
-        EventType::Fitness => Ok(include_str!(
-            "../../templates/participation_confirmation_fitness.txt"
-        )),
-        EventType::Events => Err(anyhow!(
-            "Participation confirmation is not supported for event type 'Events'."
-        )),
-    }?;
-
-    let dates_len = event.dates.len();
-    // abort if the event has no dates
-    if dates_len < 1 {
-        return Err(anyhow!(
-            "Participation confirmation is not supported for an event without dates."
-        ));
-    }
-
-    let fmt = "%d. %B %Y";
-    let first_date = event
-        .dates
-        .first()
-        .ok_or_else(|| anyhow!("Event with id '{}' has no first date", event_id))?
-        .format_localized(fmt, Locale::de_DE)
-        .to_string();
-    let last_date = event
-        .dates
-        .last()
-        .ok_or_else(|| anyhow!("Event with id '{}' has no last date", event_id))?
-        .format_localized(fmt, Locale::de_DE)
-        .to_string();
-    let dates = format!("{dates_len} x {} Minuten", event.duration_in_minutes);
-
-    // send an email per participant
-    let email_account = event.get_associated_email_account(email_gateway).await?;
-    let subject = format!("{} Teilnahmebestätigung", event.subject_prefix());
-    let mut messages = Vec::new();
-    for subscriber in subscribers {
-        if subscriber.enrolled {
-            let price = subscriber.total_price(&event).to_euro();
-
-            let bytes = export::create_participation_confirmation(
-                subscriber.first_name.clone(),
-                subscriber.last_name.clone(),
-                event.name.clone(),
-                first_date.clone(),
-                last_date.clone(),
-                price,
-                dates.clone(),
-            )
-            .await?;
-
-            let body = template::render_participation_confirmation(template, &event, &subscriber)?;
-
-            let message = email_gateway
-                .build_message(&email_account)?
-                .to(subscriber.email.parse()?)
-                .subject(subject.clone())
-                .multipart(
-                    MultiPart::mixed()
-                        .singlepart(SinglePart::plain(body))
-                        .singlepart(
-                            Attachment::new(String::from("Teilnahmebestätigung.pdf"))
-                                .body(bytes, ContentType::parse("application/pdf")?),
-                        ),
-                )?;
-
-            messages.push(message)
-        }
-    }
-
-    let count = messages.len();
-    if count > 0 {
-        email_gateway
-            .send_messages(&email_account, messages)
-            .await?;
-    }
-
-    Ok(count)
 }
 
 #[cfg(test)]
@@ -1757,6 +1448,38 @@ Buchungstag;Valuta;Textschlüssel;Primanota;Zahlungsempfänger;Zahlungsempfänge
 }
 
 #[cfg(test)]
+async fn create_test_event(pool: &PgPool, status: LifecycleStatus) -> Result<Event> {
+    use bigdecimal::BigDecimal;
+    let now = Utc::now();
+    let event = db::write_event(
+        pool,
+        PartialEvent {
+            event_type: Some(EventType::Fitness),
+            lifecycle_status: Some(status),
+            name: Some("Test Event".to_string()),
+            sort_index: Some(0),
+            short_description: Some("Short desc".to_string()),
+            description: Some("Full desc".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(true),
+            dates: Some(vec![now + Duration::try_days(30).unwrap()]),
+            duration_in_minutes: Some(60),
+            max_subscribers: Some(10),
+            max_waiting_list: Some(5),
+            price_member: Some(BigDecimal::from(20)),
+            price_non_member: Some(BigDecimal::from(25)),
+            location: Some("Test Location".to_string()),
+            booking_template: Some("Booking template".to_string()),
+            payment_account: Some("DE1234".to_string()),
+            external_operator: Some(false),
+            ..Default::default()
+        },
+    )
+    .await?;
+    Ok(event.0)
+}
+
+#[cfg(test)]
 mod events_integration_tests {
     use anyhow::Result;
     use bigdecimal::BigDecimal;
@@ -1770,36 +1493,6 @@ mod events_integration_tests {
     use crate::test_utils::mock_email_gateway;
 
     use super::*;
-
-    async fn create_test_event(pool: &PgPool, status: LifecycleStatus) -> Result<Event> {
-        let now = Utc::now();
-        let event = db::write_event(
-            pool,
-            PartialEvent {
-                event_type: Some(EventType::Fitness),
-                lifecycle_status: Some(status),
-                name: Some("Test Event".to_string()),
-                sort_index: Some(0),
-                short_description: Some("Short desc".to_string()),
-                description: Some("Full desc".to_string()),
-                image: Some("test.png".to_string()),
-                light: Some(true),
-                dates: Some(vec![now + Duration::try_days(30).unwrap()]),
-                duration_in_minutes: Some(60),
-                max_subscribers: Some(10),
-                max_waiting_list: Some(5),
-                price_member: Some(BigDecimal::from(20)),
-                price_non_member: Some(BigDecimal::from(25)),
-                location: Some("Test Location".to_string()),
-                booking_template: Some("Booking template".to_string()),
-                payment_account: Some("DE1234".to_string()),
-                external_operator: Some(false),
-                ..Default::default()
-            },
-        )
-        .await?;
-        Ok(event.0)
-    }
 
     fn make_booking(event_id: EventId) -> EventBooking {
         make_booking_with_values(event_id, vec![])
@@ -1975,87 +1668,6 @@ mod events_integration_tests {
     }
 
     #[sqlx::test]
-    async fn test_send_event_reminders_empty_db(pool: PgPool) -> Result<()> {
-        let mock_sender = mock_email_gateway(vec![]).0;
-        let count = send_event_reminders(&pool, &mock_sender).await?;
-        assert_eq!(count, 0);
-        Ok(())
-    }
-
-    #[sqlx::test]
-    async fn test_send_participation_confirmation_events_type(pool: PgPool) -> Result<()> {
-        // Create an Events type event (not Fitness)
-        let event = db::write_event(
-            &pool,
-            PartialEvent {
-                event_type: Some(EventType::Events),
-                lifecycle_status: Some(LifecycleStatus::Running),
-                name: Some("Events Type".to_string()),
-                sort_index: Some(0),
-                short_description: Some("Short".to_string()),
-                description: Some("Desc".to_string()),
-                image: Some("img.png".to_string()),
-                light: Some(true),
-                dates: Some(vec![Utc::now() + Duration::try_days(30).unwrap()]),
-                duration_in_minutes: Some(60),
-                max_subscribers: Some(10),
-                max_waiting_list: Some(5),
-                price_member: Some(BigDecimal::from(20)),
-                price_non_member: Some(BigDecimal::from(25)),
-                location: Some("Location".to_string()),
-                booking_template: Some("Template".to_string()),
-                payment_account: Some("DE1234".to_string()),
-                external_operator: Some(false),
-                ..Default::default()
-            },
-        )
-        .await?;
-
-        let mock_sender = mock_email_gateway(vec![]).0;
-        let result = send_participation_confirmation(&pool, event.0.id, &mock_sender).await;
-        assert!(result.is_err(), "Should fail for Events type");
-        let err_msg = format!("{:?}", result.unwrap_err());
-        assert!(err_msg.contains("not supported"), "Error was: {err_msg}");
-
-        Ok(())
-    }
-
-    #[sqlx::test]
-    async fn test_send_participation_confirmation_no_dates(pool: PgPool) -> Result<()> {
-        // Create a Fitness event with no dates
-        let event = db::write_event(
-            &pool,
-            PartialEvent {
-                event_type: Some(EventType::Fitness),
-                lifecycle_status: Some(LifecycleStatus::Running),
-                name: Some("Fitness Event".to_string()),
-                sort_index: Some(0),
-                short_description: Some("Short".to_string()),
-                description: Some("Desc".to_string()),
-                image: Some("img.png".to_string()),
-                light: Some(true),
-                custom_date: Some("Sometime".to_string()),
-                duration_in_minutes: Some(60),
-                max_subscribers: Some(10),
-                max_waiting_list: Some(5),
-                price_member: Some(BigDecimal::from(20)),
-                price_non_member: Some(BigDecimal::from(25)),
-                location: Some("Location".to_string()),
-                booking_template: Some("Template".to_string()),
-                payment_account: Some("DE1234".to_string()),
-                external_operator: Some(false),
-                ..Default::default()
-            },
-        )
-        .await?;
-
-        let mock_sender = mock_email_gateway(vec![]).0;
-        let result = send_participation_confirmation(&pool, event.0.id, &mock_sender).await;
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[sqlx::test]
     async fn test_send_booking_mail_booked(pool: PgPool) -> Result<()> {
         let event = create_test_event(&pool, LifecycleStatus::Published).await?;
 
@@ -2113,24 +1725,6 @@ mod events_integration_tests {
         .0;
 
         send_booking_mail(&booking, &event, false, "PAY123".to_string(), &mock_sender).await?;
-
-        Ok(())
-    }
-
-    #[sqlx::test]
-    async fn test_send_payment_reminders(pool: PgPool) -> Result<()> {
-        let mock_sender = mock_email_gateway(vec![(
-            crate::models::EmailType::Fitness,
-            "test@example.com",
-        )])
-        .0;
-
-        let result = send_payment_reminders(&pool, EventType::Fitness, &mock_sender).await;
-        if let Err(e) = &result {
-            eprintln!("Error: {:?}", e);
-        }
-        assert!(result.is_ok());
-        assert_eq!(result?, 0);
 
         Ok(())
     }

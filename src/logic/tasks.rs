@@ -23,7 +23,7 @@ pub(crate) async fn renew_calendar_watch(api: &dyn CalendarApi) {
 
 /// send a reminder email for all events starting next week
 pub(crate) async fn send_event_reminders(pool: &PgPool, email_gateway: &impl EmailGateway) {
-    match events::send_event_reminders(pool, email_gateway).await {
+    match events::notifications::send_event_reminders(pool, email_gateway).await {
         Ok(count) if count > 0 => info!("{} event reminders has been send successfully.", count),
         Ok(_) => (),
         Err(e) => error!("Error while sending event reminders: {}", e),
@@ -45,7 +45,7 @@ pub(crate) async fn send_payment_reminders(
     event_type: EventType,
     email_gateway: &impl EmailGateway,
 ) -> Result<()> {
-    match events::send_payment_reminders(pool, event_type, email_gateway).await {
+    match events::notifications::send_payment_reminders(pool, event_type, email_gateway).await {
         Ok(count) if count > 0 => {
             info!("{} payment reminders has been send successfully.", count);
             Ok(())
@@ -64,7 +64,7 @@ pub(crate) async fn send_participation_confirmation(
     event_id: EventId,
     email_gateway: &impl EmailGateway,
 ) -> Result<()> {
-    match events::send_participation_confirmation(pool, event_id, email_gateway).await {
+    match events::notifications::send_participation_confirmation(pool, event_id, email_gateway).await {
         Ok(count) if count > 0 => {
             info!(
                 "{} participation confirmations has been send successfully.",

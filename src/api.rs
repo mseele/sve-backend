@@ -787,7 +787,7 @@ async fn emails(
     if let Some(emails) = body.emails {
         contact::emails(emails, &state.email_sender).await?;
     } else if let Some(event) = body.event {
-        events::send_event_email(&state.pg_pool, event, &state.email_sender).await?;
+        events::notifications::send_event_email(&state.pg_pool, event, &state.email_sender).await?;
     }
     Ok(StatusCode::OK)
 }
