@@ -30,7 +30,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, error};
 use urlencoding::encode;
 
-use crate::calendar::CalendarClient;
+use crate::calendar::{CalendarApi, GoogleCalendarApi};
 use crate::email::RealEmailGateway;
 use crate::error::{ConflictError, ValidationError};
 use crate::logic::contact::{CaptchaVerifier, HcaptchaVerifier};
@@ -160,7 +160,7 @@ pub(crate) async fn router(
     let jwks = Arc::new(RwLock::new(JwksCache::new()));
 
     let email_sender = RealEmailGateway::new(secrets.clone());
-    let calendar_client = CalendarClient::new(secrets.clone());
+    let calendar_api = Arc::new(GoogleCalendarApi::new(secrets.clone()));
     let captcha_secret = secrets.get(SecretKey::CaptchaSecret).await?;
     let captcha_verifier = Arc::new(HcaptchaVerifier::new(captcha_secret));
 
@@ -177,7 +177,7 @@ pub(crate) async fn router(
         session_secret: secrets.get(SecretKey::SessionSecret).await?,
         secrets,
         email_sender,
-        calendar_client,
+        calendar_api,
         captcha_verifier,
     };
 
@@ -304,7 +304,7 @@ struct AppState {
     session_secret: String,
     secrets: Arc<dyn SecretProvider>,
     email_sender: RealEmailGateway,
-    calendar_client: CalendarClient,
+    calendar_api: Arc<dyn CalendarApi>,
     captcha_verifier: Arc<dyn CaptchaVerifier>,
 }
 
@@ -814,7 +814,7 @@ async fn subscribers(
 // calendar
 
 async fn appointments(State(state): State<AppState>) -> Result<impl IntoResponse, ResponseError> {
-    let result = calendar::appointments(&state.calendar_client).await?;
+    let result = calendar::appointments(&*state.calendar_api).await?;
     Ok(Json(result))
 }
 
@@ -894,7 +894,7 @@ async fn check_email_connectivity(
 async fn renew_calendar_watch(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    tasks::renew_calendar_watch(&state.calendar_client).await;
+    tasks::renew_calendar_watch(&*state.calendar_api).await;
     Ok(StatusCode::OK)
 }
 

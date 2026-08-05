@@ -737,7 +737,7 @@ impl From<NewsTopic> for EmailType {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Clone)]
 pub(crate) struct Appointment {
     pub(crate) id: Option<String>,
     pub(crate) sort_index: u32,

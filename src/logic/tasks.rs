@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use tracing::{error, info};
 
 use super::{calendar, events};
-use crate::calendar::CalendarClient;
+use crate::calendar::CalendarApi;
 use crate::email::{EmailGateway, RealEmailGateway};
 use crate::models::{EventId, EventType};
 
@@ -14,8 +14,8 @@ pub(crate) async fn check_email_connectivity(email_gateway: &RealEmailGateway) {
     }
 }
 
-pub(crate) async fn renew_calendar_watch(client: &CalendarClient) {
-    match calendar::renew_watch(client).await {
+pub(crate) async fn renew_calendar_watch(api: &dyn CalendarApi) {
+    match calendar::renew_watch(api).await {
         Ok(_) => info!("Calendar watch has been renewed"),
         Err(e) => error!("Error renewing calendar watch: {}", e),
     }

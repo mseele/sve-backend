@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
+use async_trait::async_trait;
 use chrono::{Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Europe::Berlin;
 use google_calendar3::{
@@ -19,14 +20,20 @@ use crate::{
     models::Appointment,
 };
 
-/// Owns the Google Calendar client and the secret needed to build it.
-/// Callers use this instead of threading `&dyn SecretProvider` everywhere.
-#[derive(Clone)]
-pub(crate) struct CalendarClient {
+#[async_trait]
+pub(crate) trait CalendarApi: Send + Sync {
+    async fn list_events(&self, calendar_id: &str, max_results: i32) -> Result<Vec<Appointment>>;
+
+    async fn renew_watch(&self, calendar_id: &str, id: &str, resource_id: &str) -> Result<()>;
+
+    async fn stop_watch(&self, id: &str, resource_id: &str) -> Result<()>;
+}
+
+pub(crate) struct GoogleCalendarApi {
     secrets: Arc<dyn SecretProvider>,
 }
 
-impl CalendarClient {
+impl GoogleCalendarApi {
     pub(crate) fn new(secrets: Arc<dyn SecretProvider>) -> Self {
         Self { secrets }
     }
@@ -61,48 +68,11 @@ impl CalendarClient {
 
         Ok(CalendarHub::new(client, auth))
     }
+}
 
-    pub(crate) async fn renew_watch(
-        &self,
-        calendar_id: &str,
-        id: &str,
-        resource_id: &str,
-    ) -> Result<()> {
-        // now + 1 year
-        let expiration = Utc::now().timestamp_millis() + (1000 * 60 * 60 * 24 * 365);
-
-        let hub = self.calendar_hub().await?;
-
-        // stop the current watch (ignore errors if channel already expired)
-        let request = Channel {
-            id: Some(id.into()),
-            resource_id: Some(resource_id.into()),
-            ..Default::default()
-        };
-        let _ = hub.channels().stop(request).doit().await;
-
-        // add a new watch
-        let request = Channel {
-            id: Some(id.into()),
-            type_: Some("web_hook".into()),
-            address: Some("https://backend.sv-eutingen.de/api/calendar/notifications".into()),
-            expiration: Some(expiration),
-            ..Default::default()
-        };
-        hub.events()
-            .watch(request, calendar_id)
-            .add_scope(Scope::Full)
-            .doit()
-            .await?;
-
-        Ok(())
-    }
-
-    pub(crate) async fn appointments(
-        &self,
-        calendar_id: &str,
-        max_results: i32,
-    ) -> Result<Vec<Appointment>> {
+#[async_trait]
+impl CalendarApi for GoogleCalendarApi {
+    async fn list_events(&self, calendar_id: &str, max_results: i32) -> Result<Vec<Appointment>> {
         let hub = self.calendar_hub().await?;
 
         let local_datetime = Local::now().with_timezone(&Berlin).naive_local();
@@ -134,6 +104,92 @@ impl CalendarClient {
         };
 
         Ok(appointments)
+    }
+
+    async fn renew_watch(&self, calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
+        // stop the current watch (ignore errors if channel already expired)
+        let _ = self.stop_watch(id, resource_id).await;
+
+        let expiration = Utc::now().timestamp_millis() + (1000 * 60 * 60 * 24 * 365);
+
+        let hub = self.calendar_hub().await?;
+
+        let request = Channel {
+            id: Some(id.into()),
+            type_: Some("web_hook".into()),
+            address: Some("https://backend.sv-eutingen.de/api/calendar/notifications".into()),
+            expiration: Some(expiration),
+            ..Default::default()
+        };
+        hub.events()
+            .watch(request, calendar_id)
+            .add_scope(Scope::Full)
+            .doit()
+            .await?;
+
+        Ok(())
+    }
+
+    async fn stop_watch(&self, id: &str, resource_id: &str) -> Result<()> {
+        let hub = self.calendar_hub().await?;
+        let request = Channel {
+            id: Some(id.into()),
+            resource_id: Some(resource_id.into()),
+            ..Default::default()
+        };
+        hub.channels().stop(request).doit().await?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+pub(crate) struct InMemoryCalendarApi {
+    events: Vec<Appointment>,
+    watch_error: Option<String>,
+    stop_watch_errors: std::sync::Mutex<Vec<String>>,
+}
+
+#[cfg(test)]
+impl InMemoryCalendarApi {
+    pub(crate) fn new(events: Vec<Appointment>) -> Self {
+        Self {
+            events,
+            watch_error: None,
+            stop_watch_errors: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+
+    pub(crate) fn with_watch_error(mut self, msg: &str) -> Self {
+        self.watch_error = Some(msg.to_string());
+        self
+    }
+
+    pub(crate) fn push_stop_watch_error(&self, msg: &str) {
+        self.stop_watch_errors.lock().unwrap().push(msg.to_string());
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl CalendarApi for InMemoryCalendarApi {
+    async fn list_events(&self, _calendar_id: &str, _max_results: i32) -> Result<Vec<Appointment>> {
+        Ok(self.events.clone())
+    }
+
+    async fn renew_watch(&self, _calendar_id: &str, id: &str, resource_id: &str) -> Result<()> {
+        let _ = self.stop_watch(id, resource_id).await;
+        match &self.watch_error {
+            Some(msg) => Err(anyhow!("{}", msg)),
+            None => Ok(()),
+        }
+    }
+
+    async fn stop_watch(&self, _id: &str, _resource_id: &str) -> Result<()> {
+        let mut errors = self.stop_watch_errors.lock().unwrap();
+        if let Some(msg) = errors.pop() {
+            return Err(anyhow!("{}", msg));
+        }
+        Ok(())
     }
 }
 
