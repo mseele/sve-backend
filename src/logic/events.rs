@@ -272,7 +272,8 @@ pub(crate) async fn export_sepa_xml(
     if creditor_name.is_empty() || creditor_iban.is_empty() || creditor_id.is_empty() {
         return Err(anyhow::Error::from(SepaExportError::ConfigIncomplete));
     }
-    let creditor_bic = banking::lookup_bic(&creditor_iban)
+    let bic_lookup = banking::HttpBicLookup::new();
+    let creditor_bic = banking::lookup_bic(&bic_lookup, &creditor_iban)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to lookup creditor BIC: {}", e))?;
 
@@ -290,7 +291,7 @@ pub(crate) async fn export_sepa_xml(
     let mut failed_ibans = Vec::new();
     for sub in &bookings {
         match sub.iban.as_ref() {
-            Some(iban) => match banking::lookup_bic(iban).await {
+            Some(iban) => match banking::lookup_bic(&bic_lookup, iban).await {
                 Ok(bic) => booking_data.push((sub.clone(), bic)),
                 Err(_) => failed_ibans.push(iban.clone()),
             },

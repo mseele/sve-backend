@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow, bail};
+use async_trait::async_trait;
 use chrono::{Datelike, Duration, NaiveDate, Utc, Weekday};
 use iban::IbanLike;
 use num_traits::ToPrimitive;
@@ -98,41 +99,66 @@ fn sepa_lead_days(seq_tp: SepaSequenceType) -> u32 {
     }
 }
 
-pub(crate) async fn lookup_bic(iban: &str) -> Result<String> {
-    let parsed = iban
-        .parse::<iban::Iban>()
-        .map_err(|_| anyhow!("Invalid IBAN: {}", iban))?;
+#[cfg_attr(test, mockall::automock)]
+#[async_trait]
+pub(crate) trait BicLookup {
+    async fn lookup(&self, iban: &str) -> Result<String>;
+}
 
-    if let Some(bank_code) = parsed.bank_identifier()
-        && let Some(bank) = fints_institute_db::get_bank_by_bank_code(bank_code)
-    {
-        return Ok(bank.bic.to_string());
+pub(crate) struct HttpBicLookup {
+    client: reqwest::Client,
+}
+
+impl HttpBicLookup {
+    pub(crate) fn new() -> Self {
+        Self {
+            client: reqwest::Client::new(),
+        }
     }
+}
 
-    let url = format!("https://bankcheck.dev/api/v1/validate?q={}", iban);
-    let client = reqwest::Client::new();
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("BIC lookup failed: {}", e))?;
+#[async_trait]
+impl BicLookup for HttpBicLookup {
+    async fn lookup(&self, iban: &str) -> Result<String> {
+        let parsed = iban
+            .parse::<iban::Iban>()
+            .map_err(|_| anyhow!("Invalid IBAN: {}", iban))?;
 
-    let json: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to parse BIC response: {}", e))?;
+        if let Some(bank_code) = parsed.bank_identifier()
+            && let Some(bank) = fints_institute_db::get_bank_by_bank_code(bank_code)
+        {
+            return Ok(bank.bic.to_string());
+        }
 
-    if let Some(bic) = json
-        .get("result")
-        .and_then(|r| r.get("bankInfo"))
-        .and_then(|bi| bi.get("bic"))
-        .and_then(|b| b.as_str())
-        && !bic.is_empty()
-    {
-        return Ok(bic.to_string());
+        let url = format!("https://bankcheck.dev/api/v1/validate?q={}", iban);
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| anyhow::anyhow!("BIC lookup failed: {}", e))?;
+
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to parse BIC response: {}", e))?;
+
+        if let Some(bic) = json
+            .get("result")
+            .and_then(|r| r.get("bankInfo"))
+            .and_then(|bi| bi.get("bic"))
+            .and_then(|b| b.as_str())
+            && !bic.is_empty()
+        {
+            return Ok(bic.to_string());
+        }
+
+        bail!("No BIC found for IBAN: {}", iban)
     }
+}
 
-    bail!("No BIC found for IBAN: {}", iban)
+pub(crate) async fn lookup_bic(lookup: &impl BicLookup, iban: &str) -> Result<String> {
+    lookup.lookup(iban).await
 }
 
 fn write_element(writer: &mut Writer<Vec<u8>>, name: &str, value: &str) -> Result<()> {
@@ -342,6 +368,7 @@ mod tests {
     };
 
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_validate_iban_str() {
@@ -638,5 +665,45 @@ mod tests {
 
         assert!(xml.contains(r#"<InstdAmt Ccy="EUR">60.00</InstdAmt>"#));
         assert!(xml.contains("<CtrlSum>60.00</CtrlSum>"));
+    }
+
+    #[tokio::test]
+    async fn test_http_bic_lookup_finds_bic_from_fints_db() {
+        let lookup = HttpBicLookup::new();
+        let result = lookup
+            .lookup("DE89370400440532013000")
+            .await
+            .expect("BIC lookup should succeed");
+        assert_eq!(result, "COBADEFF370");
+    }
+
+    #[tokio::test]
+    async fn test_lookup_bic_delegates_to_mock() {
+        let mut mock = MockBicLookup::new();
+        mock.expect_lookup()
+            .once()
+            .with(mockall::predicate::eq("FR1420041010050500013M02606"))
+            .returning(|_| {
+                Err(anyhow::anyhow!(
+                    "No BIC found for IBAN: FR1420041010050500013M02606"
+                ))
+            });
+
+        let result = lookup_bic(&mock, "FR1420041010050500013M02606").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_lookup_bic_delegates_to_mock_success() {
+        let mut mock = MockBicLookup::new();
+        mock.expect_lookup()
+            .once()
+            .with(mockall::predicate::eq("FR1420041010050500013M02606"))
+            .returning(|_| Ok("BNPAFRPPXXX".to_string()));
+
+        let result = lookup_bic(&mock, "FR1420041010050500013M02606")
+            .await
+            .expect("BIC lookup should succeed");
+        assert_eq!(result, "BNPAFRPPXXX");
     }
 }

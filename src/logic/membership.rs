@@ -230,7 +230,8 @@ async fn create_internal_email(
     bank_account: Iban,
     email_gateway: &impl EmailGateway,
 ) -> Result<Message> {
-    let bic = banking::lookup_bic(bank_account.electronic_str())
+    let bic_lookup = banking::HttpBicLookup::new();
+    let bic = banking::lookup_bic(&bic_lookup, bank_account.electronic_str())
         .await
         .unwrap_or_else(|_| "-".to_string());
 
