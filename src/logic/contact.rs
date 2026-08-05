@@ -1,9 +1,92 @@
+use std::collections::HashMap;
+use std::net::IpAddr;
+
+use anyhow::{Result, anyhow};
+use async_trait::async_trait;
+use lettre::message::SinglePart;
+#[cfg(test)]
+use mockall::automock;
+use tracing::info;
+
 use crate::email::EmailGateway;
 use crate::models::{ContactMessage, Email, EmailType};
-use anyhow::Result;
-use lettre::message::SinglePart;
-use std::collections::HashMap;
-use tracing::info;
+
+/// Errors raised by a [`CaptchaVerifier`].
+///
+/// The variant distinguishes *who is at fault* so route handlers can map back to
+/// the status code hCaptcha's documented failure modes warrant:
+/// - [`CaptchaError::Invalid`] — the submitted token did not validate. Client
+///   fault, maps to `400 BAD_REQUEST`.
+/// - [`CaptchaError::Internal`] — request construction, remote-IP handling, or
+///   the outbound verification call broke. Server fault, maps to
+///   `500 INTERNAL_SERVER_ERROR`.
+#[derive(Debug)]
+pub(crate) enum CaptchaError {
+    Invalid(anyhow::Error),
+    Internal(anyhow::Error),
+}
+
+impl std::fmt::Display for CaptchaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CaptchaError::Invalid(err) => write!(f, "captcha invalid: {err}"),
+            CaptchaError::Internal(err) => write!(f, "captcha verification failed: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for CaptchaError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            CaptchaError::Invalid(err) | CaptchaError::Internal(err) => Some(err.as_ref()),
+        }
+    }
+}
+
+#[cfg_attr(test, automock)]
+#[async_trait]
+pub(crate) trait CaptchaVerifier: Send + Sync {
+    async fn verify(&self, token: &str, ip: Option<IpAddr>) -> Result<(), CaptchaError>;
+}
+
+#[derive(Clone)]
+pub(crate) struct HcaptchaVerifier {
+    secret: String,
+}
+
+impl HcaptchaVerifier {
+    pub(crate) fn new(secret: String) -> Self {
+        Self { secret }
+    }
+}
+
+#[async_trait]
+impl CaptchaVerifier for HcaptchaVerifier {
+    async fn verify(&self, token: &str, ip: Option<IpAddr>) -> Result<(), CaptchaError> {
+        let captcha = hcaptcha::Captcha::new(token)
+            .map_err(|e| CaptchaError::Invalid(anyhow!("Failed to create captcha: {e:?}")))?;
+        let mut request = hcaptcha::Request::new(&self.secret, captcha).map_err(|e| {
+            CaptchaError::Internal(anyhow!("Failed to build captcha request: {e:?}"))
+        })?;
+        if let Some(ip) = ip {
+            request = request.set_remoteip(&ip.to_string()).map_err(|e| {
+                CaptchaError::Internal(anyhow!("Failed to set captcha remote ip: {e:?}"))
+            })?;
+        }
+        let response = hcaptcha::Client::new()
+            .verify(request)
+            .await
+            .map_err(|e| CaptchaError::Internal(anyhow!("Captcha verification failed: {e:?}")))?;
+        if response.success() {
+            Ok(())
+        } else {
+            Err(CaptchaError::Invalid(anyhow!(
+                "Captcha invalid: {:?}",
+                response.error_codes()
+            )))
+        }
+    }
+}
 
 /// Build the plain text body for a contact message
 fn build_contact_body(contact_message: &ContactMessage) -> String {

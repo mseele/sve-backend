@@ -33,6 +33,7 @@ use urlencoding::encode;
 use crate::calendar::CalendarClient;
 use crate::email::RealEmailGateway;
 use crate::error::{ConflictError, ValidationError};
+use crate::logic::contact::{CaptchaVerifier, HcaptchaVerifier};
 use crate::logic::secrets::{SecretKey, SecretProvider};
 use crate::logic::{calendar, contact, events, export, membership, news, tasks};
 use crate::models::{
@@ -160,6 +161,8 @@ pub(crate) async fn router(
 
     let email_sender = RealEmailGateway::new(secrets.clone());
     let calendar_client = CalendarClient::new(secrets.clone());
+    let captcha_secret = secrets.get(SecretKey::CaptchaSecret).await?;
+    let captcha_verifier = Arc::new(HcaptchaVerifier::new(captcha_secret));
 
     let state = AppState {
         pg_pool,
@@ -175,6 +178,7 @@ pub(crate) async fn router(
         secrets,
         email_sender,
         calendar_client,
+        captcha_verifier,
     };
 
     Ok(Router::new()
@@ -301,6 +305,7 @@ struct AppState {
     secrets: Arc<dyn SecretProvider>,
     email_sender: RealEmailGateway,
     calendar_client: CalendarClient,
+    captcha_verifier: Arc<dyn CaptchaVerifier>,
 }
 
 #[derive(Clone)]
@@ -616,7 +621,7 @@ async fn booking(
     ClientIp(ip): ClientIp,
     extract::Json(booking): extract::Json<EventBooking>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&booking.token, ip, &*state.secrets).await?;
+    validate_captcha_with_verifier(&booking.token, ip, &*state.captcha_verifier).await?;
     let response = events::booking(&state.pg_pool, booking, &state.email_sender).await;
     Ok(Json(response))
 }
@@ -773,7 +778,7 @@ async fn subscribe(
     ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&subscription.token, ip, &*state.secrets).await?;
+    validate_captcha_with_verifier(&subscription.token, ip, &*state.captcha_verifier).await?;
     news::subscribe(&state.pg_pool, subscription, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
@@ -783,7 +788,7 @@ async fn unsubscribe(
     ClientIp(ip): ClientIp,
     extract::Json(subscription): extract::Json<NewsSubscription>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&subscription.token, ip, &*state.secrets).await?;
+    validate_captcha_with_verifier(&subscription.token, ip, &*state.captcha_verifier).await?;
     news::unsubscribe(&state.pg_pool, subscription).await?;
     Ok(StatusCode::OK)
 }
@@ -843,7 +848,7 @@ async fn message(
     ClientIp(ip): ClientIp,
     Json(message): Json<ContactMessage>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&message.token, ip, &*state.secrets).await?;
+    validate_captcha_with_verifier(&message.token, ip, &*state.captcha_verifier).await?;
     contact::message(message, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
@@ -867,7 +872,7 @@ async fn membership_application(
     ClientIp(ip): ClientIp,
     extract::Json(application): extract::Json<MembershipApplication>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    validate_captcha(&application.token, ip, &*state.secrets).await?;
+    validate_captcha_with_verifier(&application.token, ip, &*state.captcha_verifier).await?;
     membership::application(&state.pg_pool, application, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
@@ -929,70 +934,49 @@ fn into_file_response(filename: String, bytes: Vec<u8>) -> impl IntoResponse {
     )
 }
 
-/// Validates the provided captcha token using the hCaptcha service.
-/// Returns Ok(()) if the captcha is valid, or a ResponseError if validation fails.
-async fn validate_captcha(
-    token: &Option<String>,
-    client_ip: Option<IpAddr>,
-    secrets: &dyn SecretProvider,
-) -> Result<(), ResponseError> {
-    let token = token.as_ref().ok_or_else(|| ResponseError {
+fn require_captcha_token(token: &Option<String>) -> Result<&str, ResponseError> {
+    token.as_deref().ok_or_else(|| ResponseError {
         err: anyhow::anyhow!("No captcha token provided"),
         response: Some((StatusCode::BAD_REQUEST, "Captcha token is required.".into())),
-    })?;
+    })
+}
 
-    let secret = &secrets.get(SecretKey::CaptchaSecret).await?;
+/// Validates the provided captcha token using the supplied verifier.
+/// Returns Ok(()) if the captcha is valid, or a ResponseError if validation fails.
+async fn validate_captcha_with_verifier(
+    token: &Option<String>,
+    client_ip: Option<IpAddr>,
+    verifier: &dyn CaptchaVerifier,
+) -> Result<(), ResponseError> {
+    let token = require_captcha_token(token)?;
 
-    let captcha = hcaptcha::Captcha::new(token.as_str()).map_err(|e| ResponseError {
-        err: anyhow::anyhow!("Failed to create captcha: {:?}", e),
-        response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
-    })?;
-
-    let mut request = hcaptcha::Request::new(secret, captcha).map_err(|e| ResponseError {
-        err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
-        response: Some((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Captcha validation failed.".into(),
-        )),
-    })?;
-
-    if let Some(ip) = client_ip {
-        request = request
-            .set_remoteip(&ip.to_string())
-            .map_err(|e| ResponseError {
-                err: anyhow::anyhow!("Failed to build captcha request: {:?}", e),
+    verifier
+        .verify(token, client_ip)
+        .await
+        .map_err(|e| match e {
+            contact::CaptchaError::Invalid(err) => ResponseError {
+                err,
+                response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
+            },
+            contact::CaptchaError::Internal(err) => ResponseError {
+                err,
                 response: Some((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Captcha validation failed.".into(),
                 )),
-            })?;
-    }
-
-    let response = hcaptcha::Client::new()
-        .verify(request)
-        .await
-        .map_err(|e| ResponseError {
-            err: anyhow::anyhow!("Captcha verification failed: {:?}", e),
-            response: Some((
-                StatusCode::BAD_REQUEST,
-                "Captcha verification failed.".into(),
-            )),
+            },
         })?;
 
-    if response.success() {
-        Ok(())
-    } else {
-        Err(ResponseError {
-            err: anyhow::anyhow!("Captcha invalid: {:?}", response.error_codes()),
-            response: Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into())),
-        })
-    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use pretty_assertions::assert_eq;
+
+    use crate::logic::contact::{CaptchaError, MockCaptchaVerifier};
 
     fn test_secret() -> String {
         "test-secret-key-that-is-at-least-32-bytes!".to_string()
@@ -1071,5 +1055,89 @@ mod tests {
         };
         let allowed_emails = vec!["fitness@sv-eutingen.de".to_string()];
         assert!(!authorize(&claims, &allowed_emails, "sv-eutingen.de"));
+    }
+
+    #[tokio::test]
+    async fn validate_captcha_with_verifier_returns_ok_when_verifier_accepts() {
+        let mut mock = MockCaptchaVerifier::new();
+        mock.expect_verify()
+            .withf(|token, ip| {
+                token == "valid-token" && ip == &Some("127.0.0.1".parse::<IpAddr>().unwrap())
+            })
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let result = validate_captcha_with_verifier(
+            &Some("valid-token".to_string()),
+            Some("127.0.0.1".parse().unwrap()),
+            &mock,
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_captcha_with_verifier_returns_bad_request_when_verifier_says_invalid() {
+        let mut mock = MockCaptchaVerifier::new();
+        mock.expect_verify()
+            .withf(|token, ip| {
+                token == "invalid-token" && ip == &Some("127.0.0.1".parse::<IpAddr>().unwrap())
+            })
+            .times(1)
+            .returning(|_, _| Err(CaptchaError::Invalid(anyhow::anyhow!("captcha invalid"))));
+
+        let result = validate_captcha_with_verifier(
+            &Some("invalid-token".to_string()),
+            Some("127.0.0.1".parse().unwrap()),
+            &mock,
+        )
+        .await;
+        let err = result.expect_err("expected error");
+        assert_eq!(
+            err.response,
+            Some((StatusCode::BAD_REQUEST, "Invalid captcha token.".into()))
+        );
+    }
+
+    #[tokio::test]
+    async fn validate_captcha_with_verifier_returns_internal_error_on_verifier_internal_failure() {
+        let mut mock = MockCaptchaVerifier::new();
+        mock.expect_verify()
+            .withf(|token, ip| {
+                token == "any-token" && ip == &Some("127.0.0.1".parse::<IpAddr>().unwrap())
+            })
+            .times(1)
+            .returning(|_, _| {
+                Err(CaptchaError::Internal(anyhow::anyhow!(
+                    "request build failed"
+                )))
+            });
+
+        let result = validate_captcha_with_verifier(
+            &Some("any-token".to_string()),
+            Some("127.0.0.1".parse().unwrap()),
+            &mock,
+        )
+        .await;
+        let err = result.expect_err("expected error");
+        assert_eq!(
+            err.response,
+            Some((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Captcha validation failed.".into()
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn validate_captcha_with_verifier_returns_bad_request_when_token_missing() {
+        let mock = MockCaptchaVerifier::new();
+
+        let result = validate_captcha_with_verifier(&None, None, &mock).await;
+        let err = result.expect_err("expected error");
+        assert_eq!(
+            err.response,
+            Some((StatusCode::BAD_REQUEST, "Captcha token is required.".into()))
+        );
     }
 }
