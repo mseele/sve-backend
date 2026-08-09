@@ -1,0 +1,40 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text font-size="15px" line-height="1.6" color="#333" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#fafafa">
+    {{> _branding_header}}
+
+    <mj-section padding="0 24px">
+      <mj-column>
+        <mj-text>
+          <p>Hallo {{firstname}},</p>
+
+          <p>herzlich willkommen beim SV Eutingen 1947 e.V.! Wir freuen uns sehr, Dich als neues Mitglied in unserem Verein zu begr&uuml;&szlig;en.</p>
+
+          <p>Du bist nun ein Teil unserer &uuml;ber 500-k&ouml;pfigen SVE-Gemeinschaft und tr&auml;gst einen Beitrag zu unserem gemeinsamen Anliegen bei: gesellschaftliche Teilhabe durch Sport und Begegnung zu erm&ouml;glichen.</p>
+
+          <p>Deinen Mitgliedsantrag haben wir erhalten und bearbeiten ihn umgehend. Sollten wir noch R&uuml;ckfragen haben, werden wir uns direkt bei Dir melden.</p>
+
+          <p>Wenn Du Fragen hast oder Dich in einem Bereich unseres Vereins einbringen willst, steht Dir unser Team jederzeit gerne zur Verf&uuml;gung. Schreibe daf&uuml;r einfach eine Mail an <a href="mailto:info@sv-eutingen.de" style="color: #9B1B1E;">info@sv-eutingen.de</a> und wir leiten alles in die Wege.</p>
+
+          {{#if newsletter}}
+          <p>Wir haben dich wie gew&uuml;nscht auch f&uuml;r unseren Newsletter angemeldet.<br />
+          Ab sofort erh&auml;ltst Du automatisch eine Mail, sobald es Neuigkeiten gibt. Aber keine Sorge: wir fassen die wichtigsten Infos nur wenige Male im Jahr zusammen. &Uuml;ber unsere Social Media-Kan&auml;le kannst Du t&auml;glich verfolgen, was wir tun.</p>
+
+          <p>Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich <a href="https://www.sv-eutingen.de/newsletter" style="color: #9B1B1E;">hier</a> wieder abmelden.</p>
+          {{/if}}
+
+          <p>Wir w&uuml;nschen Dir viel Freude und eine tolle Zeit beim SVE!</p>
+
+          <p>Herzliche Gr&uuml;&szlig;e<br />SV Eutingen 1947 e.V.</p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

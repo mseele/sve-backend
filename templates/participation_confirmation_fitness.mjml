@@ -1,0 +1,29 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text font-size="15px" line-height="1.6" color="#333" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#fafafa">
+    {{> _branding_header}}
+
+    <mj-section padding="0 24px">
+      <mj-column>
+        <mj-text>
+          <p>Hallo {{firstname}},</p>
+
+          <p>vielen Dank f&uuml;r deine Teilnahme an unserem Kurs &bdquo;{{name}}&rdquo;.</p>
+
+          <p>Im Anhang befindet sich deine Teilnahmebest&auml;tigung.</p>
+
+          <p>Wir hoffen du hattest viel Freude mit dem Kurs.</p>
+
+          <p>Herzliche Gr&uuml;&szlig;e<br />Team Fitness@SVE</p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

@@ -1,0 +1,29 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text font-size="15px" line-height="1.6" color="#333" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#fafafa">
+    {{> _branding_header}}
+
+    <mj-section padding="0 24px">
+      <mj-column>
+        <mj-text>
+          <p>Hallo {{firstname}},</p>
+
+          <p>vielen Dank f&uuml;r Deine Anmeldung zum Kurs &bdquo;{{name}}&rdquo;. Leider ist Dein gew&uuml;nschter Kurs schon vollst&auml;ndig ausgebucht.</p>
+
+          <p>Wir haben Dich jedoch auf der Warteliste vorgemerkt und melden uns bei Dir, sobald ein Platz frei wird.</p>
+
+          <p>Im kommenden Halbjahr startet unser neues Kursangebot, dass wir wieder &uuml;ber s&auml;mtliche Kan&auml;le ver&ouml;ffentlichen. Sicher klappt es dann auch direkt mit Deinem Platz, wenn f&uuml;r Dich ein interessantes Angebot dabei ist.</p>
+
+          <p>Herzliche Gr&uuml;&szlig;e<br />Team Fitness@SVE</p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

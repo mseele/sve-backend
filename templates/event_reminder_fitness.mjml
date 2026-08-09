@@ -1,0 +1,31 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text font-size="15px" line-height="1.6" color="#333" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#fafafa">
+    {{> _branding_header}}
+
+    <mj-section padding="0 24px">
+      <mj-column>
+        <mj-text>
+          <p>Hallo {{firstname}},</p>
+
+          <p>Du hast einen Platz in unserem SVE-Kurs &bdquo;{{name}}&rdquo; gebucht.<br />
+          Kommende Woche geht es los und wir m&ouml;chten Dir letzte Infos geben:</p>
+
+          <p>Der Kurs beginnt am <strong>{{start_date}}</strong> um <strong>{{start_time}}</strong> und findet hier statt:<br />
+          <strong>{{location}}</strong></p>
+
+          <p>Wir freuen uns auf Deine Teilnahme und w&uuml;nschen Dir viel Freude beim Kurs.</p>
+
+          <p>Herzliche Gr&uuml;&szlig;e<br />Team Fitness@SVE</p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

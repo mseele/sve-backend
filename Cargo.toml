@@ -85,6 +85,9 @@ rustls = "0.23.43"
 hcaptcha = { version = "3.2.5", default-features = false, features = ["rustls-backend"] }
 jsonwebtoken = { version = "11.0.0", features = ["aws_lc_rs"] }
 
+[build-dependencies]
+mrml = "6.0.1"
+
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 mockall = "0.15.0"

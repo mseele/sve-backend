@@ -1,0 +1,27 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text font-size="15px" line-height="1.6" color="#333" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#fafafa">
+    {{> _branding_header}}
+
+    <mj-section padding="0 24px">
+      <mj-column>
+        <mj-text>
+          <p>Hallo {{firstname}},</p>
+
+          <p>wir haben dein gebuchtes Event &bdquo;{{name}}&ldquo; storniert.</p>
+
+          <p>Wir w&uuml;nschen Dir noch einen sch&ouml;nen Tag und hoffen das in unserem vielf&auml;ltigen Angebot vielleicht mal wieder etwas f&uuml;r Dich dabei ist.</p>
+
+          <p>Herzliche Gr&uuml;&szlig;e<br />Team Events@SVE</p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

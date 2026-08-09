@@ -1,0 +1,29 @@
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text font-size="15px" line-height="1.6" color="#333" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#fafafa">
+    {{> _branding_header}}
+
+    <mj-section padding="0 24px">
+      <mj-column>
+        <mj-text>
+          <p>Hallo {{firstname}},</p>
+
+          <p>vielen Dank f&uuml;r Deine Anmeldung zum Event &bdquo;{{name}}&rdquo;. Leider ist Dein gew&uuml;nschtes Event schon vollst&auml;ndig ausgebucht.</p>
+
+          <p>Wir haben Dich jedoch auf der Warteliste vorgemerkt und melden uns bei Dir, sobald ein Platz frei wird.</p>
+
+          <p>Wir versuchen unser Angebot st&auml;ndig zu erweitern und werden auch in Zukunft viele interessante Events anbieten. Sicher klappt es bei einem zuk&uuml;nftigen Event direkt mit Deinem Platz, wenn f&uuml;r Dich etwas Interessantes dabei ist.</p>
+
+          <p>Herzliche Gr&uuml;&szlig;e<br />Team Events@SVE</p>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

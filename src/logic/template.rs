@@ -9,6 +9,7 @@ use handlebars::{
     Context, Handlebars, Helper, HelperDef, HelperResult, Output, RenderContext, RenderErrorReason,
     Renderable,
 };
+use lazy_static::lazy_static;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -368,6 +369,117 @@ where
 
     let result = handlebars.render_template(template, &data)?;
     Ok(result)
+}
+
+#[allow(dead_code)]
+struct StaticPaydayHelper;
+
+impl HelperDef for StaticPaydayHelper {
+    fn call<'reg: 'rc, 'rc>(
+        &self,
+        _h: &Helper,
+        _: &Handlebars,
+        _: &Context,
+        _: &mut RenderContext,
+        _out: &mut dyn Output,
+    ) -> HelperResult {
+        Ok(())
+    }
+}
+
+lazy_static! {
+    pub(crate) static ref HANDLEBARS: Handlebars<'static> = {
+        let mut hb = Handlebars::new();
+        hb.set_strict_mode(true);
+        hb.register_escape_fn(handlebars::no_escape);
+
+        hb.register_helper("eq", Box::new(EqHelper));
+        hb.register_helper("payday", Box::new(StaticPaydayHelper));
+
+        hb.register_partial(
+            "_branding_header",
+            include_str!("../../templates/_branding_header.hbs"),
+        )
+        .unwrap();
+        hb.register_partial(
+            "_branding_footer",
+            include_str!("../../templates/_branding_footer.hbs"),
+        )
+        .unwrap();
+
+        hb.register_template_string(
+            "cancel_booking_events",
+            include_str!("../../templates/compiled/cancel_booking_events.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "cancel_booking_fitness",
+            include_str!("../../templates/compiled/cancel_booking_fitness.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "contact_confirmation",
+            include_str!("../../templates/compiled/contact_confirmation.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "event_reminder_events",
+            include_str!("../../templates/compiled/event_reminder_events.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "event_reminder_fitness",
+            include_str!("../../templates/compiled/event_reminder_fitness.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "membership_application",
+            include_str!("../../templates/compiled/membership_application.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "participation_confirmation_fitness",
+            include_str!("../../templates/compiled/participation_confirmation_fitness.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "payment_reminder_events",
+            include_str!("../../templates/compiled/payment_reminder_events.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "payment_reminder_fitness",
+            include_str!("../../templates/compiled/payment_reminder_fitness.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "schedule_change_events",
+            include_str!("../../templates/compiled/schedule_change_events.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "schedule_change_fitness",
+            include_str!("../../templates/compiled/schedule_change_fitness.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "waiting_list_events",
+            include_str!("../../templates/compiled/waiting_list_events.html"),
+        )
+        .unwrap();
+        hb.register_template_string(
+            "waiting_list_fitness",
+            include_str!("../../templates/compiled/waiting_list_fitness.html"),
+        )
+        .unwrap();
+
+        hb
+    };
+}
+
+#[allow(dead_code)]
+pub(crate) fn render_html(name: &str, data: &impl Serialize) -> Result<String> {
+    Ok(HANDLEBARS.render(name, data)?)
 }
 
 #[cfg(test)]
@@ -859,5 +971,41 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             Vec::new(),
             PaymentMethod::BankTransfer,
         )
+    }
+
+    #[test]
+    fn test_render_html_renders_template_by_name() {
+        let result = render_html(
+            "contact_confirmation",
+            &ContactConfirmationTemplateData::new("Max Mustermann"),
+        )
+        .unwrap();
+
+        assert!(result.contains("Hallo Max Mustermann"));
+        assert!(result.contains("<!doctype html>"));
+        assert!(result.contains("SV Eutingen 1947 e.V."));
+    }
+
+    #[test]
+    fn test_render_html_handles_missing_variable_gracefully() {
+        let result = render_html(
+            "contact_confirmation",
+            &serde_json::json!({ "name": "Max" }),
+        )
+        .unwrap();
+
+        assert!(result.contains("Hallo Max"));
+    }
+
+    #[test]
+    fn test_render_html_partials_are_rendered() {
+        let result = render_html(
+            "membership_application",
+            &serde_json::json!({ "firstname": "Anna", "newsletter": true }),
+        )
+        .unwrap();
+
+        assert!(result.contains("Hallo Anna"));
+        assert!(result.contains("SV Eutingen 1947 e.V."));
     }
 }
