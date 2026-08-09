@@ -1,0 +1,12 @@
+Hallo {{name}},
+
+vielen Dank für Deine Nachricht an den SV Eutingen 1947 e.V.
+Wir haben sie erhalten und werden uns schnellstmöglich darum kümmern.
+
+Herzliche Grüße
+SV Eutingen 1947 e.V.
+
+--
+Marktstr. 84
+72184 Eutingen im Gäu
+#mehralseinverein

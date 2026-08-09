@@ -9,6 +9,7 @@ use mockall::automock;
 use tracing::info;
 
 use crate::email::EmailGateway;
+use crate::logic::template;
 use crate::models::{ContactMessage, Email, EmailType};
 
 /// Errors raised by a [`CaptchaVerifier`].
@@ -134,6 +135,23 @@ pub(crate) async fn message(
         .await?;
 
     info!("Info message has been send successfully");
+
+    let confirmation_body = template::render_contact_confirmation(
+        include_str!("../../templates/contact_confirmation.txt"),
+        &contact_message.name,
+    )?;
+
+    let confirmation = email_gateway
+        .build_message(&email_account)?
+        .subject("Vielen Dank für Deine Nachricht")
+        .to(contact_message.email.parse()?)
+        .singlepart(SinglePart::plain(confirmation_body))?;
+
+    email_gateway
+        .send_messages(&email_account, vec![confirmation])
+        .await?;
+
+    info!("Confirmation email has been sent successfully");
 
     Ok(())
 }
@@ -271,7 +289,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_message_sends_to_correct_account() {
+    async fn test_message_sends_forward_and_confirmation() {
         let (mock_sender, captured) =
             mock_email_gateway(vec![(EmailType::Info, "info@sv-eutingen.de")]);
 
@@ -289,6 +307,6 @@ mod tests {
         assert!(result.is_ok());
 
         let sent = captured.lock().unwrap();
-        assert_eq!(sent.len(), 1, "One email should have been sent");
+        assert_eq!(sent.len(), 2, "Two emails should have been sent");
     }
 }

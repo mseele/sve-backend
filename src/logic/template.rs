@@ -159,6 +159,17 @@ impl<'a> MembershipApplicationTemplateData<'a> {
     }
 }
 
+#[derive(Serialize)]
+struct ContactConfirmationTemplateData<'a> {
+    name: &'a str,
+}
+
+impl<'a> ContactConfirmationTemplateData<'a> {
+    fn new(name: &'a str) -> Self {
+        Self { name: name.trim() }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct PaydayHelper<'a> {
     first_event_date: Option<&'a DateTime<Utc>>,
@@ -337,6 +348,10 @@ pub(crate) fn render_membership_application(
         MembershipApplicationTemplateData::new(membership_application),
         None,
     )
+}
+
+pub(crate) fn render_contact_confirmation(template: &str, name: &str) -> Result<String> {
+    render(template, ContactConfirmationTemplateData::new(name), None)
 }
 
 fn render<D>(template: &str, data: D, payday_helper: Option<PaydayHelper>) -> Result<String>
