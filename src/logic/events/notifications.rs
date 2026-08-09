@@ -1,5 +1,5 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use anyhow::{Result, anyhow, bail};
 use chrono::Locale;
@@ -406,7 +406,8 @@ mod tests {
 
     #[sqlx::test]
     async fn test_send_event_email_no_bookings(pool: PgPool) -> Result<()> {
-        let event = crate::logic::events::create_test_event(&pool, LifecycleStatus::Published).await?;
+        let event =
+            crate::logic::events::create_test_event(&pool, LifecycleStatus::Published).await?;
         let mock_sender = mock_email_gateway(vec![(
             crate::models::EmailType::Fitness,
             "test@example.com",
@@ -442,7 +443,10 @@ mod tests {
         };
 
         let result = send_event_email(&pool, email, &mock_sender).await;
-        assert!(result.is_err(), "Should fail when neither bookings nor waiting_list selected");
+        assert!(
+            result.is_err(),
+            "Should fail when neither bookings nor waiting_list selected"
+        );
         Ok(())
     }
 
@@ -450,11 +454,10 @@ mod tests {
     async fn test_send_event_email_with_bookings(pool: PgPool) -> Result<()> {
         use crate::models::{EmailType, EventBooking};
 
-        let event = crate::logic::events::create_test_event(&pool, LifecycleStatus::Published).await?;
-        let (mock_sender, captured) = mock_email_gateway(vec![(
-            EmailType::Fitness,
-            "test@example.com",
-        )]);
+        let event =
+            crate::logic::events::create_test_event(&pool, LifecycleStatus::Published).await?;
+        let (mock_sender, captured) =
+            mock_email_gateway(vec![(EmailType::Fitness, "test@example.com")]);
 
         let booking_data = EventBooking {
             event_id: event.id,
@@ -492,7 +495,10 @@ mod tests {
             .filter(|(_, msgs)| !msgs.is_empty())
             .flat_map(|(_, msgs)| msgs)
             .collect();
-        assert!(!email_messages.is_empty(), "Should have sent at least one event email");
+        assert!(
+            !email_messages.is_empty(),
+            "Should have sent at least one event email"
+        );
 
         Ok(())
     }

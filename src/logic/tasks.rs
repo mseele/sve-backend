@@ -64,7 +64,9 @@ pub(crate) async fn send_participation_confirmation(
     event_id: EventId,
     email_gateway: &impl EmailGateway,
 ) -> Result<()> {
-    match events::notifications::send_participation_confirmation(pool, event_id, email_gateway).await {
+    match events::notifications::send_participation_confirmation(pool, event_id, email_gateway)
+        .await
+    {
         Ok(count) if count > 0 => {
             info!(
                 "{} participation confirmations has been send successfully.",

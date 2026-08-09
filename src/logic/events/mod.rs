@@ -19,9 +19,9 @@ use crate::email;
 use crate::error::ValidationError;
 use crate::logic::secrets::{SecretKey, SecretProvider};
 use crate::models::{
-    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField,
-    EventId, EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent,
-    PaymentMethod, ToEuro, UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
+    BookingResponse, Email, Event, EventBooking, EventCounter, EventCustomField, EventId,
+    EventType, LifecycleStatus, MessageType, NewsSubscription, PartialEvent, PaymentMethod, ToEuro,
+    UnpaidEventBooking, VerifyPaymentBookingRecord, VerifyPaymentResult,
 };
 use crate::{db, hashids};
 

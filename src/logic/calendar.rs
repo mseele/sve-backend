@@ -57,10 +57,7 @@ pub(crate) async fn notifications(channel_id: &str, hook: &impl DeployHook) -> R
     if status == StatusCode::OK {
         info!("Re-Deploy triggered successfully");
     } else {
-        warn!(
-            "Trigger Re-Deploy failed with status code {}",
-            status
-        );
+        warn!("Trigger Re-Deploy failed with status code {}", status);
     }
 
     Ok(())

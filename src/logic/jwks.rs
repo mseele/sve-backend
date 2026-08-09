@@ -123,7 +123,10 @@ impl FakeJwksFetcher {
     }
 
     pub(crate) async fn add_key(&self, kid: &str, key: DecodingKey) {
-        self.keys.write().await.insert(kid.to_string(), Arc::new(key));
+        self.keys
+            .write()
+            .await
+            .insert(kid.to_string(), Arc::new(key));
     }
 
     pub(crate) async fn set_next_call_error(&self, msg: &str) {
@@ -151,20 +154,15 @@ impl JwksFetcher for FakeJwksFetcher {
 
 #[cfg(test)]
 pub(crate) fn generate_test_rsa_key() -> (DecodingKey, EncodingKey) {
-    use rsa::pkcs1::{EncodeRsaPrivateKey, EncodeRsaPublicKey};
     use rsa::RsaPrivateKey;
+    use rsa::pkcs1::{EncodeRsaPrivateKey, EncodeRsaPublicKey};
 
     let mut rng = rsa::rand_core::OsRng;
     let private_key = RsaPrivateKey::new(&mut rng, 2048).unwrap();
     let der = private_key.to_pkcs1_der().unwrap();
     let encoding_key = EncodingKey::from_rsa_der(der.as_bytes());
     let public_key = private_key.to_public_key();
-    let decoding_key = DecodingKey::from_rsa_der(
-        public_key
-            .to_pkcs1_der()
-            .unwrap()
-            .as_bytes(),
-    );
+    let decoding_key = DecodingKey::from_rsa_der(public_key.to_pkcs1_der().unwrap().as_bytes());
     (decoding_key, encoding_key)
 }
 

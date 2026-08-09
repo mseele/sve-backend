@@ -152,10 +152,7 @@ where
     }
 }
 
-pub(crate) async fn router(
-    pg_pool: PgPool,
-    secrets: Arc<dyn SecretProvider>,
-) -> Result<Router> {
+pub(crate) async fn router(pg_pool: PgPool, secrets: Arc<dyn SecretProvider>) -> Result<Router> {
     let jwks_fetcher: Arc<dyn JwksFetcher> = Arc::new(RealJwksFetcher::new());
 
     let email_sender = RealEmailGateway::new(secrets.clone());
@@ -905,8 +902,8 @@ mod tests {
     use serde::Serialize;
 
     use crate::logic::contact::{CaptchaError, MockCaptchaVerifier};
-    use crate::logic::jwks::generate_test_rsa_key;
     use crate::logic::jwks::FakeJwksFetcher;
+    use crate::logic::jwks::generate_test_rsa_key;
 
     #[derive(Debug, Serialize)]
     struct GoogleClaimsForTest {
@@ -920,7 +917,12 @@ mod tests {
         "test-secret-key-that-is-at-least-32-bytes!".to_string()
     }
 
-    fn mint_google_token(encoding_key: &EncodingKey, email: &str, hd: Option<&str>, kid: &str) -> String {
+    fn mint_google_token(
+        encoding_key: &EncodingKey,
+        email: &str,
+        hd: Option<&str>,
+        kid: &str,
+    ) -> String {
         let now = Utc::now().timestamp() as usize;
         let claims = GoogleClaimsForTest {
             email: email.to_string(),
@@ -1096,7 +1098,12 @@ mod tests {
     async fn verify_google_token_valid_token_succeeds() {
         let (decoding_key, encoding_key) = generate_test_rsa_key();
         let kid = "test-kid-1";
-        let token = mint_google_token(&encoding_key, "admin@sv-eutingen.de", Some("sv-eutingen.de"), kid);
+        let token = mint_google_token(
+            &encoding_key,
+            "admin@sv-eutingen.de",
+            Some("sv-eutingen.de"),
+            kid,
+        );
 
         let fetcher = FakeJwksFetcher::new();
         fetcher.add_key(kid, decoding_key).await;
@@ -1116,7 +1123,10 @@ mod tests {
         let result = verify_google_token(&token, &fetcher).await;
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("Unknown kid"), "expected 'Unknown kid' in error, got: {err}");
+        assert!(
+            err.contains("Unknown kid"),
+            "expected 'Unknown kid' in error, got: {err}"
+        );
     }
 
     #[tokio::test]
@@ -1142,11 +1152,16 @@ mod tests {
         let token = mint_google_token(&encoding_key, "admin@sv-eutingen.de", None, "some-kid");
 
         let fetcher = FakeJwksFetcher::new();
-        fetcher.set_next_call_error("simulated network failure").await;
+        fetcher
+            .set_next_call_error("simulated network failure")
+            .await;
 
         let result = verify_google_token(&token, &fetcher).await;
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("simulated network failure"), "expected network failure in error, got: {err}");
+        assert!(
+            err.contains("simulated network failure"),
+            "expected network failure in error, got: {err}"
+        );
     }
 }
