@@ -827,6 +827,8 @@ pub(crate) struct Email {
     pub(crate) subject: String,
     pub(crate) content: String,
     pub(crate) attachments: Option<Vec<EmailAttachment>>,
+    pub(crate) html_content: Option<String>,
+    pub(crate) bcc: Option<String>,
 }
 
 impl Email {
@@ -843,7 +845,19 @@ impl Email {
             subject,
             content,
             attachments,
+            html_content: None,
+            bcc: None,
         }
+    }
+
+    pub(crate) fn with_html(mut self, html_content: String) -> Self {
+        self.html_content = Some(html_content);
+        self
+    }
+
+    pub(crate) fn with_bcc(mut self, bcc: String) -> Self {
+        self.bcc = Some(bcc);
+        self
     }
 
     pub(crate) fn into_message(
@@ -851,13 +865,29 @@ impl Email {
         email_account: &EmailAccount,
         email_gateway: &impl email::EmailGateway,
     ) -> Result<Message> {
-        let message_builder = email_gateway
+        let mut message_builder = email_gateway
             .build_message(email_account)?
             .to(self.to.parse()?)
             .subject(self.subject);
-        let message = match self.attachments {
-            Some(attachments) => {
-                let mut multi_part = MultiPart::mixed().singlepart(SinglePart::plain(self.content));
+
+        if let Some(ref bcc_addr) = self.bcc {
+            message_builder = message_builder.bcc(bcc_addr.parse()?);
+        }
+
+        let Self {
+            content,
+            html_content,
+            attachments,
+            ..
+        } = self;
+
+        let message = match (html_content, attachments) {
+            (None, None) => message_builder.singlepart(SinglePart::plain(content))?,
+            (Some(html), None) => {
+                message_builder.multipart(MultiPart::alternative_plain_html(content, html))?
+            }
+            (None, Some(attachments)) => {
+                let mut multi_part = MultiPart::mixed().singlepart(SinglePart::plain(content));
                 for attachment in attachments {
                     let filename = attachment.name;
                     let content = STANDARD.decode(&attachment.data)?;
@@ -865,10 +895,20 @@ impl Email {
                     multi_part = multi_part
                         .singlepart(Attachment::new(filename).body(content, content_type));
                 }
-                message_builder.multipart(multi_part)
+                message_builder.multipart(multi_part)?
             }
-            None => message_builder.singlepart(SinglePart::plain(self.content)),
-        }?;
+            (Some(html), Some(attachments)) => {
+                let mut mixed =
+                    MultiPart::mixed().multipart(MultiPart::alternative_plain_html(content, html));
+                for attachment in attachments {
+                    let filename = attachment.name;
+                    let content = STANDARD.decode(&attachment.data)?;
+                    let content_type = ContentType::parse(&attachment.mime_type)?;
+                    mixed = mixed.singlepart(Attachment::new(filename).body(content, content_type));
+                }
+                message_builder.multipart(mixed)?
+            }
+        };
 
         Ok(message)
     }
@@ -1582,5 +1622,170 @@ mod additional_model_tests {
         let s = "100";
         let parsed: BigDecimal = s.parse_euro_without_symbol().unwrap();
         assert_eq!(parsed, BigDecimal::from_i8(100).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod email_tests {
+    use super::*;
+    use crate::test_utils::mock_email_gateway;
+    use pretty_assertions::assert_eq;
+
+    fn make_email(
+        content: &str,
+        html_content: Option<&str>,
+        attachments: Option<Vec<EmailAttachment>>,
+        bcc: Option<&str>,
+    ) -> Email {
+        let mut email = Email::new(
+            MessageType::General,
+            "to@example.com".to_string(),
+            "Subject".to_string(),
+            content.to_string(),
+            attachments,
+        );
+        if let Some(html) = html_content {
+            email = email.with_html(html.to_string());
+        }
+        if let Some(bcc_addr) = bcc {
+            email = email.with_bcc(bcc_addr.to_string());
+        }
+        email
+    }
+
+    fn sample_attachment() -> EmailAttachment {
+        EmailAttachment {
+            name: "test.pdf".to_string(),
+            mime_type: "application/pdf".to_string(),
+            data: STANDARD.encode(b"fake-pdf-bytes"),
+        }
+    }
+
+    #[test]
+    fn plain_only() {
+        let (gw, _) = mock_email_gateway(vec![(EmailType::Info, "from@example.com")]);
+        let email = make_email("Hello world", None, None, None);
+        let msg = email
+            .into_message(
+                &EmailAccount::new_for_test(EmailType::Info, "from@example.com"),
+                &gw,
+            )
+            .unwrap();
+        let formatted = String::from_utf8(msg.formatted()).unwrap();
+        assert!(
+            formatted.contains("Content-Type: text/plain"),
+            "got: {formatted}"
+        );
+        assert!(
+            !formatted.contains("multipart/"),
+            "should not be multipart, got: {formatted}"
+        );
+    }
+
+    #[test]
+    fn alternative_plain_and_html_no_attachments() {
+        let (gw, _) = mock_email_gateway(vec![(EmailType::Info, "from@example.com")]);
+        let email = make_email("Hello plain", Some("<p>Hello HTML</p>"), None, None);
+        let msg = email
+            .into_message(
+                &EmailAccount::new_for_test(EmailType::Info, "from@example.com"),
+                &gw,
+            )
+            .unwrap();
+        let formatted = String::from_utf8(msg.formatted()).unwrap();
+        assert!(
+            formatted.contains("Content-Type: multipart/alternative"),
+            "got: {formatted}"
+        );
+        assert!(formatted.contains("text/plain"), "got: {formatted}");
+        assert!(formatted.contains("text/html"), "got: {formatted}");
+    }
+
+    #[test]
+    fn mixed_plain_and_attachments_no_html() {
+        let (gw, _) = mock_email_gateway(vec![(EmailType::Info, "from@example.com")]);
+        let email = make_email("Hello plain", None, Some(vec![sample_attachment()]), None);
+        let msg = email
+            .into_message(
+                &EmailAccount::new_for_test(EmailType::Info, "from@example.com"),
+                &gw,
+            )
+            .unwrap();
+        let formatted = String::from_utf8(msg.formatted()).unwrap();
+        assert!(
+            formatted.contains("Content-Type: multipart/mixed"),
+            "got: {formatted}"
+        );
+        assert!(formatted.contains("text/plain"), "got: {formatted}");
+        assert!(formatted.contains("test.pdf"), "got: {formatted}");
+    }
+
+    #[test]
+    fn nested_mixed_alternative_inside_mixed_with_attachments() {
+        let (gw, _) = mock_email_gateway(vec![(EmailType::Info, "from@example.com")]);
+        let email = make_email(
+            "Hello plain",
+            Some("<p>Hello HTML</p>"),
+            Some(vec![sample_attachment()]),
+            None,
+        );
+        let msg = email
+            .into_message(
+                &EmailAccount::new_for_test(EmailType::Info, "from@example.com"),
+                &gw,
+            )
+            .unwrap();
+        let formatted = String::from_utf8(msg.formatted()).unwrap();
+        assert!(
+            formatted.contains("Content-Type: multipart/mixed"),
+            "outer should be mixed, got: {formatted}"
+        );
+        assert!(
+            formatted.contains("Content-Type: multipart/alternative"),
+            "inner should be alternative, got: {formatted}"
+        );
+        assert!(formatted.contains("text/plain"), "got: {formatted}");
+        assert!(formatted.contains("text/html"), "got: {formatted}");
+        assert!(formatted.contains("test.pdf"), "got: {formatted}");
+    }
+
+    #[test]
+    fn bcc_included_when_set() {
+        let (gw, _) = mock_email_gateway(vec![(EmailType::Info, "from@example.com")]);
+        let email = make_email("Hello", None, None, Some("bcc@example.com"));
+        let msg = email
+            .into_message(
+                &EmailAccount::new_for_test(EmailType::Info, "from@example.com"),
+                &gw,
+            )
+            .unwrap();
+        let envelope_recipients = msg.envelope().to();
+        let addresses: Vec<String> = envelope_recipients.iter().map(|a| a.to_string()).collect();
+        assert!(
+            addresses.contains(&"bcc@example.com".to_string()),
+            "envelope should include BCC, got: {addresses:?}"
+        );
+    }
+
+    #[test]
+    fn bcc_omitted_when_none() {
+        let (gw, _) = mock_email_gateway(vec![(EmailType::Info, "from@example.com")]);
+        let email = make_email("Hello", None, None, None);
+        let msg = email
+            .into_message(
+                &EmailAccount::new_for_test(EmailType::Info, "from@example.com"),
+                &gw,
+            )
+            .unwrap();
+        let envelope_recipients = msg.envelope().to();
+        let addresses: Vec<String> = envelope_recipients.iter().map(|a| a.to_string()).collect();
+        assert!(
+            !addresses.contains(&"bcc@example.com".to_string()),
+            "envelope should NOT include BCC when absent, got: {addresses:?}"
+        );
+        assert!(
+            addresses.contains(&"to@example.com".to_string()),
+            "envelope should include To, got: {addresses:?}"
+        );
     }
 }
