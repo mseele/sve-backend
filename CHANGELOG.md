@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.16.0] - 2026-08-09
+
+### Features
+
+- Inject CaptchaVerifier into contact route (#72)
+- Inject BicLookup trait into banking for offline-testable BIC lookups (#73)
+- Inject deploy hook via DeployHook trait for offline-testeable calendar notifications
+- Extract JwksFetcher module for offline JWT verification tests (#76)
+- Extract events::notifications into its own module (#77)
+
+### Refactor
+
+- Collapse email seam into deep EmailGateway (#71)
+
 ## [2.15.8] - 2026-07-30
 
 ### Bug Fixes
