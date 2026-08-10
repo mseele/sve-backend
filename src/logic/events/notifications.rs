@@ -102,20 +102,24 @@ pub(crate) async fn send_event_reminders(
         let message_type: MessageType = event.event_type.into();
         let mut messages = Vec::new();
 
-        let (subject, body) = match event.event_type {
+        let (subject, body, html_template) = match event.event_type {
             EventType::Fitness => (
                 format!("{} Info zum Kursstart", event.subject_prefix()),
                 include_str!("../../../templates/event_reminder_fitness.txt"),
+                "event_reminder_fitness",
             ),
             EventType::Events => (
                 format!("{} Info zum Eventstart", event.subject_prefix()),
                 include_str!("../../../templates/event_reminder_events.txt"),
+                "event_reminder_events",
             ),
         };
 
         if let Some(subscribers) = &event.subscribers {
             for subscriber in subscribers.iter().filter(|s| s.enrolled) {
                 let body = template::render_event_reminder(body, event, subscriber)?;
+                let html_body =
+                    template::render_event_reminder_html(html_template, event, subscriber)?;
 
                 messages.push(
                     Email::new(
@@ -125,6 +129,7 @@ pub(crate) async fn send_event_reminders(
                         body,
                         None,
                     )
+                    .with_html(html_body)
                     .into_message(&email_account, email_gateway)?,
                 );
             }
@@ -499,6 +504,82 @@ mod tests {
             !email_messages.is_empty(),
             "Should have sent at least one event email"
         );
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_event_reminders_sends_multipart_alternative(pool: PgPool) -> Result<()> {
+        use crate::db;
+        use crate::models::{EmailType, EventBooking};
+
+        let (mock_sender, captured) =
+            mock_email_gateway(vec![(EmailType::Fitness, "fitness@test.com")]);
+
+        let event = db::write_event(
+            &pool,
+            PartialEvent {
+                event_type: Some(EventType::Fitness),
+                lifecycle_status: Some(LifecycleStatus::Published),
+                name: Some("Reminder Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Desc".to_string()),
+                image: Some("img.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![Utc::now() + Duration::try_days(3).unwrap()]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Test Location".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let booking_data = EventBooking {
+            event_id: event.0.id,
+            first_name: "Max".to_string(),
+            last_name: "Mustermann".to_string(),
+            street: "Teststr 1".to_string(),
+            city: "Teststadt".to_string(),
+            email: "max@test.com".to_string(),
+            phone: None,
+            member: Some(true),
+            updates: Some(false),
+            comments: None,
+            custom_values: vec![],
+            token: None,
+            iban: None,
+        };
+
+        crate::logic::events::booking(&pool, booking_data, &mock_sender).await;
+
+        captured.lock().unwrap().clear();
+
+        let count = send_event_reminders(&pool, &mock_sender).await?;
+        assert_eq!(count, 1);
+
+        let sent = captured.lock().unwrap();
+        let messages: Vec<_> = sent.iter().flat_map(|(_, msgs)| msgs).collect();
+        assert_eq!(messages.len(), 1);
+
+        let formatted = String::from_utf8(messages[0].formatted()).unwrap();
+        assert!(
+            formatted.contains("Content-Type: multipart/alternative"),
+            "Should be multipart/alternative"
+        );
+        assert!(
+            formatted.contains("text/plain"),
+            "Should contain text/plain"
+        );
+        assert!(formatted.contains("text/html"), "Should contain text/html");
+        assert!(formatted.contains("Hallo Max"), "Should contain greeting");
 
         Ok(())
     }

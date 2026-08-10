@@ -303,6 +303,17 @@ pub(crate) fn render_event_reminder<'a>(
     )
 }
 
+pub(crate) fn render_event_reminder_html<'a>(
+    template_name: &str,
+    event: &'a Event,
+    subscription: &'a EventSubscription,
+) -> Result<String> {
+    render_html(
+        template_name,
+        &ReminderTemplateData::new(event, subscription)?,
+    )
+}
+
 pub(crate) fn render_participation_confirmation<'a>(
     template: &str,
     event: &'a Event,
@@ -477,7 +488,6 @@ lazy_static! {
     };
 }
 
-#[allow(dead_code)]
 pub(crate) fn render_html(name: &str, data: &impl Serialize) -> Result<String> {
     Ok(HANDLEBARS.render(name, data)?)
 }
