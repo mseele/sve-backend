@@ -2,15 +2,14 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
 use anyhow::{Result, anyhow, bail};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::Locale;
-use lettre::message::header::ContentType;
-use lettre::message::{Attachment, MultiPart, SinglePart};
 use sqlx::PgPool;
 
 use crate::db;
 use crate::email;
 use crate::logic::{export, template};
-use crate::models::{Email, EventEmail, EventId, EventType, MessageType, ToEuro};
+use crate::models::{Email, EmailAttachment, EventEmail, EventId, EventType, MessageType, ToEuro};
 
 pub(crate) async fn send_event_email(
     pool: &PgPool,
@@ -161,9 +160,15 @@ pub(crate) async fn send_payment_reminders(
     let mut messages = Vec::new();
 
     let subject = format!("{} Zahlungserinnerung", event_type.subject_prefix());
-    let body = match event_type {
-        EventType::Fitness => include_str!("../../../templates/payment_reminder_fitness.txt"),
-        EventType::Events => include_str!("../../../templates/payment_reminder_events.txt"),
+    let (body, html_template) = match event_type {
+        EventType::Fitness => (
+            include_str!("../../../templates/payment_reminder_fitness.txt"),
+            "payment_reminder_fitness",
+        ),
+        EventType::Events => (
+            include_str!("../../../templates/payment_reminder_events.txt"),
+            "payment_reminder_events",
+        ),
     };
 
     let mut event_cache = HashMap::new();
@@ -180,6 +185,7 @@ pub(crate) async fn send_payment_reminders(
             .ok_or_else(|| anyhow!("Event with id '{}' is not in the cache", key))?;
 
         let body = template::render_payment_reminder(body, event, booking)?;
+        let html_body = template::render_payment_reminder_html(html_template, event, booking)?;
 
         messages.push(
             Email::new(
@@ -189,6 +195,7 @@ pub(crate) async fn send_payment_reminders(
                 body,
                 None,
             )
+            .with_html(html_body)
             .into_message(&email_account, email_gateway)?,
         );
     }
@@ -271,19 +278,27 @@ pub(crate) async fn send_participation_confirmation(
             .await?;
 
             let body = template::render_participation_confirmation(template, &event, &subscriber)?;
+            let html_body = template::render_participation_confirmation_html(
+                "participation_confirmation_fitness",
+                &event,
+                &subscriber,
+            )?;
 
-            let message = email_gateway
-                .build_message(&email_account)?
-                .to(subscriber.email.parse()?)
-                .subject(subject.clone())
-                .multipart(
-                    MultiPart::mixed()
-                        .singlepart(SinglePart::plain(body))
-                        .singlepart(
-                            Attachment::new(String::from("Teilnahmebestätigung.pdf"))
-                                .body(bytes, ContentType::parse("application/pdf")?),
-                        ),
-                )?;
+            let attachment = EmailAttachment {
+                name: "Teilnahmebestätigung.pdf".to_string(),
+                mime_type: "application/pdf".to_string(),
+                data: STANDARD.encode(&bytes),
+            };
+
+            let message = Email::new(
+                MessageType::Fitness,
+                subscriber.email.clone(),
+                subject.clone(),
+                body,
+                Some(vec![attachment]),
+            )
+            .with_html(html_body)
+            .into_message(&email_account, email_gateway)?;
 
             messages.push(message)
         }
@@ -307,7 +322,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
 
-    use crate::models::{EventType, LifecycleStatus, PartialEvent};
+    use crate::models::{EventType, LifecycleStatus, PartialEvent, PaymentMethod};
     use crate::test_utils::mock_email_gateway;
 
     use super::*;
@@ -580,6 +595,197 @@ mod tests {
         );
         assert!(formatted.contains("text/html"), "Should contain text/html");
         assert!(formatted.contains("Hallo Max"), "Should contain greeting");
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_payment_reminders_sends_multipart_alternative(pool: PgPool) -> Result<()> {
+        use crate::db;
+        use crate::models::EmailType;
+        use chrono::{DateTime, Utc};
+
+        let (mock_sender, captured) =
+            mock_email_gateway(vec![(EmailType::Events, "events@test.com")]);
+
+        let event = db::write_event(
+            &pool,
+            PartialEvent {
+                event_type: Some(EventType::Events),
+                lifecycle_status: Some(LifecycleStatus::Published),
+                name: Some("Payment Reminder Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Desc".to_string()),
+                image: Some("img.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![Utc::now() - Duration::try_days(60).unwrap()]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Test Location".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                payment_method: Some(PaymentMethod::BankTransfer),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let event_id = event.0.id.into_inner();
+
+        sqlx::query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Max",
+            "Mustermann",
+            "Teststr 1",
+            "Teststadt",
+            "max@test.com",
+            None::<String>,
+            true,
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row = sqlx::query!(
+            r#"SELECT id FROM event_subscribers WHERE email = $1"#,
+            "max@test.com"
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        sqlx::query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at, created)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            event_id,
+            subscriber_row.id,
+            true,
+            false,
+            None::<DateTime<Utc>>,
+            "pay_001",
+            None::<DateTime<Utc>>,
+            Utc::now() - Duration::try_days(30).unwrap(),
+        )
+        .execute(&pool)
+        .await?;
+
+        let count = send_payment_reminders(&pool, EventType::Events, &mock_sender).await?;
+        assert_eq!(count, 1);
+
+        let sent = captured.lock().unwrap();
+        let messages: Vec<_> = sent.iter().flat_map(|(_, msgs)| msgs).collect();
+        assert_eq!(messages.len(), 1);
+
+        let formatted = String::from_utf8(messages[0].formatted()).unwrap();
+        assert!(
+            formatted.contains("Content-Type: multipart/alternative"),
+            "Should be multipart/alternative, got: {}",
+            formatted
+        );
+        assert!(
+            formatted.contains("text/plain"),
+            "Should contain text/plain"
+        );
+        assert!(formatted.contains("text/html"), "Should contain text/html");
+        assert!(formatted.contains("Hallo Max"), "Should contain greeting");
+
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_send_participation_confirmation_sends_nested_mixed(pool: PgPool) -> Result<()> {
+        use crate::db;
+        use crate::models::EmailType;
+
+        let (mock_sender, captured) =
+            mock_email_gateway(vec![(EmailType::Fitness, "fitness@test.com")]);
+
+        let event = db::write_event(
+            &pool,
+            PartialEvent {
+                event_type: Some(EventType::Fitness),
+                lifecycle_status: Some(LifecycleStatus::Published),
+                name: Some("Participation Event".to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Desc".to_string()),
+                image: Some("img.png".to_string()),
+                light: Some(true),
+                dates: Some(vec![
+                    Utc::now() + Duration::try_days(30).unwrap(),
+                    Utc::now() + Duration::try_days(37).unwrap(),
+                ]),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(10),
+                max_waiting_list: Some(5),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(25)),
+                location: Some("Test Location".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("DE1234".to_string()),
+                external_operator: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let event_id = event.0.id.into_inner();
+
+        sqlx::query!(
+            r#"INSERT INTO event_subscribers (first_name, last_name, street, city, email, phone, member)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            "Max",
+            "Mustermann",
+            "Teststr 1",
+            "Teststadt",
+            "max@test.com",
+            None::<String>,
+            true,
+        )
+        .execute(&pool)
+        .await?;
+
+        let subscriber_row = sqlx::query!(
+            r#"SELECT id FROM event_subscribers WHERE email = $1"#,
+            "max@test.com"
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        sqlx::query!(
+            r#"INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, canceled, payment_id, payment_confirmed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+            event_id,
+            subscriber_row.id,
+            true,
+            false,
+            None::<chrono::DateTime<Utc>>,
+            "pay_001",
+            None::<chrono::DateTime<Utc>>,
+        )
+        .execute(&pool)
+        .await?;
+
+        let count = send_participation_confirmation(&pool, event.0.id, &mock_sender).await?;
+        assert_eq!(count, 1);
+
+        let sent = captured.lock().unwrap();
+        let messages: Vec<_> = sent.iter().flat_map(|(_, msgs)| msgs).collect();
+        assert_eq!(messages.len(), 1);
+
+        let formatted = String::from_utf8(messages[0].formatted()).unwrap();
+        assert!(formatted.contains("multipart/mixed"), "no mixed");
+        assert!(
+            formatted.contains("multipart/alternative"),
+            "no alternative"
+        );
+        assert!(formatted.contains("text/plain"), "no plain");
+        assert!(formatted.contains("text/html"), "no html");
+        assert!(formatted.contains("application/pdf"), "no pdf");
+        assert!(formatted.contains("Hallo Max"), "no greeting");
 
         Ok(())
     }

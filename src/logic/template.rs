@@ -358,6 +358,17 @@ pub(crate) fn render_participation_confirmation<'a>(
     )
 }
 
+pub(crate) fn render_participation_confirmation_html<'a>(
+    template_name: &str,
+    event: &'a Event,
+    subscription: &'a EventSubscription,
+) -> Result<String> {
+    render_html(
+        template_name,
+        &ParticipationConfirmationData::new(event, subscription)?,
+    )
+}
+
 pub(crate) fn render_payment_reminder<'a>(
     template: &str,
     event: &'a Event,
@@ -367,6 +378,17 @@ pub(crate) fn render_payment_reminder<'a>(
         template,
         BookingTemplateData::from_unpaid_booking(booking, event),
         None,
+    )
+}
+
+pub(crate) fn render_payment_reminder_html<'a>(
+    template_name: &str,
+    event: &'a Event,
+    booking: &'a UnpaidEventBooking,
+) -> Result<String> {
+    render_html(
+        template_name,
+        &BookingTemplateData::from_unpaid_booking(booking, event),
     )
 }
 

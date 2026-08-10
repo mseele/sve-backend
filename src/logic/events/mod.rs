@@ -399,15 +399,9 @@ pub(crate) async fn cancel_booking(
         )?;
 
         messages.push(
-            Email::new(
-                message_type,
-                new_booking.email.clone(),
-                subject,
-                body,
-                None,
-            )
-            .with_bcc(email_account.address.clone())
-            .into_message(&email_account, email_gateway)?,
+            Email::new(message_type, new_booking.email.clone(), subject, body, None)
+                .with_bcc(email_account.address.clone())
+                .into_message(&email_account, email_gateway)?,
         );
     }
 
@@ -719,19 +713,27 @@ async fn send_booking_mail(
         });
     }
 
-    let mut body =
-        template::render_booking(template, booking, event, opt_payment_id.clone(), None, Some(true))?;
+    let mut body = template::render_booking(
+        template,
+        booking,
+        event,
+        opt_payment_id.clone(),
+        None,
+        Some(true),
+    )?;
 
-    let mut html_body = html_template_name.map(|name| {
-        template::render_booking_html(
-            name,
-            booking,
-            event,
-            opt_payment_id.clone(),
-            None,
-            Some(true),
-        )
-    }).transpose()?;
+    let mut html_body = html_template_name
+        .map(|name| {
+            template::render_booking_html(
+                name,
+                booking,
+                event,
+                opt_payment_id.clone(),
+                None,
+                Some(true),
+            )
+        })
+        .transpose()?;
 
     if booking.updates.unwrap_or(false) {
         let ps = format!(
@@ -751,14 +753,8 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
         }
     }
 
-    let mut email = Email::new(
-        message_type,
-        booking.email.clone(),
-        subject,
-        body,
-        None,
-    )
-    .with_bcc(email_account.address.clone());
+    let mut email = Email::new(message_type, booking.email.clone(), subject, body, None)
+        .with_bcc(email_account.address.clone());
 
     if let Some(html_body) = html_body {
         email = email.with_html(html_body);
