@@ -314,6 +314,38 @@ pub(crate) fn render_event_reminder_html<'a>(
     )
 }
 
+pub(crate) fn render_booking_html<'a>(
+    template_name: &str,
+    booking: &'a EventBooking,
+    event: &'a Event,
+    payment_id: Option<String>,
+    prebooking_link: Option<String>,
+    direct_booking: Option<bool>,
+) -> Result<String> {
+    render_html(
+        template_name,
+        &BookingTemplateData::from_booking(
+            booking,
+            event,
+            payment_id,
+            prebooking_link,
+            direct_booking,
+        ),
+    )
+}
+
+pub(crate) fn render_schedule_change_html<'a>(
+    template_name: &str,
+    booking: &'a EventBooking,
+    event: &'a Event,
+    removed_dates: &[DateTime<Utc>],
+) -> Result<String> {
+    render_html(
+        template_name,
+        &ScheduleChangeTemplateData::new(booking, event, removed_dates),
+    )
+}
+
 pub(crate) fn render_participation_confirmation<'a>(
     template: &str,
     event: &'a Event,

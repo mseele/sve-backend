@@ -7,7 +7,6 @@ use chrono::{DateTime, Duration, NaiveDate, Utc};
 use encoding::Encoding;
 use encoding::{DecoderTrap, all::ISO_8859_1};
 use lazy_static::lazy_static;
-use lettre::message::SinglePart;
 use regex::Regex;
 use sqlx::PgPool;
 use tracing::{error, info, warn};
@@ -122,9 +121,15 @@ pub(crate) async fn update(
         }
 
         let subject = format!("{} Terminänderung {}", event.subject_prefix(), event.name);
-        let template = match event.event_type {
-            EventType::Fitness => include_str!("../../../templates/schedule_change_fitness.txt"),
-            EventType::Events => include_str!("../../../templates/schedule_change_events.txt"),
+        let (template, html_template_name) = match event.event_type {
+            EventType::Fitness => (
+                include_str!("../../../templates/schedule_change_fitness.txt"),
+                "schedule_change_fitness",
+            ),
+            EventType::Events => (
+                include_str!("../../../templates/schedule_change_events.txt"),
+                "schedule_change_events",
+            ),
         };
 
         let email_account = event.get_associated_email_account(email_gateway).await?;
@@ -134,9 +139,16 @@ pub(crate) async fn update(
         for (booking, _, _) in bookings {
             let body =
                 template::render_schedule_change(template, &booking, &event, &removed_dates)?;
+            let html_body = template::render_schedule_change_html(
+                html_template_name,
+                &booking,
+                &event,
+                &removed_dates,
+            )?;
 
             messages.push(
                 Email::new(message_type, booking.email, subject.clone(), body, None)
+                    .with_html(html_body)
                     .into_message(&email_account, email_gateway)?,
             );
         }
@@ -337,22 +349,41 @@ pub(crate) async fn cancel_booking(
         db::cancel_event_booking(pool, booking_id).await?;
 
     let email_account = event.get_associated_email_account(email_gateway).await?;
+    let message_type: MessageType = event.event_type.into();
     let mut messages = Vec::new();
 
     // create cancellation confirmation email
     let subject = format!("{} Stornierung Buchung", event.subject_prefix());
-    let body = match event.event_type {
-        EventType::Fitness => include_str!("../../../templates/cancel_booking_fitness.txt"),
-        EventType::Events => include_str!("../../../templates/cancel_booking_events.txt"),
+    let (template, html_template_name) = match event.event_type {
+        EventType::Fitness => (
+            include_str!("../../../templates/cancel_booking_fitness.txt"),
+            "cancel_booking_fitness",
+        ),
+        EventType::Events => (
+            include_str!("../../../templates/cancel_booking_events.txt"),
+            "cancel_booking_events",
+        ),
     };
-    let body = template::render_booking(body, &canceled_booking, &event, None, None, None)?;
+    let body = template::render_booking(template, &canceled_booking, &event, None, None, None)?;
+    let html_body = template::render_booking_html(
+        html_template_name,
+        &canceled_booking,
+        &event,
+        None,
+        None,
+        None,
+    )?;
     messages.push(
-        email_gateway
-            .build_message(&email_account)?
-            .to(canceled_booking.email.parse()?)
-            .bcc(email_account.address.parse()?)
-            .subject(subject)
-            .singlepart(SinglePart::plain(body))?,
+        Email::new(
+            message_type,
+            canceled_booking.email.clone(),
+            subject,
+            body,
+            None,
+        )
+        .with_html(html_body)
+        .with_bcc(email_account.address.clone())
+        .into_message(&email_account, email_gateway)?,
     );
 
     // create booking confirmation email for the new booking
@@ -368,12 +399,15 @@ pub(crate) async fn cancel_booking(
         )?;
 
         messages.push(
-            email_gateway
-                .build_message(&email_account)?
-                .to(new_booking.email.parse()?)
-                .bcc(email_account.address.parse()?)
-                .subject(subject)
-                .singlepart(SinglePart::plain(body))?,
+            Email::new(
+                message_type,
+                new_booking.email.clone(),
+                subject,
+                body,
+                None,
+            )
+            .with_bcc(email_account.address.clone())
+            .into_message(&email_account, email_gateway)?,
         );
     }
 
@@ -662,13 +696,16 @@ async fn send_booking_mail(
     email_gateway: &impl email::EmailGateway,
 ) -> Result<()> {
     let email_account = event.get_associated_email_account(email_gateway).await?;
+    let message_type: MessageType = event.event_type.into();
     let subject;
     let template: &str;
     let opt_payment_id;
+    let html_template_name: Option<&str>;
     if booked {
         subject = format!("{} Bestätigung Buchung", event.subject_prefix());
         template = &event.booking_template;
         opt_payment_id = Some(payment_id);
+        html_template_name = None;
     } else {
         subject = format!("{} Bestätigung Warteliste", event.subject_prefix());
         template = match event.event_type {
@@ -676,34 +713,58 @@ async fn send_booking_mail(
             EventType::Events => include_str!("../../../templates/waiting_list_events.txt"),
         };
         opt_payment_id = None;
+        html_template_name = Some(match event.event_type {
+            EventType::Fitness => "waiting_list_fitness",
+            EventType::Events => "waiting_list_events",
+        });
     }
 
     let mut body =
-        template::render_booking(template, booking, event, opt_payment_id, None, Some(true))?;
+        template::render_booking(template, booking, event, opt_payment_id.clone(), None, Some(true))?;
+
+    let mut html_body = html_template_name.map(|name| {
+        template::render_booking_html(
+            name,
+            booking,
+            event,
+            opt_payment_id.clone(),
+            None,
+            Some(true),
+        )
+    }).transpose()?;
 
     if booking.updates.unwrap_or(false) {
-        body.push_str(
-            format!(
-                "
+        let ps = format!(
+            "
 
 PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
 {}",
-                match event.event_type {
-                    EventType::Fitness => "Kursangebote",
-                    EventType::Events => "Events",
-                },
-                super::news::UNSUBSCRIBE_MESSAGE
-            )
-            .as_str(),
-        )
+            match event.event_type {
+                EventType::Fitness => "Kursangebote",
+                EventType::Events => "Events",
+            },
+            super::news::UNSUBSCRIBE_MESSAGE
+        );
+        body.push_str(&ps);
+        if let Some(ref mut html) = html_body {
+            html.push_str(&ps.replace('\n', "<br>"));
+        }
     }
 
-    let message = email_gateway
-        .build_message(&email_account)?
-        .to(booking.email.parse()?)
-        .bcc(email_account.address.parse()?)
-        .subject(subject)
-        .singlepart(SinglePart::plain(body))?;
+    let mut email = Email::new(
+        message_type,
+        booking.email.clone(),
+        subject,
+        body,
+        None,
+    )
+    .with_bcc(email_account.address.clone());
+
+    if let Some(html_body) = html_body {
+        email = email.with_html(html_body);
+    }
+
+    let message = email.into_message(&email_account, email_gateway)?;
 
     email_gateway
         .send_messages(&email_account, vec![message])
