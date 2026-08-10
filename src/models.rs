@@ -927,6 +927,7 @@ pub(crate) enum MessageType {
     Events,
     Fitness,
     Kunstrasen,
+    Mitglieder,
 }
 
 impl From<MessageType> for EmailType {
@@ -936,6 +937,7 @@ impl From<MessageType> for EmailType {
             MessageType::Events => Self::Events,
             MessageType::Fitness => Self::Fitness,
             MessageType::Kunstrasen => Self::Kunstrasen,
+            MessageType::Mitglieder => Self::Mitglieder,
         }
     }
 }

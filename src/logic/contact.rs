@@ -141,11 +141,17 @@ pub(crate) async fn message(
         &contact_message.name,
     )?;
 
-    let confirmation = email_gateway
-        .build_message(&email_account)?
-        .subject("Vielen Dank für Deine Nachricht")
-        .to(contact_message.email.parse()?)
-        .singlepart(SinglePart::plain(confirmation_body))?;
+    let confirmation_html = template::render_contact_confirmation_html(&contact_message.name)?;
+
+    let confirmation = Email::new(
+        contact_message.message_type,
+        contact_message.email.clone(),
+        "Vielen Dank für Deine Nachricht".to_string(),
+        confirmation_body,
+        None,
+    )
+    .with_html(confirmation_html)
+    .into_message(&email_account, email_gateway)?;
 
     email_gateway
         .send_messages(&email_account, vec![confirmation])

@@ -416,8 +416,24 @@ pub(crate) fn render_membership_application(
     )
 }
 
+pub(crate) fn render_membership_application_html(
+    membership_application: &MembershipApplication,
+) -> Result<String> {
+    render_html(
+        "membership_application",
+        &MembershipApplicationTemplateData::new(membership_application),
+    )
+}
+
 pub(crate) fn render_contact_confirmation(template: &str, name: &str) -> Result<String> {
     render(template, ContactConfirmationTemplateData::new(name), None)
+}
+
+pub(crate) fn render_contact_confirmation_html(name: &str) -> Result<String> {
+    render_html(
+        "contact_confirmation",
+        &ContactConfirmationTemplateData::new(name),
+    )
 }
 
 fn render<D>(template: &str, data: D, payday_helper: Option<PaydayHelper>) -> Result<String>

@@ -3,9 +3,11 @@ use super::csv;
 use super::news;
 use super::template;
 use crate::email::EmailGateway;
+use crate::models::Email;
 use crate::models::EmailAccount;
 use crate::models::EmailType;
 use crate::models::MembershipApplication;
+use crate::models::MessageType;
 use crate::models::NewsSubscription;
 use crate::models::NewsTopic;
 use anyhow::Result;
@@ -64,14 +66,17 @@ fn create_welcome_email(
 ) -> Result<Message> {
     let template = include_str!("../../templates/membership_application.txt");
     let body = template::render_membership_application(template, membership_application)?;
+    let html_body = template::render_membership_application_html(membership_application)?;
 
-    let message = email_gateway
-        .build_message(email_account)?
-        .to(membership_application.email.parse()?)
-        .subject("Willkomen beim SV Eutingen 1947 e.V.")
-        .singlepart(SinglePart::plain(body))?;
-
-    Ok(message)
+    Email::new(
+        MessageType::Mitglieder,
+        membership_application.email.clone(),
+        "Willkomen beim SV Eutingen 1947 e.V.".to_string(),
+        body,
+        None,
+    )
+    .with_html(html_body)
+    .into_message(email_account, email_gateway)
 }
 
 /// Build the HTML body for the internal membership application email
