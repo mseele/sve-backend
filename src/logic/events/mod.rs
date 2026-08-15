@@ -372,6 +372,7 @@ pub(crate) async fn cancel_booking(
         None,
         None,
         None,
+        None,
     )?;
     messages.push(
         Email::new(
@@ -389,17 +390,19 @@ pub(crate) async fn cancel_booking(
     // create booking confirmation email for the new booking
     if let Some((new_booking, payment_id)) = waiting_list_booking {
         let subject = format!("{} Bestätigung Buchung", event.subject_prefix());
-        let body = template::render_booking(
+        let (body, html_body) = template::render_booking_generic(
             &event.booking_template,
             &new_booking,
             &event,
             Some(payment_id),
             None,
             Some(false),
+            None,
         )?;
 
         messages.push(
             Email::new(message_type, new_booking.email.clone(), subject, body, None)
+                .with_html(html_body)
                 .with_bcc(email_account.address.clone())
                 .into_message(&email_account, email_gateway)?,
         );
@@ -713,30 +716,8 @@ async fn send_booking_mail(
         });
     }
 
-    let mut body = template::render_booking(
-        template,
-        booking,
-        event,
-        opt_payment_id.clone(),
-        None,
-        Some(true),
-    )?;
-
-    let mut html_body = html_template_name
-        .map(|name| {
-            template::render_booking_html(
-                name,
-                booking,
-                event,
-                opt_payment_id.clone(),
-                None,
-                Some(true),
-            )
-        })
-        .transpose()?;
-
-    if booking.updates.unwrap_or(false) {
-        let ps = format!(
+    let ps = booking.updates.unwrap_or(false).then(|| {
+        format!(
             "
 
 PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
@@ -746,11 +727,40 @@ PS: Ab sofort erhältst Du automatisch eine E-Mail, sobald neue {} online sind.
                 EventType::Events => "Events",
             },
             super::news::UNSUBSCRIBE_MESSAGE
-        );
+        )
+    });
+
+    let (mut body, html_body) = if booked {
+        let (text, html) = template::render_booking_generic(
+            template,
+            booking,
+            event,
+            opt_payment_id,
+            None,
+            Some(true),
+            ps.as_deref(),
+        )?;
+        (text, Some(html))
+    } else {
+        let text = template::render_booking(template, booking, event, None, None, Some(true))?;
+        let html = html_template_name
+            .map(|name| {
+                template::render_booking_html(
+                    name,
+                    booking,
+                    event,
+                    None,
+                    None,
+                    Some(true),
+                    ps.as_deref(),
+                )
+            })
+            .transpose()?;
+        (text, html)
+    };
+
+    if let Some(ps) = ps {
         body.push_str(&ps);
-        if let Some(ref mut html) = html_body {
-            html.push_str(&ps.replace('\n', "<br>"));
-        }
     }
 
     let mut email = Email::new(message_type, booking.email.clone(), subject, body, None)

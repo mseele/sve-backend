@@ -1,0 +1,27 @@
+<mjml lang="de">
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Arial, Helvetica, sans-serif" />
+      <mj-text css-class="sve-text" font-size="15px" line-height="1.6" color="#333" padding="10px 48px" />
+    </mj-attributes>
+    <mj-raw>{{> _head_meta}}</mj-raw>
+  </mj-head>
+  <mj-body background-color="#fafafa" css-class="sve-body">
+    {{> _branding_header}}
+
+    <mj-section css-class="sve-section" padding="0">
+      <mj-column padding="0">
+        <mj-text>
+          {{{body}}}
+        </mj-text>
+        {{#if ps}}
+        <mj-text>
+          {{{ps}}}
+        </mj-text>
+        {{/if}}
+      </mj-column>
+    </mj-section>
+
+    {{> _branding_footer}}
+  </mj-body>
+</mjml>

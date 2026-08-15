@@ -57,12 +57,13 @@ pub(crate) async fn send_event_email(
             prebooking_link = None;
         }
 
-        let body = template::render_booking(
+        let (body, html_body) = template::render_booking_generic(
             &data.body,
             &booking,
             &event,
             Some(payment_id),
             prebooking_link,
+            None,
             None,
         )?;
 
@@ -79,6 +80,7 @@ pub(crate) async fn send_event_email(
                 body,
                 attachments,
             )
+            .with_html(html_body)
             .into_message(&email_account, email_gateway)?,
         );
     }

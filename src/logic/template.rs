@@ -291,6 +291,63 @@ pub(crate) fn render_booking<'a>(
     )
 }
 
+#[derive(Serialize)]
+struct GenericMailTemplateData {
+    body: String,
+    ps: Option<String>,
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+fn boldize(s: &str) -> String {
+    let parts: Vec<&str> = s.split("**").collect();
+    let mut out = String::with_capacity(s.len());
+    for (i, part) in parts.iter().enumerate() {
+        if i % 2 == 1 && !part.is_empty() {
+            out.push_str("<strong>");
+            out.push_str(part);
+            out.push_str("</strong>");
+        } else {
+            out.push_str(part);
+        }
+    }
+    out
+}
+
+pub(crate) fn render_generic_mail_html(body: &str, ps: Option<&str>) -> Result<String> {
+    let body = boldize(&escape_html(body)).replace('\n', "<br>");
+    let ps = ps.map(|ps| escape_html(ps).replace('\n', "<br>"));
+
+    render_html("generic_mail", &GenericMailTemplateData { body, ps })
+}
+
+pub(crate) fn render_booking_generic<'a>(
+    template: &str,
+    booking: &'a EventBooking,
+    event: &'a Event,
+    payment_id: Option<String>,
+    prebooking_link: Option<String>,
+    direct_booking: Option<bool>,
+    ps: Option<&str>,
+) -> Result<(String, String)> {
+    let text = render_booking(
+        template,
+        booking,
+        event,
+        payment_id,
+        prebooking_link,
+        direct_booking,
+    )?;
+    let html = render_generic_mail_html(&text, ps)?;
+
+    Ok((text, html))
+}
+
 pub(crate) fn render_event_reminder<'a>(
     template: &str,
     event: &'a Event,
@@ -321,8 +378,9 @@ pub(crate) fn render_booking_html<'a>(
     payment_id: Option<String>,
     prebooking_link: Option<String>,
     direct_booking: Option<bool>,
+    ps: Option<&str>,
 ) -> Result<String> {
-    render_html(
+    let mut html = render_html(
         template_name,
         &BookingTemplateData::from_booking(
             booking,
@@ -331,7 +389,14 @@ pub(crate) fn render_booking_html<'a>(
             prebooking_link,
             direct_booking,
         ),
-    )
+    )?;
+
+    if let Some(ps) = ps {
+        let ps = escape_html(ps).replace('\n', "<br>");
+        html = html.replace("</body>", &format!("<p>{ps}</p></body>"));
+    }
+
+    Ok(html)
 }
 
 pub(crate) fn render_schedule_change_html<'a>(
@@ -555,6 +620,11 @@ lazy_static! {
             include_str!("../../templates/compiled/waiting_list_fitness.html"),
         )
         .unwrap();
+        hb.register_template_string(
+            "generic_mail",
+            include_str!("../../templates/compiled/generic_mail.html"),
+        )
+        .unwrap();
 
         hb
     };
@@ -571,6 +641,64 @@ mod tests {
     use bigdecimal::{BigDecimal, FromPrimitive};
     use chrono::{DateTime, Duration, Locale, TimeZone, Utc};
     use pretty_assertions::assert_eq;
+
+    const DB_FITNESS_TEMPLATE: &str = r#"Hallo {{firstname}},
+
+vielen Dank für Dein Interesse an unserem Kurs **“{{name}}”**.
+{{#if direct_booking}}
+Wir haben für Dich einen Platz im Kurs **verbindlich reserviert**.
+{{else}}
+Gerade ist ein Platz im Kurs frei geworden. Wir haben für Dich einen Platz im Kurs **verbindlich reserviert**.
+{{/if}}
+
+Die Kurstermine sind:
+**{{dates}}**
+
+Der Kurs findet statt in: **{{location}}**
+
+{{#eq payment_type "BankTransfer"}}
+Bitte überweise die Teilnahmegebühr i.H.v. **{{price}}** bis zum **{{payday}}** auf dieses Konto:
+
+**{{payment_details}}**
+{{/eq}}
+{{#eq payment_type "SepaDirectDebit"}}
+Die Teilnahmegebühr i.H.v. **{{price}}** wird einige Tage vor Kursbeginn per SEPA-Lastschrift von deinem Konto abgebucht.
+{{/eq}}
+
+Ein letzter Hinweis: Es gibt eine Mindestteilnehmerzahl, damit der Kurs stattfinden kann. Sollten sich zu wenige anmelden oder es aus unvorhergesehen Gründen (Krankheit Kursleitung usw.) nicht am Starttermin losgehen kann, informieren wir Dich selbstverständlich sofort. Wenn Du nichts mehr von uns hörst, beginnt der Kurs wie geplant.
+
+Wir freuen uns auf Deine Teilnahme und wünschen Dir viel Freude beim Kurs.
+
+Herzliche Grüße
+Team Fitness@SVE"#;
+
+    const SVETOOLS_COURSE_CANCELLATION: &str = r#"Hallo {{firstname}},
+
+leider kann der von dir gebuchte Fitnesskurs **"{{name}}"** aufgrund zu geringer Teilnehmerzahl nicht stattfinden.
+
+Solltest du den Kurs bereits bezahlt haben, **werden wir dir das Geld selbstverständlich umgehend zurücküberweisen**.
+
+Wir entschuldigen uns nochmals für die Absage und hoffen, dass in Zukunft wieder ein passender Kurs für dich dabei ist.
+
+Herzliche Grüße
+Team Fitness@SVE"#;
+
+    const SVETOOLS_PREBOOKING_INVITATION: &str = r#"Hallo {{firstname}},
+
+wir werden deinen gebuchten Fitnesskurs "{{name}}" in Kürze zu folgenden Terminen erneut anbieten:
+
+**{{dates}}**
+
+Der kommende Kurs kostet **{{price}}**.
+Als bisheriger Kursteilnehmer möchten wir es Dir ermöglichen, den Kurs vor der offiziellen Veröffentlichung exklusiv zu buchen.
+
+Möchtest du wieder mit dabei sein? Dann klicke einfach auf deinen individuellen Buchungslink, um den Kurs zu buchen:
+**{{link}}**
+
+**Achtung:** Wir werden den Fitnesskurs in Kürze öffentlich ausschreiben. Ab diesem Zeitpunkt ist eine Buchung nur noch über die Webseite möglich, und ein Platz ist nicht mehr garantiert.
+
+Herzliche Grüße
+Team Fitness@SVE"#;
 
     #[test]
     fn test_render_booking() {
@@ -797,6 +925,206 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
             render_booking("{{payday 7}}", &booking_member, &event, None, None, None).unwrap(),
             tomorrow
         );
+    }
+
+    #[test]
+    fn test_render_booking_generic_bolds_but_not_text() {
+        let booking = EventBooking::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+            Vec::new(),
+            None,
+        );
+        let event = new_event(vec![Utc::now()]);
+
+        let (_, result) = render_booking_generic(
+            "Hallo {{firstname}}!\n**{{name}}** ist **ausgebucht**.\nPreis & Info <besser>",
+            &booking,
+            &event,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(result.contains(
+            "Hallo Max!<br><strong>name</strong> ist <strong>ausgebucht</strong>.<br>Preis &amp; Info &lt;besser&gt;"
+        ));
+        assert!(!result.contains("**"));
+        assert!(result.contains(r#"<html lang="de""#));
+        assert!(result.contains("https://www.sv-eutingen.de/logo.png"));
+        assert!(!result.contains("PS:"));
+    }
+
+    #[test]
+    fn test_render_booking_generic_appends_ps() {
+        let booking = EventBooking::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+            Vec::new(),
+            None,
+        );
+        let event = new_event(vec![Utc::now()]);
+
+        let (_, result) = render_booking_generic(
+            "Hallo {{firstname}}!",
+            &booking,
+            &event,
+            None,
+            None,
+            None,
+            Some("PS: Ab sofort\nhttps://example.com/unsubscribe"),
+        )
+        .unwrap();
+
+        assert!(result.contains("PS: Ab sofort<br>https://example.com/unsubscribe"));
+    }
+
+    #[test]
+    fn test_render_booking_real_db_fitness_template() {
+        let booking = EventBooking::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+            Vec::new(),
+            None,
+        );
+        let mut event = new_event(vec![Utc::now()]);
+        event.payment_account = Some(String::from(
+            "Sportverein Eutingen im Gäu e.V.\nIBAN: DE16 6429 1010 0034 4696 05",
+        ));
+
+        let template = DB_FITNESS_TEMPLATE;
+
+        let text = render_booking(
+            template,
+            &booking,
+            &event,
+            Some(String::from("26-1001")),
+            None,
+            Some(true),
+        )
+        .unwrap();
+        assert!(text.contains("**"));
+        assert!(text.contains("Kurs **“name”**."));
+        assert!(text.contains("verbindlich reserviert"));
+        assert!(text.contains("Der Kurs findet statt in: **location**"));
+        assert!(text.contains("Verwendungszweck: 26-1001"));
+
+        let (_, html) = render_booking_generic(
+            template,
+            &booking,
+            &event,
+            Some(String::from("26-1001")),
+            None,
+            Some(true),
+            None,
+        )
+        .unwrap();
+        assert!(html.contains("<strong>“name”</strong>"));
+        assert!(html.contains("<strong>verbindlich reserviert</strong>"));
+        assert!(html.contains("<strong>location</strong>"));
+        assert!(html.contains("<strong>0,00 €</strong>"));
+        assert!(html.contains("Verwendungszweck: 26-1001</strong>"));
+        assert!(!html.contains("**"));
+        assert!(html.contains("Ein letzter Hinweis:"));
+    }
+
+    #[test]
+    fn test_render_booking_svetools_presets() {
+        let booking = EventBooking::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+            Vec::new(),
+            None,
+        );
+        let event = new_event(vec![Utc::now()]);
+
+        let text = render_booking(
+            SVETOOLS_COURSE_CANCELLATION,
+            &booking,
+            &event,
+            None,
+            None,
+            Some(true),
+        )
+        .unwrap();
+        assert!(text.contains("**"));
+        assert!(text.contains("\"name\""));
+
+        let (_, html) = render_booking_generic(
+            SVETOOLS_COURSE_CANCELLATION,
+            &booking,
+            &event,
+            None,
+            None,
+            Some(true),
+            None,
+        )
+        .unwrap();
+        assert!(html.contains("<strong>&quot;name&quot;</strong>"));
+        assert!(html.contains(
+            "<strong>werden wir dir das Geld selbstverständlich umgehend zurücküberweisen</strong>"
+        ));
+
+        let link = Some(String::from("https://www.sv-eutingen.de/buchen/abc"));
+        let text = render_booking(
+            SVETOOLS_PREBOOKING_INVITATION,
+            &booking,
+            &event,
+            None,
+            link.clone(),
+            None,
+        )
+        .unwrap();
+        assert!(text.contains("**"));
+        assert!(text.contains("https://www.sv-eutingen.de/buchen/abc"));
+
+        let (_, html) = render_booking_generic(
+            SVETOOLS_PREBOOKING_INVITATION,
+            &booking,
+            &event,
+            None,
+            link,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(html.contains("<strong>https://www.sv-eutingen.de/buchen/abc</strong>"));
+        assert!(html.contains("<strong>Achtung:</strong>"));
+        assert!(html.contains("<strong>0,00 €</strong>"));
     }
 
     #[test]
@@ -1286,22 +1614,312 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
              <style>body{font-family:-apple-system,sans-serif;background:#eee;margin:0;padding:24px}\
              h1{font-size:20px}\
              .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15);\
-             margin:0 auto 24px;max-width:640px;overflow:hidden}\
+             margin:0 auto 24px;max-width:1080px;overflow:hidden}\
              .card h2{font-size:13px;margin:0;padding:10px 16px;background:#f5f5f5;\
              border-bottom:1px solid #ddd;color:#333}\
-             iframe{display:block;width:100%;height:560px;border:0}</style></head><body>\
-             <h1>SVE Email Preview \u{2014} 13 Templates</h1>",
+             iframe{display:block;width:100%;height:560px;border:0}\
+             .duo{display:grid;grid-template-columns:1fr 1fr}\
+             .duo > div + div{border-left:1px solid #ddd}\
+             .duo h3{font-size:11px;margin:0;padding:6px 12px;background:#fafafa;\
+             border-bottom:1px solid #eee;color:#888;text-transform:uppercase}\
+             .duo pre{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;\
+             margin:0;padding:12px 16px;min-height:560px;max-height:640px;overflow:auto;color:#222}</style></head><body>\
+             <h1>SVE Email Preview \u{2014} 13 statische + 3 DB/Batch-Vorlagen</h1>",
         );
+
+        let booking = EventBooking::new(
+            0,
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            Some(true),
+            None,
+            None,
+            Vec::new(),
+            None,
+        );
+        let event_events = Event::new(
+            0,
+            Utc::now(),
+            None,
+            EventType::Events,
+            LifecycleStatus::Draft,
+            String::from("SVE-Sommerfest 2026"),
+            0,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            vec![Utc.with_ymd_and_hms(2026, 6, 14, 15, 0, 0).unwrap()],
+            None,
+            0,
+            0,
+            0,
+            BigDecimal::from_i8(15).unwrap(),
+            BigDecimal::from_i8(20).unwrap(),
+            None,
+            String::from("Sportgelände SV Eutingen"),
+            String::from("booking_template"),
+            Some(String::from(
+                "Sportverein Eutingen im Gäu e.V.\nIBAN: DE16 6429 1010 0034 4696 05",
+            )),
+            None,
+            None,
+            false,
+            Vec::new(),
+            PaymentMethod::BankTransfer,
+        );
+        let event_fitness = Event::new(
+            0,
+            Utc::now(),
+            None,
+            EventType::Fitness,
+            LifecycleStatus::Draft,
+            String::from("Rückenfit im Frühling"),
+            0,
+            String::from("short_description"),
+            String::from("description"),
+            String::from("image"),
+            true,
+            vec![Utc.with_ymd_and_hms(2026, 4, 7, 19, 0, 0).unwrap()],
+            None,
+            0,
+            0,
+            0,
+            BigDecimal::from_i8(60).unwrap(),
+            BigDecimal::from_i8(70).unwrap(),
+            None,
+            String::from("Turn- & Festhalle Eutingen"),
+            String::from("booking_template"),
+            Some(String::from(
+                "Sportverein Eutingen im Gäu e.V.\nIBAN: DE16 6429 1010 0034 4696 05",
+            )),
+            None,
+            None,
+            false,
+            Vec::new(),
+            PaymentMethod::BankTransfer,
+        );
+        let subscription = EventSubscription::new(
+            0,
+            Utc::now(),
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("Haupstraße 1"),
+            String::from("72184 Eutingen"),
+            String::from("max@mustermann.de"),
+            None,
+            true,
+            true,
+            String::from("26-1001"),
+            Some(Utc::now()),
+            None,
+            None,
+            None,
+            Vec::new(),
+        );
+        let unpaid_booking = UnpaidEventBooking::new(
+            0.into(),
+            String::from("Rückenfit im Frühling"),
+            0,
+            Utc::now(),
+            String::from("Max"),
+            String::from("Mustermann"),
+            String::from("max@mustermann.de"),
+            BigDecimal::from_i8(60).unwrap(),
+            String::from("26-1002"),
+            None,
+            None,
+        );
+        let membership_application: MembershipApplication =
+            serde_json::from_value(serde_json::json!({
+                "salutation": "Herr",
+                "first_name": "Max",
+                "last_name": "Mustermann",
+                "street": "Hauptstraße 1",
+                "zipcode": "72184",
+                "city": "Eutingen im Gäu",
+                "email": "max@mustermann.de",
+                "phone": "07459 1234",
+                "gender": "männlich",
+                "birthday": "1990-01-01",
+                "iban": "DE16 6429 1010 0034 4696 05",
+                "account_owner": "Max Mustermann",
+                "membership_type": "AdultActive",
+                "family_members": null,
+                "newsletter": true,
+                "token": null
+            }))
+            .unwrap();
+        let removed_dates = vec![Utc.with_ymd_and_hms(2026, 4, 2, 19, 0, 0).unwrap()];
+
+        let push_duo_card = |label: &str, name: &str, html: &str, text: &str| -> String {
+            let srcdoc = escape_html(html);
+            let text = escape_html(text);
+            format!(
+                "<div class=\"card\"><h2>{label} <code style=\"color:#999\">({name})</code></h2>\
+                 <div class=\"duo\"><div><h3>HTML</h3><iframe srcdoc=\"{srcdoc}\"></iframe></div>\
+                 <div><h3>Text</h3><pre>{text}</pre></div></div></div>"
+            )
+        };
 
         for (name, label, data) in cases {
             let html = render_html(name, data)
                 .unwrap_or_else(|e| format!("<pre>render error: {e:?}</pre>"));
-            let srcdoc = html.replace('&', "&amp;").replace('"', "&quot;");
-            body.push_str(&format!(
-                "<div class=\"card\"><h2>{label} <code style=\"color:#999\">({name})</code></h2>\
-                 <iframe srcdoc=\"{srcdoc}\"></iframe></div>"
-            ));
+            let text = match *name {
+                "cancel_booking_events" => render_booking(
+                    include_str!("../../templates/cancel_booking_events.txt"),
+                    &booking,
+                    &event_events,
+                    None,
+                    None,
+                    None,
+                ),
+                "cancel_booking_fitness" => render_booking(
+                    include_str!("../../templates/cancel_booking_fitness.txt"),
+                    &booking,
+                    &event_fitness,
+                    None,
+                    None,
+                    None,
+                ),
+                "contact_confirmation" => render_contact_confirmation(
+                    include_str!("../../templates/contact_confirmation.txt"),
+                    "Max Mustermann",
+                ),
+                "event_reminder_events" => render_event_reminder(
+                    include_str!("../../templates/event_reminder_events.txt"),
+                    &event_events,
+                    &subscription,
+                ),
+                "event_reminder_fitness" => render_event_reminder(
+                    include_str!("../../templates/event_reminder_fitness.txt"),
+                    &event_fitness,
+                    &subscription,
+                ),
+                "membership_application" => render_membership_application(
+                    include_str!("../../templates/membership_application.txt"),
+                    &membership_application,
+                ),
+                "participation_confirmation_fitness" => render_participation_confirmation(
+                    include_str!("../../templates/participation_confirmation_fitness.txt"),
+                    &event_fitness,
+                    &subscription,
+                ),
+                "payment_reminder_events" => render_payment_reminder(
+                    include_str!("../../templates/payment_reminder_events.txt"),
+                    &event_events,
+                    &unpaid_booking,
+                ),
+                "payment_reminder_fitness" => render_payment_reminder(
+                    include_str!("../../templates/payment_reminder_fitness.txt"),
+                    &event_fitness,
+                    &unpaid_booking,
+                ),
+                "schedule_change_events" => render_schedule_change(
+                    include_str!("../../templates/schedule_change_events.txt"),
+                    &booking,
+                    &event_events,
+                    &removed_dates,
+                ),
+                "schedule_change_fitness" => render_schedule_change(
+                    include_str!("../../templates/schedule_change_fitness.txt"),
+                    &booking,
+                    &event_fitness,
+                    &removed_dates,
+                ),
+                "waiting_list_events" => render_booking(
+                    include_str!("../../templates/waiting_list_events.txt"),
+                    &booking,
+                    &event_events,
+                    None,
+                    None,
+                    Some(false),
+                ),
+                "waiting_list_fitness" => render_booking(
+                    include_str!("../../templates/waiting_list_fitness.txt"),
+                    &booking,
+                    &event_fitness,
+                    None,
+                    None,
+                    Some(false),
+                ),
+                _ => unreachable!("no text template for {name}"),
+            }
+            .unwrap_or_else(|e| format!("render error: {e:?}"));
+            body.push_str(&push_duo_card(label, name, &html, &text));
         }
+
+        let render_duo = |template: &str,
+                          event: &Event,
+                          payment_id: Option<String>,
+                          link: Option<String>,
+                          direct_booking: Option<bool>,
+                          ps: Option<&str>|
+         -> (String, String) {
+            let (text, html) = render_booking_generic(
+                template,
+                &booking,
+                event,
+                payment_id,
+                link,
+                direct_booking,
+                ps,
+            )
+            .unwrap_or_else(|e| {
+                let err = format!("render error: {e:?}");
+                (err.clone(), err)
+            });
+            (html, text)
+        };
+
+        let (html, text) = render_duo(
+            DB_FITNESS_TEMPLATE,
+            &event_fitness,
+            Some(String::from("26-1001")),
+            None,
+            Some(true),
+            None,
+        );
+        body.push_str(&push_duo_card(
+            "DB-Buchungsmail Fitness (echte DB-Vorlage)",
+            "generic_mail",
+            &html,
+            &text,
+        ));
+
+        let (html, text) = render_duo(
+            SVETOOLS_COURSE_CANCELLATION,
+            &event_fitness,
+            None,
+            None,
+            Some(true),
+            None,
+        );
+        body.push_str(&push_duo_card(
+            "Batch-Mail: Kursabsage (sve-tools)",
+            "generic_mail",
+            &html,
+            &text,
+        ));
+
+        let (html, text) = render_duo(
+            SVETOOLS_PREBOOKING_INVITATION,
+            &event_fitness,
+            None,
+            Some(String::from("https://www.sv-eutingen.de/buchen/abc")),
+            None,
+            None,
+        );
+        body.push_str(&push_duo_card(
+            "Prebooking-Mail: Einladung (sve-tools)",
+            "generic_mail",
+            &html,
+            &text,
+        ));
 
         body.push_str("</body></html>");
 

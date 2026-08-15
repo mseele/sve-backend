@@ -1,9 +1,8 @@
 use crate::db;
 use crate::email::EmailGateway;
-use crate::models::{NewsSubscription, NewsTopic};
+use crate::logic::template;
+use crate::models::{Email, MessageType, NewsSubscription, NewsTopic};
 use anyhow::Result;
-use lettre::message::SinglePart;
-use lettre::message::header::{self, ContentType};
 use sqlx::PgPool;
 use std::collections::{HashMap, HashSet};
 
@@ -110,15 +109,8 @@ async fn send_mail(
     let email_account = email_gateway
         .account_by_type(primary_news_topic.into())
         .await?;
-    let message = email_gateway
-        .build_message(&email_account)?
-        .header(header::MIME_VERSION_1_0)
-        .header(ContentType::TEXT_PLAIN)
-        .to(subscription.email.parse()?)
-        .bcc(email_account.address.parse()?)
-        .subject(subject)
-        .singlepart(SinglePart::plain(format!(
-            "Lieber Interessent/In,
+    let text_body = format!(
+        "Lieber Interessent/In,
 
 vielen Dank für Dein Interesse an {}.
 
@@ -128,8 +120,19 @@ Ab sofort erhältst Du automatisch eine E-Mail{}.
 
 Herzliche Grüße
 {}",
-            topic, kind, UNSUBSCRIBE_MESSAGE, regards
-        )))?;
+        topic, kind, UNSUBSCRIBE_MESSAGE, regards
+    );
+    let html_body = template::render_generic_mail_html(&text_body, None)?;
+    let message = Email::new(
+        MessageType::from(primary_news_topic),
+        subscription.email.clone(),
+        subject.to_string(),
+        text_body,
+        None,
+    )
+    .with_html(html_body)
+    .with_bcc(email_account.address.clone())
+    .into_message(&email_account, email_gateway)?;
 
     email_gateway
         .send_messages(&email_account, vec![message])
@@ -211,6 +214,11 @@ mod tests {
         let body = String::from_utf8_lossy(&body_string);
         let body = body.replace("=\r\n", "").replace("=\n", "");
         assert!(
+            body.contains("Content-Type: multipart/alternative"),
+            "Should be multipart/alternative"
+        );
+        assert!(body.contains("text/html"), "Should contain text/html");
+        assert!(
             body.contains("unseren Events"),
             "Should contain Events topic text"
         );
@@ -250,6 +258,11 @@ mod tests {
         let body_string = message.formatted();
         let body = String::from_utf8_lossy(&body_string);
         let body = body.replace("=\r\n", "").replace("=\n", "");
+        assert!(
+            body.contains("Content-Type: multipart/alternative"),
+            "Should be multipart/alternative"
+        );
+        assert!(body.contains("text/html"), "Should contain text/html");
         assert!(
             body.contains("Events"),
             "Should contain Events in topic list"

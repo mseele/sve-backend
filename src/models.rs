@@ -737,6 +737,16 @@ impl From<NewsTopic> for EmailType {
     }
 }
 
+impl From<NewsTopic> for MessageType {
+    fn from(topic: NewsTopic) -> Self {
+        match topic {
+            NewsTopic::General => Self::General,
+            NewsTopic::Events => Self::Events,
+            NewsTopic::Fitness => Self::Fitness,
+        }
+    }
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub(crate) struct Appointment {
     pub(crate) id: Option<String>,
