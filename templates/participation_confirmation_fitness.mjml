@@ -1,15 +1,17 @@
-<mjml>
+<mjml lang="de">
   <mj-head>
     <mj-attributes>
       <mj-all font-family="Arial, Helvetica, sans-serif" />
-      <mj-text font-size="15px" line-height="1.6" color="#333" />
+      <mj-text css-class="sve-text" font-size="15px" line-height="1.6" color="#333" padding="10px 48px" />
     </mj-attributes>
+    <mj-preview>Deine Teilnahmebest&auml;tigung f&uuml;r Deinen Kurs.</mj-preview>
+    <mj-raw>{{> _head_meta}}</mj-raw>
   </mj-head>
-  <mj-body background-color="#fafafa">
+  <mj-body background-color="#fafafa" css-class="sve-body">
     {{> _branding_header}}
 
-    <mj-section padding="0 24px">
-      <mj-column>
+    <mj-section css-class="sve-section" padding="0">
+      <mj-column padding="0">
         <mj-text>
           <p>Hallo {{firstname}},</p>
 

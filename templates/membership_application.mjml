@@ -1,15 +1,17 @@
-<mjml>
+<mjml lang="de">
   <mj-head>
     <mj-attributes>
       <mj-all font-family="Arial, Helvetica, sans-serif" />
-      <mj-text font-size="15px" line-height="1.6" color="#333" />
+      <mj-text css-class="sve-text" font-size="15px" line-height="1.6" color="#333" padding="10px 48px" />
     </mj-attributes>
+    <mj-preview>Herzlich willkommen beim SV Eutingen 1947 e.V.</mj-preview>
+    <mj-raw>{{> _head_meta}}</mj-raw>
   </mj-head>
-  <mj-body background-color="#fafafa">
+  <mj-body background-color="#fafafa" css-class="sve-body">
     {{> _branding_header}}
 
-    <mj-section padding="0 24px">
-      <mj-column>
+    <mj-section css-class="sve-section" padding="0">
+      <mj-column padding="0">
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
@@ -25,7 +27,7 @@
           <p>Wir haben dich wie gew&uuml;nscht auch f&uuml;r unseren Newsletter angemeldet.<br />
           Ab sofort erh&auml;ltst Du automatisch eine Mail, sobald es Neuigkeiten gibt. Aber keine Sorge: wir fassen die wichtigsten Infos nur wenige Male im Jahr zusammen. &Uuml;ber unsere Social Media-Kan&auml;le kannst Du t&auml;glich verfolgen, was wir tun.</p>
 
-          <p>Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich <a href="https://www.sv-eutingen.de/newsletter" style="color: #9B1B1E;">hier</a> wieder abmelden.</p>
+          <p>Solltest Du an unserem E-Mail-Service kein Interesse mehr haben, kannst Du dich <a href="https://www.sv-eutingen.de/newsletter" target="_blank" style="color: #9B1B1E;">hier</a> wieder abmelden.</p>
           {{/if}}
 
           <p>Wir w&uuml;nschen Dir viel Freude und eine tolle Zeit beim SVE!</p>

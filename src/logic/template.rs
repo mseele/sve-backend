@@ -487,6 +487,8 @@ lazy_static! {
             include_str!("../../templates/_branding_footer.hbs"),
         )
         .unwrap();
+        hb.register_partial("_head_meta", include_str!("../../templates/_head_meta.hbs"))
+            .unwrap();
 
         hb.register_template_string(
             "cancel_booking_events",
@@ -1087,5 +1089,225 @@ Platz als Wartelistennachrücker gebucht.{{/if}}";
 
         assert!(result.contains("Hallo Anna"));
         assert!(result.contains("SV Eutingen 1947 e.V."));
+    }
+
+    #[test]
+    fn test_render_html_header_logo_is_linked() {
+        let result = render_html(
+            "contact_confirmation",
+            &ContactConfirmationTemplateData::new("Max Mustermann"),
+        )
+        .unwrap();
+
+        assert!(result.contains("https://www.sv-eutingen.de/logo.png"));
+        assert!(result.contains(r#"href="https://www.sv-eutingen.de/" target="_blank""#));
+    }
+
+    #[test]
+    fn test_render_html_footer_links_website_and_socials() {
+        let result = render_html(
+            "membership_application",
+            &serde_json::json!({ "firstname": "Anna", "newsletter": true }),
+        )
+        .unwrap();
+
+        assert!(result.contains(r#">www.sv-eutingen.de</a>"#));
+        assert!(result.contains(r#"href="https://www.sv-eutingen.de" target="_blank""#));
+        assert!(result.contains(r#"href="https://www.sv-eutingen.de/newsletter" target="_blank""#));
+        assert!(result.contains("fussball.de"));
+        assert!(result.contains(r#"rel="noopener noreferrer""#));
+        assert!(result.contains("instagram.com/sveutingen1947"));
+        assert!(result.contains("facebook.com/sveutingen"));
+        assert!(result.contains("youtube.com/@SVEutingeneV"));
+        assert!(result.contains("linkedin.com/company/sv-eutingen-1947-e-v/"));
+        assert!(result.contains("impressum"));
+        assert!(result.contains("datenschutz"));
+    }
+
+    #[test]
+    fn test_render_html_supports_dark_mode() {
+        let result = render_html(
+            "contact_confirmation",
+            &ContactConfirmationTemplateData::new("Max Mustermann"),
+        )
+        .unwrap();
+
+        assert!(result.contains(r#"<meta name="color-scheme" content="light dark">"#));
+        assert!(result.contains(r#"<meta name="supported-color-schemes" content="light dark">"#));
+        assert!(result.contains("@media (prefers-color-scheme: dark)"));
+        assert!(result.contains("[data-ogsc]"));
+        assert!(result.contains(".sve-text a { color: #e71b17 !important; }"));
+        assert!(result.contains(".sve-foot-brand { color: #e71b17 !important; }"));
+    }
+
+    #[test]
+    fn test_render_html_footer_is_fluid_and_outlook_safe() {
+        let result = render_html(
+            "contact_confirmation",
+            &ContactConfirmationTemplateData::new("Max Mustermann"),
+        )
+        .unwrap();
+
+        assert!(result.contains(r#"<div style="max-width:600px;margin:0 auto;">"#));
+        assert!(result.contains(r#"<!--[if mso]><table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" width="600"><tr><td><![endif]-->"#));
+        assert!(result.contains(r#"<!--[if mso]></td></tr></table><![endif]-->"#));
+    }
+
+    #[test]
+    fn test_render_html_uses_presentation_tables_and_german_lang() {
+        let result = render_html(
+            "contact_confirmation",
+            &ContactConfirmationTemplateData::new("Max Mustermann"),
+        )
+        .unwrap();
+
+        assert!(result.contains(r#"<html lang="de""#));
+        assert!(result.contains(
+            r#"<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">"#
+        ));
+    }
+
+    #[test]
+    fn test_render_html_contains_preheader() {
+        let result = render_html(
+            "cancel_booking_events",
+            &serde_json::json!({ "firstname": "Max", "name": "SVE-Sommerfest 2026" }),
+        )
+        .unwrap();
+
+        assert!(result.contains("Dein gebuchtes Event wurde storniert."));
+    }
+
+    #[test]
+    #[ignore = "dev tool: renders all emails into target/email-preview.html for visual review"]
+    fn email_preview_gallery() {
+        let cases: &[(&str, &str, serde_json::Value)] = &[
+            (
+                "cancel_booking_events",
+                "Stornierung Event",
+                serde_json::json!({ "firstname": "Max", "name": "SVE-Sommerfest 2026" }),
+            ),
+            (
+                "cancel_booking_fitness",
+                "Stornierung Kurs",
+                serde_json::json!({ "firstname": "Max", "name": "Rückenfit im Frühling" }),
+            ),
+            (
+                "contact_confirmation",
+                "Kontaktbestätigung",
+                serde_json::json!({ "name": "Max Mustermann" }),
+            ),
+            (
+                "event_reminder_events",
+                "Event-Erinnerung",
+                serde_json::json!({
+                    "firstname": "Max",
+                    "name": "SVE-Sommerfest 2026",
+                    "location": "Sportgelände SV Eutingen",
+                    "start_date": "Samstag, 14. Juni 2026",
+                    "start_time": "15:00 Uhr"
+                }),
+            ),
+            (
+                "event_reminder_fitness",
+                "Kurs-Erinnerung",
+                serde_json::json!({
+                    "firstname": "Max",
+                    "name": "Rückenfit im Frühling",
+                    "location": "Turn- & Festhalle Eutingen",
+                    "start_date": "Montag, 7. April 2026",
+                    "start_time": "19:00 Uhr"
+                }),
+            ),
+            (
+                "membership_application",
+                "Mitgliedsantrag (mit Newsletter)",
+                serde_json::json!({ "firstname": "Anna", "newsletter": true }),
+            ),
+            (
+                "participation_confirmation_fitness",
+                "Teilnahmebestätigung",
+                serde_json::json!({ "firstname": "Max", "name": "Rückenfit im Frühling" }),
+            ),
+            (
+                "payment_reminder_events",
+                "Zahlungserinnerung Event",
+                serde_json::json!({
+                    "firstname": "Max",
+                    "name": "SVE-Sommerfest 2026",
+                    "price": "15,00 €",
+                    "payment_details": "Sportverein Eutingen im Gäu e.V.\nIBAN: DE16 6429 1010 0034 4696 05\nVerwendungszweck: 26-1001"
+                }),
+            ),
+            (
+                "payment_reminder_fitness",
+                "Zahlungserinnerung Kurs",
+                serde_json::json!({
+                    "firstname": "Max",
+                    "name": "Rückenfit im Frühling",
+                    "price": "60,00 €",
+                    "payment_details": "Sportverein Eutingen im Gäu e.V.\nIBAN: DE16 6429 1010 0034 4696 05\nVerwendungszweck: 26-1002"
+                }),
+            ),
+            (
+                "schedule_change_events",
+                "Terminänderung Event",
+                serde_json::json!({
+                    "firstname": "Max",
+                    "name": "SVE-Sommerfest 2026",
+                    "removed_dates": "- Do., 12. Juni 2026, 15:00 Uhr",
+                    "new_dates": "- Fr., 13. Juni 2026, 15:00 Uhr"
+                }),
+            ),
+            (
+                "schedule_change_fitness",
+                "Terminänderung Kurs",
+                serde_json::json!({
+                    "firstname": "Max",
+                    "name": "Rückenfit im Frühling",
+                    "removed_dates": "- Mi., 09. April 2026, 19:00 Uhr",
+                    "new_dates": "- Mi., 16. April 2026, 19:00 Uhr"
+                }),
+            ),
+            (
+                "waiting_list_events",
+                "Warteliste Event",
+                serde_json::json!({ "firstname": "Max", "name": "SVE-Sommerfest 2026" }),
+            ),
+            (
+                "waiting_list_fitness",
+                "Warteliste Kurs",
+                serde_json::json!({ "firstname": "Max", "name": "Rückenfit im Frühling" }),
+            ),
+        ];
+
+        let mut body = String::from(
+            "<!doctype html><html><head><meta charset=\"utf-8\"><title>SVE Email Preview</title>\
+             <style>body{font-family:-apple-system,sans-serif;background:#eee;margin:0;padding:24px}\
+             h1{font-size:20px}\
+             .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.15);\
+             margin:0 auto 24px;max-width:640px;overflow:hidden}\
+             .card h2{font-size:13px;margin:0;padding:10px 16px;background:#f5f5f5;\
+             border-bottom:1px solid #ddd;color:#333}\
+             iframe{display:block;width:100%;height:560px;border:0}</style></head><body>\
+             <h1>SVE Email Preview \u{2014} 13 Templates</h1>",
+        );
+
+        for (name, label, data) in cases {
+            let html = render_html(name, data)
+                .unwrap_or_else(|e| format!("<pre>render error: {e:?}</pre>"));
+            let srcdoc = html.replace('&', "&amp;").replace('"', "&quot;");
+            body.push_str(&format!(
+                "<div class=\"card\"><h2>{label} <code style=\"color:#999\">({name})</code></h2>\
+                 <iframe srcdoc=\"{srcdoc}\"></iframe></div>"
+            ));
+        }
+
+        body.push_str("</body></html>");
+
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target/email-preview.html");
+        std::fs::write(path, &body).expect("Failed to write email preview gallery");
+
+        println!("Email preview gallery written to {path}");
     }
 }
