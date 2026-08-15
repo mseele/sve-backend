@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.17.0] - 2026-08-15
+
+### Features
+
+- Send confirmation email to contact form submitter
+- Add HTML content and BCC support to Email model
+- Wire event reminder email as multipart/alternative (#94)
+- Wire booking + cancellation + schedule change emails for multipart (#95)
+- Wire payment reminders + participation confirmation for multipart (#96)
+- Wire membership welcome + contact confirmation for multipart (#97)
+- Responsive email branding, dark mode, and client compatibility (#83)
+- Bold key facts in HTML email templates
+- Wire newsletter + DB booking mails as multipart (#83)
+
 ## [2.16.0] - 2026-08-09
 
 ### Features
