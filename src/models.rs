@@ -1641,7 +1641,6 @@ mod additional_model_tests {
 mod email_tests {
     use super::*;
     use crate::test_utils::mock_email_gateway;
-    use pretty_assertions::assert_eq;
 
     fn make_email(
         content: &str,

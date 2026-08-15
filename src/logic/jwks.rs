@@ -170,27 +170,6 @@ pub(crate) fn generate_test_rsa_key() -> (DecodingKey, EncodingKey) {
 mod tests {
     use super::*;
 
-    use jsonwebtoken::{Algorithm, EncodingKey, Header};
-    use serde::Serialize;
-
-    #[derive(Debug, Serialize)]
-    struct TestClaims {
-        sub: String,
-        exp: usize,
-        iat: usize,
-    }
-
-    fn mint_test_token(encoding_key: &EncodingKey, kid: &str) -> String {
-        let claims = TestClaims {
-            sub: "test-user".to_string(),
-            exp: 9999999999_usize,
-            iat: 1000000000_usize,
-        };
-        let mut header = Header::new(Algorithm::RS256);
-        header.kid = Some(kid.to_string());
-        jsonwebtoken::encode(&header, &claims, encoding_key).unwrap()
-    }
-
     #[tokio::test]
     async fn fake_fetcher_returns_key_when_added() {
         let (decoding_key, _encoding_key) = super::generate_test_rsa_key();
