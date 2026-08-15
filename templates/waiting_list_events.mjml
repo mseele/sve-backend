@@ -15,7 +15,7 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>vielen Dank f&uuml;r Deine Anmeldung zum Event &bdquo;{{name}}&rdquo;. Leider ist Dein gew&uuml;nschtes Event schon vollst&auml;ndig ausgebucht.</p>
+          <p>vielen Dank f&uuml;r Deine Anmeldung zum Event <strong>&bdquo;{{name}}&rdquo;</strong>. Leider ist Dein gew&uuml;nschtes Event schon vollst&auml;ndig ausgebucht.</p>
 
           <p>Wir haben Dich jedoch auf der Warteliste vorgemerkt und melden uns bei Dir, sobald ein Platz frei wird.</p>
 

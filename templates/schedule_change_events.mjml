@@ -15,13 +15,13 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>bei deinem gebuchten Event &bdquo;{{name}}&rdquo; gibt es eine Termin&auml;nderung.</p>
+          <p>bei deinem gebuchten Event <strong>&bdquo;{{name}}&rdquo;</strong> gibt es eine Termin&auml;nderung.</p>
 
           <p>Die folgenden Termine entfallen:</p>
-          <p style="white-space: pre-line;">{{removed_dates}}</p>
+          <p style="white-space: pre-line;"><strong>{{removed_dates}}</strong></p>
 
           <p>Die neuen Termine sind:</p>
-          <p style="white-space: pre-line;">{{new_dates}}</p>
+          <p style="white-space: pre-line;"><strong>{{new_dates}}</strong></p>
 
           <p>Wir w&uuml;nschen Dir weiterhin viel Spa&szlig; beim Event.</p>
 

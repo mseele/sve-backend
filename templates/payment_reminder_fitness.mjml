@@ -15,11 +15,11 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>leider haben wir festgestellt, dass du deinen gebuchten Kurs &bdquo;{{name}}&rdquo; noch nicht bezahlt hast.</p>
+          <p>leider haben wir festgestellt, dass du deinen gebuchten Kurs <strong>&bdquo;{{name}}&rdquo;</strong> noch nicht bezahlt hast.</p>
 
           <p>Wir m&ouml;chten Dich bitten, die Kursgeb&uuml;hr in H&ouml;he von <strong>{{price}}</strong> so bald wie m&ouml;glich auf folgendes Konto zu &uuml;berweisen:</p>
 
-          <p style="white-space: pre-line;">{{payment_details}}</p>
+          <p style="white-space: pre-line;"><strong>{{payment_details}}</strong></p>
 
           <p>Sollte der Kurs bis zum ersten Termin nicht bezahlt sein, behalten wir uns vor den Kursplatz an einen Teilnehmer der Warteliste neu zu vergeben.<br />
           Solltest du den Betrag schon &uuml;berwiesen haben, kannst du diese Email als gegenstandslos betrachten.</p>

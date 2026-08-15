@@ -15,13 +15,13 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>bei deinem gebuchten Kurs &bdquo;{{name}}&rdquo; gibt es eine Termin&auml;nderung.</p>
+          <p>bei deinem gebuchten Kurs <strong>&bdquo;{{name}}&rdquo;</strong> gibt es eine Termin&auml;nderung.</p>
 
           <p>Die folgenden Kurstermine entfallen:</p>
-          <p style="white-space: pre-line;">{{removed_dates}}</p>
+          <p style="white-space: pre-line;"><strong>{{removed_dates}}</strong></p>
 
           <p>Die neuen Kurstermine sind:</p>
-          <p style="white-space: pre-line;">{{new_dates}}</p>
+          <p style="white-space: pre-line;"><strong>{{new_dates}}</strong></p>
 
           <p>Wir w&uuml;nschen Dir weiterhin viel Spa&szlig; beim Kurs.</p>
 

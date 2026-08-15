@@ -15,9 +15,9 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>herzlich willkommen beim SV Eutingen 1947 e.V.! Wir freuen uns sehr, Dich als neues Mitglied in unserem Verein zu begr&uuml;&szlig;en.</p>
+          <p>herzlich willkommen beim <strong>SV Eutingen 1947 e.V.</strong>! Wir freuen uns sehr, Dich als neues Mitglied in unserem Verein zu begr&uuml;&szlig;en.</p>
 
-          <p>Du bist nun ein Teil unserer &uuml;ber 500-k&ouml;pfigen SVE-Gemeinschaft und tr&auml;gst einen Beitrag zu unserem gemeinsamen Anliegen bei: gesellschaftliche Teilhabe durch Sport und Begegnung zu erm&ouml;glichen.</p>
+          <p>Du bist nun ein Teil unserer <strong>&uuml;ber 500-k&ouml;pfigen SVE-Gemeinschaft</strong> und tr&auml;gst einen Beitrag zu unserem gemeinsamen Anliegen bei: gesellschaftliche Teilhabe durch Sport und Begegnung zu erm&ouml;glichen.</p>
 
           <p>Deinen Mitgliedsantrag haben wir erhalten und bearbeiten ihn umgehend. Sollten wir noch R&uuml;ckfragen haben, werden wir uns direkt bei Dir melden.</p>
 

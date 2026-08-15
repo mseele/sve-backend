@@ -15,7 +15,7 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>vielen Dank f&uuml;r deine Teilnahme an unserem Kurs &bdquo;{{name}}&rdquo;.</p>
+          <p>vielen Dank f&uuml;r deine Teilnahme an unserem Kurs <strong>&bdquo;{{name}}&rdquo;</strong>.</p>
 
           <p>Im Anhang befindet sich deine Teilnahmebest&auml;tigung.</p>
 

@@ -15,7 +15,7 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>Du hast einen Platz in unserem SVE-Kurs &bdquo;{{name}}&rdquo; gebucht.<br />
+          <p>Du hast einen Platz in unserem SVE-Kurs <strong>&bdquo;{{name}}&rdquo;</strong> gebucht.<br />
           Kommende Woche geht es los und wir m&ouml;chten Dir letzte Infos geben:</p>
 
           <p>Der Kurs beginnt am <strong>{{start_date}}</strong> um <strong>{{start_time}}</strong> und findet hier statt:<br />

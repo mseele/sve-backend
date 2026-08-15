@@ -15,7 +15,7 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>wir haben deinen gebuchten Kurs &bdquo;{{name}}&ldquo; storniert.</p>
+          <p>wir haben deinen gebuchten Kurs <strong>&bdquo;{{name}}&ldquo;</strong> storniert.</p>
 
           <p>Im kommenden Halbjahr startet unser neues Kursangebot, dass wir wieder &uuml;ber s&auml;mtliche Kan&auml;le ver&ouml;ffentlichen. Vielleicht ist dort wieder ein interessantes Angebot f&uuml;r Dich dabei.</p>
 

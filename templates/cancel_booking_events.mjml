@@ -15,7 +15,7 @@
         <mj-text>
           <p>Hallo {{firstname}},</p>
 
-          <p>wir haben dein gebuchtes Event &bdquo;{{name}}&ldquo; storniert.</p>
+          <p>wir haben dein gebuchtes Event <strong>&bdquo;{{name}}&ldquo;</strong> storniert.</p>
 
           <p>Wir w&uuml;nschen Dir noch einen sch&ouml;nen Tag und hoffen das in unserem vielf&auml;ltigen Angebot vielleicht mal wieder etwas f&uuml;r Dich dabei ist.</p>
 
