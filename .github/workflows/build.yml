@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout # the code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Build # the binary
         uses: houseabsolute/actions-rust-cross@v1
@@ -63,7 +63,7 @@ jobs:
       CROSS_CONTAINER_OPTS: --network=host
     steps:
       - name: Checkout # the code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Test # the code
         uses: houseabsolute/actions-rust-cross@v1
