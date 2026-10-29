@@ -2,14 +2,14 @@ use crate::{
     db,
     models::{Event, EventId, EventSubscription, PaymentMethod, ToEuro},
 };
-use anyhow::{Result, anyhow};
+use anyhow::{Context as _, Result, anyhow};
 use chrono::Locale;
 use printpdf::{
     Color, Line, LinePoint, Mm, Op, PdfDocument, PdfFontHandle, PdfPage, PdfParseErrorSeverity,
     PdfSaveOptions, PdfWarnMsg, Point, Polygon, PolygonRing, Pt, Rgb, Svg, TextItem, TextMatrix,
     XObjectTransform,
 };
-use simple_excel_writer::{CellValue, Column, Row, ToCellValue, Workbook};
+use rust_xlsxwriter::{Workbook, Worksheet, XlsxError};
 use sqlx::PgPool;
 use tracing::warn;
 
@@ -44,16 +44,14 @@ fn export(
     bookings: Vec<EventSubscription>,
     waiting_list: Vec<EventSubscription>,
 ) -> Result<(String, Vec<u8>)> {
-    let mut workbook = Workbook::create_in_memory();
+    let mut workbook = Workbook::new();
 
     // create one sheet for bookings and one for waiting list
     create_sheet(&mut workbook, "Buchungen", &event, bookings)?;
     create_sheet(&mut workbook, "Warteliste", &event, waiting_list)?;
 
-    // close the workbook and extract the bytes
-    let bytes = workbook
-        .close()?
-        .ok_or_else(|| anyhow!("Workbook did not return some bytes"))?;
+    // save the workbook to an in memory buffer
+    let bytes = workbook.save_to_buffer()?;
 
     // create a filename and return it with the bytes
     let filename = format!("{}.xlsx", event.name.to_lowercase());
@@ -67,104 +65,97 @@ fn create_sheet(
     event: &Event,
     subscribers: Vec<EventSubscription>,
 ) -> Result<()> {
-    let mut sheet = workbook.create_sheet(&format!("{name} ({})", subscribers.len()));
+    let sheet = workbook.add_worksheet();
+    sheet
+        .set_name(format!("{name} ({})", subscribers.len()))
+        .context("Error setting excel sheet name")?;
 
-    sheet.add_column(Column { width: 5.0 });
-    sheet.add_column(Column { width: 15.0 });
-    sheet.add_column(Column { width: 16.0 });
-    sheet.add_column(Column { width: 16.0 });
-    sheet.add_column(Column { width: 18.0 });
-    sheet.add_column(Column { width: 20.0 });
-    sheet.add_column(Column { width: 25.0 });
-    sheet.add_column(Column { width: 20.0 });
-    sheet.add_column(Column { width: 8.0 });
-    sheet.add_column(Column { width: 10.0 });
-    sheet.add_column(Column { width: 10.0 });
-    sheet.add_column(Column { width: 6.5 });
-
-    let mut custom_fields = Vec::new();
-    for custom_field in event.custom_fields.iter() {
-        sheet.add_column(Column { width: 20.0 });
-        custom_fields.push(custom_field.name.clone());
+    // set the column widths
+    let base_widths = [
+        5.0, 15.0, 16.0, 16.0, 18.0, 20.0, 25.0, 20.0, 8.0, 10.0, 10.0, 6.5,
+    ];
+    for (index, width) in base_widths.iter().enumerate() {
+        sheet.set_column_width(index as u16, *width)?;
     }
+    let mut column = base_widths.len() as u16;
+    for _ in event.custom_fields.iter() {
+        sheet.set_column_width(column, 20.0)?;
+        column += 1;
+    }
+    sheet.set_column_width(column, 100.0)?;
 
     let payment_column = match event.payment_method {
         PaymentMethod::BankTransfer => "Zahlung bestätigt",
         PaymentMethod::SepaDirectDebit => "SEPA exportiert",
     };
 
-    sheet.add_column(Column { width: 100.0 });
+    // write the header row
+    let mut headers = vec![
+        "Id",
+        "Buchungsdatum",
+        "Vorname",
+        "Nachname",
+        "Straße",
+        "PLZ",
+        "Email",
+        "Telefon",
+        "Mitglied",
+        "Betrag",
+        "Buchungsnr",
+        payment_column,
+    ];
+    for custom_field in event.custom_fields.iter() {
+        headers.push(custom_field.name.as_str());
+    }
+    headers.push("Kommentar");
+    for (index, header) in headers.iter().enumerate() {
+        sheet.write(0, index as u16, *header)?;
+    }
 
-    workbook.write_sheet(&mut sheet, |sheet_writer| {
-        let mut row = Row::new();
-        row.add_cell("Id");
-        row.add_cell("Buchungsdatum");
-        row.add_cell("Vorname");
-        row.add_cell("Nachname");
-        row.add_cell("Straße");
-        row.add_cell("PLZ");
-        row.add_cell("Email");
-        row.add_cell("Telefon");
-        row.add_cell("Mitglied");
-        row.add_cell("Betrag");
-        row.add_cell("Buchungsnr");
-        row.add_cell(payment_column);
-        for custom_field in custom_fields.iter() {
-            row.add_cell(custom_field.to_owned());
-        }
-        row.add_cell("Kommentar");
-
-        sheet_writer.append_row(row)?;
-
-        for value in subscribers {
-            let price = value.total_price(event).to_euro();
-            let mut row = Row::new();
-            row.add_cell(value.id.to_string());
-            row.add_cell(value.created.naive_utc());
-            row.add_cell(value.first_name);
-            row.add_cell(value.last_name);
-            row.add_cell(value.street);
-            row.add_cell(value.city);
-            row.add_cell(value.email);
-            row.add_cell(opt(value.phone));
-            row.add_cell(bool(value.member));
-            row.add_cell(price);
-            row.add_cell(value.payment_id);
-            match event.payment_method {
-                PaymentMethod::BankTransfer => {
-                    row.add_cell(bool(value.payment_confirmed_at.is_some()));
-                }
-                PaymentMethod::SepaDirectDebit => {
-                    row.add_cell(bool(value.sepa_exported_at.is_some()));
-                }
+    // write one row per subscriber
+    for (row_index, value) in subscribers.iter().enumerate() {
+        let row = row_index as u32 + 1;
+        let price = value.total_price(event).to_euro();
+        sheet.write(row, 0, value.id.to_string())?;
+        sheet.write_datetime(row, 1, value.created.naive_utc())?;
+        sheet.write(row, 2, &value.first_name)?;
+        sheet.write(row, 3, &value.last_name)?;
+        sheet.write(row, 4, &value.street)?;
+        sheet.write(row, 5, &value.city)?;
+        sheet.write(row, 6, &value.email)?;
+        sheet.write(row, 7, value.phone.as_deref())?;
+        yes_no(sheet, row, 8, value.member)?;
+        sheet.write(row, 9, price)?;
+        sheet.write(row, 10, &value.payment_id)?;
+        match event.payment_method {
+            PaymentMethod::BankTransfer => {
+                yes_no(sheet, row, 11, value.payment_confirmed_at.is_some())?;
             }
-            for (index, _) in custom_fields.iter().enumerate() {
-                row.add_cell(opt(value.custom_values.get(index).cloned()));
+            PaymentMethod::SepaDirectDebit => {
+                yes_no(sheet, row, 11, value.sepa_exported_at.is_some())?;
             }
-            row.add_cell(opt(value.comment));
-            sheet_writer.append_row(row)?;
         }
-
-        Ok(())
-    })?;
+        for (index, _) in event.custom_fields.iter().enumerate() {
+            sheet.write(
+                row,
+                column + index as u16,
+                value.custom_values.get(index).cloned(),
+            )?;
+        }
+        sheet.write(
+            row,
+            column + event.custom_fields.len() as u16,
+            value.comment.as_deref(),
+        )?;
+    }
 
     Ok(())
 }
 
-fn opt<T>(value: Option<T>) -> CellValue
-where
-    T: ToCellValue,
-{
+fn yes_no(sheet: &mut Worksheet, row: u32, column: u16, value: bool) -> Result<(), XlsxError> {
     match value {
-        Some(v) => v.to_cell_value(),
-        None => CellValue::Blank(1),
-    }
-}
-
-fn bool(value: bool) -> CellValue {
-    match value {
-        true => CellValue::String("Y".into()),
-        false => CellValue::String("N".into()),
+        true => sheet.write(row, column, "Y").map(|_| ()),
+        false => sheet.write(row, column, "N").map(|_| ()),
     }
 }
 
