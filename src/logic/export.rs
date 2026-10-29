@@ -926,7 +926,8 @@ mod tests {
         let mut content = String::new();
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).unwrap();
-            if file.name().ends_with(".xml") || file.name().ends_with(".rels") {
+            let name = file.name().unwrap().into_owned();
+            if name.ends_with(".xml") || name.ends_with(".rels") {
                 file.read_to_string(&mut content).unwrap();
             }
         }
