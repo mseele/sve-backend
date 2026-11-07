@@ -1179,6 +1179,28 @@ impl MembershipType {
             _ => "Hauptverein",
         }
     }
+
+    /// DFBnet product name of the membership type, as expected by the DVH
+    /// profile import.
+    pub(crate) fn get_dfb_due(&self) -> &'static str {
+        match self {
+            MembershipType::Fitness => "Sparte Fitness Jahr",
+            MembershipType::Family => "Familienbeitrag beliebige Kinder Jahr",
+            MembershipType::AdultActive => "Aktiver Erwachsener Jahr",
+            MembershipType::AdultSuporting => "Fördermitglied Erwachsener Jahr",
+            MembershipType::AdultPremium => "Premiummitglied Erwachsener Jahr",
+            MembershipType::Youth => "Kind, Jugendliche(r) Jahr",
+            MembershipType::Free => "Beitragsfrei Jahr",
+        }
+    }
+
+    /// Mitgliedschaftstyp as expected by the DVH profile import.
+    pub(crate) fn get_dvh_membership_type(&self) -> &'static str {
+        match self {
+            MembershipType::AdultSuporting => "Passive",
+            _ => "Active",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1798,5 +1820,49 @@ mod email_tests {
             addresses.contains(&"to@example.com".to_string()),
             "envelope should include To, got: {addresses:?}"
         );
+    }
+
+    #[test]
+    fn test_get_dfb_due() {
+        assert_eq!(MembershipType::Fitness.get_dfb_due(), "Sparte Fitness Jahr");
+        assert_eq!(
+            MembershipType::Family.get_dfb_due(),
+            "Familienbeitrag beliebige Kinder Jahr"
+        );
+        assert_eq!(
+            MembershipType::AdultActive.get_dfb_due(),
+            "Aktiver Erwachsener Jahr"
+        );
+        assert_eq!(
+            MembershipType::AdultSuporting.get_dfb_due(),
+            "Fördermitglied Erwachsener Jahr"
+        );
+        assert_eq!(
+            MembershipType::AdultPremium.get_dfb_due(),
+            "Premiummitglied Erwachsener Jahr"
+        );
+        assert_eq!(
+            MembershipType::Youth.get_dfb_due(),
+            "Kind, Jugendliche(r) Jahr"
+        );
+        assert_eq!(MembershipType::Free.get_dfb_due(), "Beitragsfrei Jahr");
+    }
+
+    #[test]
+    fn test_get_dvh_membership_type() {
+        assert_eq!(
+            MembershipType::AdultSuporting.get_dvh_membership_type(),
+            "Passive"
+        );
+        for membership_type in [
+            MembershipType::Fitness,
+            MembershipType::Family,
+            MembershipType::AdultActive,
+            MembershipType::AdultPremium,
+            MembershipType::Youth,
+            MembershipType::Free,
+        ] {
+            assert_eq!(membership_type.get_dvh_membership_type(), "Active");
+        }
     }
 }

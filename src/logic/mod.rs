@@ -2,6 +2,7 @@ pub(crate) mod banking;
 pub(crate) mod calendar;
 pub(crate) mod contact;
 pub(crate) mod csv;
+pub(crate) mod dvh;
 pub(crate) mod events;
 pub(crate) mod export;
 pub(crate) mod jwks;
