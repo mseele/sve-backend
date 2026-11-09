@@ -1,5 +1,5 @@
 use super::banking;
-use super::csv;
+use super::dvh;
 use super::news;
 use super::template;
 use crate::email::EmailGateway;
@@ -11,6 +11,8 @@ use crate::models::MessageType;
 use crate::models::NewsSubscription;
 use crate::models::NewsTopic;
 use anyhow::Result;
+use chrono::Utc;
+use chrono_tz::Europe::Berlin;
 use iban::{Iban, IbanLike};
 use lettre::Message;
 use lettre::message::Attachment;
@@ -25,6 +27,10 @@ pub(crate) async fn application(
     email_gateway: &impl EmailGateway,
 ) -> Result<()> {
     let bank_account = banking::validate_iban(&membership_application.iban)?;
+
+    // validate all birthdays before any side effects, so that applications
+    // with unparseable dates are rejected without subscribing to news
+    dvh::parse_birthdays(&membership_application)?;
 
     // subscribe to news if newsletter is selected
     if membership_application.newsletter {
@@ -248,7 +254,10 @@ async fn create_internal_email(
 
     let body = build_internal_email_html(&membership_application, &bank_name, &bic)?;
 
-    let attachment: String = csv::write_membership_application(membership_application)?;
+    let attachment = dvh::write_membership_application(
+        &membership_application,
+        Utc::now().with_timezone(&Berlin).date_naive(),
+    )?;
 
     let message = email_gateway
         .build_message(email_account)?
@@ -257,10 +266,12 @@ async fn create_internal_email(
         .multipart(
             MultiPart::mixed()
                 .singlepart(SinglePart::html(body))
-                .singlepart(
-                    Attachment::new("mitgliedsantrag.csv".into())
-                        .body(attachment, ContentType::parse("text/csv")?),
-                ),
+                .singlepart(Attachment::new("mitgliedsantrag.xlsx".into()).body(
+                    attachment,
+                    ContentType::parse(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )?,
+                )),
         )?;
 
     Ok(message)
@@ -284,7 +295,7 @@ mod tests {
             street: "Musterstraße 1".to_string(),
             zipcode: "12345".to_string(),
             city: "Musterstadt".to_string(),
-            birthday: "1990-01-01".to_string(),
+            birthday: "01.01.1990".to_string(),
             start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
             phone: "1234567890".to_string(),
             email: "max@example.com".to_string(),
@@ -305,7 +316,7 @@ mod tests {
         assert!(html.contains("Mustermann"));
         assert!(html.contains("Musterstraße 1"));
         assert!(html.contains("12345 Musterstadt"));
-        assert!(html.contains("1990-01-01"));
+        assert!(html.contains("01.01.1990"));
         assert!(html.contains("01.01.2024"));
         assert!(html.contains("1234567890"));
         assert!(html.contains("max@example.com"));
@@ -325,12 +336,12 @@ mod tests {
             MembershipFamilyMember {
                 first_name: "Anna".to_string(),
                 last_name: "Mustermann".to_string(),
-                birthday: "1992-05-15".to_string(),
+                birthday: "15.05.1992".to_string(),
             },
             MembershipFamilyMember {
                 first_name: "Ben".to_string(),
                 last_name: "Mustermann".to_string(),
-                birthday: "1995-08-20".to_string(),
+                birthday: "20.08.1995".to_string(),
             },
         ];
 
@@ -341,7 +352,7 @@ mod tests {
             street: "Musterstraße 1".to_string(),
             zipcode: "12345".to_string(),
             city: "Musterstadt".to_string(),
-            birthday: "1990-01-01".to_string(),
+            birthday: "01.01.1990".to_string(),
             start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
             phone: "1234567890".to_string(),
             email: "max@example.com".to_string(),
@@ -360,8 +371,8 @@ mod tests {
         assert!(html.contains("Anna"));
         assert!(html.contains("Ben"));
         assert!(html.contains("Mustermann"));
-        assert!(html.contains("1992-05-15"));
-        assert!(html.contains("1995-08-20"));
+        assert!(html.contains("15.05.1992"));
+        assert!(html.contains("20.08.1995"));
         // Verify both family members appear in the table
         assert!(html.contains("<tr>\n                        <td>Anna</td>"));
         assert!(html.contains("<tr>\n                        <td>Ben</td>"));
@@ -376,7 +387,7 @@ mod tests {
             street: "Musterstraße 1".to_string(),
             zipcode: "12345".to_string(),
             city: "Musterstadt".to_string(),
-            birthday: "1990-01-01".to_string(),
+            birthday: "01.01.1990".to_string(),
             start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
             phone: "1234567890".to_string(),
             email: "max@example.com".to_string(),
@@ -415,7 +426,7 @@ mod tests {
             street: "Musterstraße 1".to_string(),
             zipcode: "12345".to_string(),
             city: "Musterstadt".to_string(),
-            birthday: "1990-01-01".to_string(),
+            birthday: "01.01.1990".to_string(),
             start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
             phone: "1234567890".to_string(),
             email: "max@example.com".to_string(),
