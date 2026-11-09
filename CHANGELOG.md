@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.18.0] - 2026-11-09
+
+### Documentation
+
+- Add git commit and push guidelines
+
+### Features
+
+- Replace CSV attachment with DVH xlsx import file (#98)
+
+### Ci
+
+- Bump actions/checkout from v6 to v7
+
 ## [2.17.0] - 2026-08-15
 
 ### Features
