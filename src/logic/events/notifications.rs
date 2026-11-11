@@ -3,7 +3,8 @@ use std::collections::hash_map::Entry;
 
 use anyhow::{Result, anyhow, bail};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use chrono::Locale;
+use chrono::{Duration, Locale, Utc};
+use chrono_tz::Europe::Berlin;
 use sqlx::PgPool;
 
 use crate::db;
@@ -144,6 +145,120 @@ pub(crate) async fn send_event_reminders(
     }
 
     Ok(events.len())
+}
+
+pub(crate) async fn send_manager_event_reminders(
+    pool: &PgPool,
+    lead_days: i32,
+    email_gateway: &impl email::EmailGateway,
+) -> Result<usize> {
+    if lead_days < 0 {
+        bail!("Manager reminder lead days must not be negative");
+    }
+
+    let today = Utc::now().with_timezone(&Berlin).date_naive();
+    let target_date = today
+        .checked_add_signed(Duration::days(i64::from(lead_days)))
+        .ok_or_else(|| anyhow!("Manager reminder target date is out of range"))?;
+    let events = db::get_manager_reminder_events(pool, target_date, lead_days).await?;
+
+    let mut sent_count = 0;
+    for event in events {
+        let recipients = event
+            .manager_recipients
+            .as_ref()
+            .ok_or_else(|| anyhow!("Manager recipients missing for event {}", event.id))?;
+        let subscribers = event
+            .subscribers
+            .as_ref()
+            .ok_or_else(|| anyhow!("Subscribers missing for event {}", event.id))?;
+        if recipients.is_empty() {
+            continue;
+        }
+
+        let enrolled_count = subscribers
+            .iter()
+            .filter(|subscriber| subscriber.enrolled)
+            .count();
+        let waiting_count = subscribers
+            .iter()
+            .filter(|subscriber| !subscriber.enrolled)
+            .count();
+        let open_places = if event.max_subscribers < 0 {
+            "unbegrenzt".to_string()
+        } else {
+            (i32::from(event.max_subscribers) - enrolled_count as i32)
+                .max(0)
+                .to_string()
+        };
+        let dates = event
+            .dates
+            .iter()
+            .map(|date| {
+                format!(
+                    "- {}",
+                    date.with_timezone(&Berlin)
+                        .format_localized("%A, %-d. %B %Y um %H:%M Uhr", Locale::de_DE)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let mut body = format!(
+            "Operative Erinnerung zum bevorstehenden Event\n\nVeranstaltung: {}\nTermine:\n{}\nOrt: {}\nAnmeldungen: {}\nWarteliste: {}\nFreie Plätze: {}",
+            event.name, dates, event.location, enrolled_count, waiting_count, open_places
+        );
+        if let Some(cost_per_date) = &event.cost_per_date {
+            // Keep this calculation aligned with SVE Tools' EventBookings.finacialResult.
+            let income = subscribers
+                .iter()
+                .filter(|subscriber| subscriber.enrolled)
+                .fold(bigdecimal::BigDecimal::from(0), |total, subscriber| {
+                    total
+                        + if subscriber.member {
+                            event.price_member.clone()
+                        } else {
+                            event.price_non_member.clone()
+                        }
+                });
+            let date_count = if event.custom_date.is_some() {
+                1
+            } else {
+                event.dates.len()
+            };
+            let net_result =
+                income - cost_per_date.clone() * bigdecimal::BigDecimal::from(date_count as i64);
+            body.push_str(&format!(
+                "\nVoraussichtliches Nettoergebnis: {}",
+                net_result.to_euro()
+            ));
+        }
+
+        let email_account = event.get_associated_email_account(email_gateway).await?;
+        let message_type: MessageType = event.event_type.into();
+        let subject = format!("Operative Erinnerung: {}", event.name);
+        let messages = recipients
+            .iter()
+            .map(|recipient| {
+                Email::new(
+                    message_type,
+                    recipient.clone(),
+                    subject.clone(),
+                    body.clone(),
+                    None,
+                )
+                .into_message(&email_account, email_gateway)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        email_gateway
+            .send_messages(&email_account, messages)
+            .await?;
+        db::mark_manager_reminder_sent(pool, &event.id, lead_days).await?;
+        sent_count += 1;
+    }
+
+    Ok(sent_count)
 }
 
 pub(crate) async fn send_payment_reminders(
@@ -320,7 +435,8 @@ pub(crate) async fn send_participation_confirmation(
 mod tests {
     use anyhow::Result;
     use bigdecimal::BigDecimal;
-    use chrono::{Duration, Utc};
+    use chrono::{DateTime, Duration, NaiveDate, Utc};
+    use chrono_tz::Europe::Berlin;
     use pretty_assertions::assert_eq;
     use sqlx::PgPool;
 
@@ -328,6 +444,370 @@ mod tests {
     use crate::test_utils::mock_email_gateway;
 
     use super::*;
+
+    fn berlin_datetime(date: NaiveDate, hour: u32) -> DateTime<Utc> {
+        date.and_hms_opt(hour, 0, 0)
+            .unwrap()
+            .and_local_timezone(Berlin)
+            .single()
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    async fn create_manager_reminder_event(
+        pool: &PgPool,
+        name: &str,
+        event_type: EventType,
+        lifecycle_status: LifecycleStatus,
+        dates: Vec<DateTime<Utc>>,
+        custom_date: Option<&str>,
+        manager_recipients: Vec<&str>,
+        cost_per_date: Option<BigDecimal>,
+    ) -> Result<crate::models::Event> {
+        let (event, _) = crate::db::write_event(
+            pool,
+            PartialEvent {
+                event_type: Some(event_type),
+                lifecycle_status: Some(lifecycle_status),
+                name: Some(name.to_string()),
+                sort_index: Some(0),
+                short_description: Some("Short".to_string()),
+                description: Some("Description".to_string()),
+                image: Some("image.png".to_string()),
+                light: Some(true),
+                dates: Some(dates),
+                custom_date: custom_date.map(str::to_string),
+                duration_in_minutes: Some(60),
+                max_subscribers: Some(4),
+                max_waiting_list: Some(3),
+                price_member: Some(BigDecimal::from(20)),
+                price_non_member: Some(BigDecimal::from(30)),
+                cost_per_date,
+                location: Some("Eutingen".to_string()),
+                booking_template: Some("Template".to_string()),
+                payment_account: Some("Account".to_string()),
+                external_operator: Some(false),
+                manager_recipients: Some(
+                    manager_recipients.into_iter().map(str::to_string).collect(),
+                ),
+                ..Default::default()
+            },
+        )
+        .await?;
+        Ok(event)
+    }
+
+    async fn add_manager_reminder_booking(
+        pool: &PgPool,
+        event_id: &crate::models::EventId,
+        email: &str,
+        member: bool,
+        enrolled: bool,
+        payment_id: &str,
+    ) -> Result<()> {
+        let subscriber_id: i32 = sqlx::query_scalar(
+            "INSERT INTO event_subscribers (first_name, last_name, street, city, email, member) \
+             VALUES ('Private', 'Participant', 'Street', 'Eutingen', $1, $2) RETURNING id",
+        )
+        .bind(email)
+        .bind(member)
+        .fetch_one(pool)
+        .await?;
+
+        sqlx::query(
+            "INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, payment_id) \
+             VALUES ($1, $2, $3, false, $4)",
+        )
+        .bind(event_id.get_ref())
+        .bind(subscriber_id)
+        .bind(enrolled)
+        .bind(payment_id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_manager_event_reminders_send_operational_snapshot_and_are_idempotent(
+        pool: PgPool,
+    ) -> Result<()> {
+        use crate::models::EmailType;
+
+        let today = Utc::now().with_timezone(&Berlin).date_naive();
+        let target_date = today.checked_add_days(chrono::Days::new(7)).unwrap();
+        let event = create_manager_reminder_event(
+            &pool,
+            "Sommerfest",
+            EventType::Events,
+            LifecycleStatus::Review,
+            vec![
+                berlin_datetime(target_date, 0),
+                berlin_datetime(target_date, 18),
+            ],
+            None,
+            vec!["manager@example.com", "assistant@example.com"],
+            Some(BigDecimal::from(10)),
+        )
+        .await?;
+        create_manager_reminder_event(
+            &pool,
+            "Fitness event",
+            EventType::Fitness,
+            LifecycleStatus::Published,
+            vec![berlin_datetime(target_date, 12)],
+            None,
+            vec!["fitness-manager@example.com"],
+            None,
+        )
+        .await?;
+        create_manager_reminder_event(
+            &pool,
+            "Draft event",
+            EventType::Events,
+            LifecycleStatus::Draft,
+            vec![berlin_datetime(target_date, 12)],
+            None,
+            vec!["draft-manager@example.com"],
+            None,
+        )
+        .await?;
+        create_manager_reminder_event(
+            &pool,
+            "Wrong date event",
+            EventType::Events,
+            LifecycleStatus::Published,
+            vec![berlin_datetime(target_date + Duration::days(2), 12)],
+            None,
+            vec!["wrong-date-manager@example.com"],
+            None,
+        )
+        .await?;
+        create_manager_reminder_event(
+            &pool,
+            "Later matching date event",
+            EventType::Events,
+            LifecycleStatus::Published,
+            vec![
+                berlin_datetime(target_date - Duration::days(1), 12),
+                berlin_datetime(target_date, 12),
+            ],
+            None,
+            vec!["later-date-manager@example.com"],
+            None,
+        )
+        .await?;
+        create_manager_reminder_event(
+            &pool,
+            "Free-form date event",
+            EventType::Events,
+            LifecycleStatus::Published,
+            vec![],
+            Some("Some Saturday"),
+            vec!["custom-date-manager@example.com"],
+            None,
+        )
+        .await?;
+        create_manager_reminder_event(
+            &pool,
+            "No managers event",
+            EventType::Events,
+            LifecycleStatus::Published,
+            vec![berlin_datetime(target_date, 12)],
+            None,
+            vec![],
+            None,
+        )
+        .await?;
+        add_manager_reminder_booking(
+            &pool,
+            &event.id,
+            "participant@example.com",
+            true,
+            true,
+            "manager-test-enrolled",
+        )
+        .await?;
+        add_manager_reminder_booking(
+            &pool,
+            &event.id,
+            "waiting@example.com",
+            false,
+            false,
+            "manager-test-waiting",
+        )
+        .await?;
+        add_manager_reminder_booking(
+            &pool,
+            &event.id,
+            "second-participant@example.com",
+            false,
+            true,
+            "manager-test-enrolled-second",
+        )
+        .await?;
+
+        let (email_gateway, captured) =
+            mock_email_gateway(vec![(EmailType::Events, "events@example.com")]);
+        assert_eq!(
+            send_manager_event_reminders(&pool, 7, &email_gateway).await?,
+            1
+        );
+
+        let messages = captured
+            .lock()
+            .unwrap()
+            .iter()
+            .flat_map(|(_, messages)| messages.iter())
+            .map(|message| String::from_utf8(message.formatted()).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(messages.len(), 2);
+        for (message, recipient) in messages
+            .iter()
+            .zip(["manager@example.com", "assistant@example.com"])
+        {
+            assert!(message.contains(recipient));
+            assert!(message.contains("Sommerfest"));
+            assert!(message.contains("Eutingen"));
+            assert!(message.contains("Anmeldungen: 2"));
+            assert!(message.contains("Warteliste: 1"));
+            assert!(message.contains("Freie Pl=C3=A4tze: 2"));
+            assert!(message.contains("30,00"));
+            assert!(!message.contains("Private"));
+            assert!(!message.contains("Participant"));
+            assert!(!message.contains("Hallo"));
+            assert!(!message.contains("Viele Grüße"));
+        }
+
+        assert_eq!(
+            send_manager_event_reminders(&pool, 7, &email_gateway).await?,
+            0
+        );
+        assert_eq!(captured.lock().unwrap().len(), 1);
+
+        let next_date = target_date + Duration::days(1);
+        crate::db::write_event(
+            &pool,
+            PartialEvent {
+                id: Some(event.id),
+                dates: Some(vec![berlin_datetime(next_date, 12)]),
+                ..Default::default()
+            },
+        )
+        .await?;
+        assert_eq!(
+            send_manager_event_reminders(&pool, 8, &email_gateway).await?,
+            1
+        );
+        assert_eq!(captured.lock().unwrap().len(), 2);
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_manager_event_reminders_send_without_enrollments_or_cost(
+        pool: PgPool,
+    ) -> Result<()> {
+        use crate::models::EmailType;
+
+        let today = Utc::now().with_timezone(&Berlin).date_naive();
+        let target_date = today.checked_add_days(chrono::Days::new(7)).unwrap();
+        create_manager_reminder_event(
+            &pool,
+            "Leeres Event",
+            EventType::Events,
+            LifecycleStatus::Published,
+            vec![berlin_datetime(target_date, 23)],
+            None,
+            vec!["manager@example.com"],
+            None,
+        )
+        .await?;
+
+        let (email_gateway, captured) =
+            mock_email_gateway(vec![(EmailType::Events, "events@example.com")]);
+        assert_eq!(
+            send_manager_event_reminders(&pool, 7, &email_gateway).await?,
+            1
+        );
+        let captured = captured.lock().unwrap();
+        let messages = captured
+            .iter()
+            .flat_map(|(_, messages)| messages.iter())
+            .map(|message| String::from_utf8(message.formatted()).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(messages.len(), 1);
+        assert!(messages[0].contains("Anmeldungen: 0"));
+        assert!(messages[0].contains("Warteliste: 0"));
+        assert!(!messages[0].contains("Nettoergebnis"));
+        assert!(messages[0].contains("manager@example.com"));
+        Ok(())
+    }
+
+    #[sqlx::test]
+    async fn test_failed_manager_reminder_delivery_can_be_retried(pool: PgPool) -> Result<()> {
+        use crate::email::MockEmailGateway;
+        use crate::models::{EmailAccount, EmailType};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        let today = Utc::now().with_timezone(&Berlin).date_naive();
+        let target_date = today.checked_add_days(chrono::Days::new(7)).unwrap();
+        create_manager_reminder_event(
+            &pool,
+            "Retry event",
+            EventType::Events,
+            LifecycleStatus::Running,
+            vec![berlin_datetime(target_date, 12)],
+            None,
+            vec!["manager@example.com"],
+            None,
+        )
+        .await?;
+
+        let account = EmailAccount::new_for_test(EmailType::Events, "events@example.com");
+        let mut email_gateway = MockEmailGateway::new();
+        email_gateway.expect_account_by_type().returning(move |_| {
+            let account = account.clone();
+            Box::pin(async move { Ok(account) })
+        });
+        email_gateway.expect_build_message().returning(|account| {
+            Ok(lettre::Message::builder()
+                .from(account.address.parse()?)
+                .date_now())
+        });
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let send_attempts = Arc::clone(&attempts);
+        email_gateway
+            .expect_send_messages()
+            .times(2)
+            .returning(move |_, _| {
+                let attempt = send_attempts.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async move {
+                    if attempt == 0 {
+                        Err(anyhow::anyhow!("simulated delivery failure"))
+                    } else {
+                        Ok(())
+                    }
+                })
+            });
+
+        assert!(
+            send_manager_event_reminders(&pool, 7, &email_gateway)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            send_manager_event_reminders(&pool, 7, &email_gateway).await?,
+            1
+        );
+        assert_eq!(
+            send_manager_event_reminders(&pool, 7, &email_gateway).await?,
+            0
+        );
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+        Ok(())
+    }
 
     #[sqlx::test]
     async fn test_send_event_reminders_empty_db(pool: PgPool) -> Result<()> {

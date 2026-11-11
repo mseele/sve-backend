@@ -30,6 +30,24 @@ pub(crate) async fn send_event_reminders(pool: &PgPool, email_gateway: &impl Ema
     }
 }
 
+/// Send operational reminders to event managers seven days before an event.
+pub(crate) async fn send_manager_event_reminders(
+    pool: &PgPool,
+    email_gateway: &impl EmailGateway,
+) -> Result<()> {
+    match events::notifications::send_manager_event_reminders(pool, 7, email_gateway).await {
+        Ok(count) if count > 0 => {
+            info!("{count} manager event reminders have been sent successfully.");
+            Ok(())
+        }
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("Error while sending manager event reminders: {}", e);
+            Err(e)
+        }
+    }
+}
+
 /// Complete all finished events.
 pub(crate) async fn close_finished_events(pool: &PgPool, email_gateway: &impl EmailGateway) {
     match events::close_finished_running_events(pool, email_gateway).await {

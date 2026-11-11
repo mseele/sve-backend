@@ -217,6 +217,10 @@ pub(crate) async fn router(pg_pool: PgPool, secrets: Arc<dyn SecretProvider>) ->
                         .route("/check_email_connectivity", get(check_email_connectivity))
                         .route("/renew_calendar_watch", get(renew_calendar_watch))
                         .route("/send_event_reminders", get(send_event_reminders))
+                        .route(
+                            "/send_manager_event_reminders",
+                            get(send_manager_event_reminders),
+                        )
                         .route("/close_finished_events", get(close_finished_events))
                         .layer(axum::middleware::from_fn_with_state(
                             state.clone(),
@@ -823,6 +827,13 @@ async fn send_event_reminders(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, ResponseError> {
     tasks::send_event_reminders(&state.pg_pool, &state.email_sender).await;
+    Ok(StatusCode::OK)
+}
+
+async fn send_manager_event_reminders(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ResponseError> {
+    tasks::send_manager_event_reminders(&state.pg_pool, &state.email_sender).await?;
     Ok(StatusCode::OK)
 }
 

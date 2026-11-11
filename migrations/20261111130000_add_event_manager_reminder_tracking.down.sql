@@ -1,0 +1,1 @@
+DROP TABLE event_manager_reminder_sends;

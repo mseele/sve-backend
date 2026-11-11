@@ -4,7 +4,7 @@ use crate::models::{
     EventType, LifecycleStatus, PartialEvent, PaymentMethod,
 };
 use anyhow::{Result, anyhow, bail};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use itertools::Itertools;
 use sqlx::{
     PgConnection, PgPool, Postgres, QueryBuilder, Row, postgres::PgRow, query,
@@ -1067,6 +1067,75 @@ WHERE
     id = $1"#,
         event_id.get_ref(),
     )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Return eligible Events whose earliest structured date is on the target
+/// Europe/Berlin calendar date and has not been reminded for this lead time.
+pub(crate) async fn get_manager_reminder_events(
+    pool: &PgPool,
+    target_date: NaiveDate,
+    lead_days: i32,
+) -> Result<Vec<Event>> {
+    let mut conn = pool.acquire().await?;
+    let event_ids: Vec<EventId> = sqlx::query_scalar::<_, i32>(
+        r#"
+SELECT e.id
+FROM events e
+INNER JOIN (
+    SELECT event_id, MIN(date) AS date
+    FROM event_dates
+    GROUP BY event_id
+) earliest_date ON earliest_date.event_id = e.id
+WHERE e.event_type = 'Events'
+    AND e.lifecycle_status IN ('Review', 'Published', 'Running')
+    AND (earliest_date.date AT TIME ZONE 'Europe/Berlin')::date = $1
+    AND EXISTS (
+        SELECT 1
+        FROM event_manager_recipients emr
+        WHERE emr.event_id = e.id
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM event_manager_reminder_sends sent
+        WHERE sent.event_id = e.id
+            AND sent.lead_days = $2
+    )
+ORDER BY e.id"#,
+    )
+    .bind(target_date)
+    .bind(lead_days)
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .map(Into::into)
+    .collect();
+
+    if event_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut events = fetch_events(&mut conn, event_ids, true).await?;
+    insert_event_manager_recipients(&mut conn, &mut events).await?;
+    Ok(events)
+}
+
+/// Record successful manager reminder delivery for one event and lead time.
+pub(crate) async fn mark_manager_reminder_sent(
+    pool: &PgPool,
+    event_id: &EventId,
+    lead_days: i32,
+) -> Result<()> {
+    sqlx::query(
+        r#"INSERT INTO event_manager_reminder_sends (event_id, lead_days)
+        VALUES ($1, $2)
+        ON CONFLICT (event_id, lead_days) DO NOTHING"#,
+    )
+    .bind(event_id.get_ref())
+    .bind(lead_days)
     .execute(pool)
     .await?;
 
