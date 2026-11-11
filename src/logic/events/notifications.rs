@@ -505,23 +505,23 @@ mod tests {
         enrolled: bool,
         payment_id: &str,
     ) -> Result<()> {
-        let subscriber_id: i32 = sqlx::query_scalar(
+        let subscriber_id: i32 = sqlx::query_scalar!(
             "INSERT INTO event_subscribers (first_name, last_name, street, city, email, member) \
              VALUES ('Private', 'Participant', 'Street', 'Eutingen', $1, $2) RETURNING id",
+            email,
+            member
         )
-        .bind(email)
-        .bind(member)
         .fetch_one(pool)
         .await?;
 
-        sqlx::query(
+        sqlx::query!(
             "INSERT INTO event_bookings (event_id, subscriber_id, enrolled, pre_booking, payment_id) \
              VALUES ($1, $2, $3, false, $4)",
+            event_id.get_ref(),
+            subscriber_id,
+            enrolled,
+            payment_id
         )
-        .bind(event_id.get_ref())
-        .bind(subscriber_id)
-        .bind(enrolled)
-        .bind(payment_id)
         .execute(pool)
         .await?;
         Ok(())

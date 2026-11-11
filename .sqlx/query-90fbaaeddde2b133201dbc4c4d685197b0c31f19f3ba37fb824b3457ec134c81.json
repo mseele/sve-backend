@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT e.id\nFROM events e\nINNER JOIN (\n    SELECT event_id, MIN(date) AS date\n    FROM event_dates\n    GROUP BY event_id\n) earliest_date ON earliest_date.event_id = e.id\nWHERE e.event_type = 'Events'\n    AND e.lifecycle_status IN ('Review', 'Published', 'Running')\n    AND (earliest_date.date AT TIME ZONE 'Europe/Berlin')::date = $1\n    AND EXISTS (\n        SELECT 1\n        FROM event_manager_recipients emr\n        WHERE emr.event_id = e.id\n    )\n    AND NOT EXISTS (\n        SELECT 1\n        FROM event_manager_reminder_sends sent\n        WHERE sent.event_id = e.id\n            AND sent.lead_days = $2\n    )\nORDER BY e.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "90fbaaeddde2b133201dbc4c4d685197b0c31f19f3ba37fb824b3457ec134c81"
+}

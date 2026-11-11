@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_manager_reminder_sends (event_id, lead_days)\n        VALUES ($1, $2)\n        ON CONFLICT (event_id, lead_days) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5ba7dc84ea1900511b8f8d980f1f21161e7d0e0197492d4da5728888f577e83c"
+}

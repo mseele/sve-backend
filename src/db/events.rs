@@ -873,10 +873,12 @@ async fn save_event_manager_recipients(
     event_id: &EventId,
     manager_recipients: Vec<String>,
 ) -> Result<()> {
-    query("DELETE FROM event_manager_recipients WHERE event_id = $1")
-        .bind(event_id.get_ref())
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM event_manager_recipients WHERE event_id = $1",
+        event_id.get_ref()
+    )
+    .execute(&mut *conn)
+    .await?;
 
     if !manager_recipients.is_empty() {
         let mut query_builder: QueryBuilder<Postgres> =
@@ -1081,7 +1083,7 @@ pub(crate) async fn get_manager_reminder_events(
     lead_days: i32,
 ) -> Result<Vec<Event>> {
     let mut conn = pool.acquire().await?;
-    let event_ids: Vec<EventId> = sqlx::query_scalar::<_, i32>(
+    let event_ids: Vec<EventId> = sqlx::query_scalar!(
         r#"
 SELECT e.id
 FROM events e
@@ -1105,9 +1107,9 @@ WHERE e.event_type = 'Events'
             AND sent.lead_days = $2
     )
 ORDER BY e.id"#,
+        target_date,
+        lead_days
     )
-    .bind(target_date)
-    .bind(lead_days)
     .fetch_all(&mut *conn)
     .await?
     .into_iter()
@@ -1129,13 +1131,13 @@ pub(crate) async fn mark_manager_reminder_sent(
     event_id: &EventId,
     lead_days: i32,
 ) -> Result<()> {
-    sqlx::query(
+    sqlx::query!(
         r#"INSERT INTO event_manager_reminder_sends (event_id, lead_days)
         VALUES ($1, $2)
         ON CONFLICT (event_id, lead_days) DO NOTHING"#,
+        event_id.get_ref(),
+        lead_days
     )
-    .bind(event_id.get_ref())
-    .bind(lead_days)
     .execute(pool)
     .await?;
 
@@ -1313,11 +1315,12 @@ mod db_integration_tests {
         .await?;
         let event_id = before_delete.id;
         delete_event(&pool, event_id).await?;
-        let recipient_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM event_manager_recipients WHERE event_id = $1")
-                .bind(event_id.get_ref())
-                .fetch_one(&pool)
-                .await?;
+        let recipient_count: i64 = sqlx::query_scalar!(
+            "SELECT COUNT(*) AS \"count!\" FROM event_manager_recipients WHERE event_id = $1",
+            event_id.get_ref()
+        )
+        .fetch_one(&pool)
+        .await?;
         assert_eq!(recipient_count, 0);
 
         Ok(())
