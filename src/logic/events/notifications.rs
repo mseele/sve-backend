@@ -744,12 +744,13 @@ mod tests {
 
     #[sqlx::test]
     async fn test_failed_manager_reminder_delivery_can_be_retried(pool: PgPool) -> Result<()> {
-        use crate::email::MockEmailGateway;
-        use crate::models::{EmailAccount, EmailType};
         use std::sync::{
             Arc,
             atomic::{AtomicUsize, Ordering},
         };
+
+        use crate::email::MockEmailGateway;
+        use crate::models::{EmailAccount, EmailType};
 
         let today = Utc::now().with_timezone(&Berlin).date_naive();
         let target_date = today.checked_add_days(chrono::Days::new(7)).unwrap();
