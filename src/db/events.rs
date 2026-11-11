@@ -17,6 +17,7 @@ pub(crate) async fn get_events(
     sort: bool,
     lifecycle_status: Option<Vec<LifecycleStatus>>,
     subscribers: bool,
+    manager_recipients: bool,
 ) -> Result<Vec<Event>> {
     let mut conn = pool.acquire().await?;
 
@@ -121,6 +122,9 @@ ORDER BY
         insert_event_custom_fields(&mut conn, &mut events).await?;
         if subscribers {
             insert_event_subscribers(&mut conn, &mut events).await?;
+        }
+        if manager_recipients {
+            insert_event_manager_recipients(&mut conn, &mut events).await?;
         }
     }
 
@@ -392,6 +396,33 @@ ORDER BY
     Ok(())
 }
 
+async fn insert_event_manager_recipients(
+    conn: &mut PgConnection,
+    events: &mut [Event],
+) -> Result<()> {
+    let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
+        "SELECT event_id, email FROM event_manager_recipients WHERE event_id IN (",
+    );
+    let mut separated = query_builder.separated(", ");
+    for event in events.iter() {
+        separated.push_bind(event.id.get_ref());
+    }
+    separated.push_unseparated(") ORDER BY event_id, position");
+
+    let mut result: HashMap<i32, Vec<String>> = HashMap::new();
+    for row in query_builder.build().fetch_all(conn).await? {
+        let id: i32 = row.try_get("event_id")?;
+        let email: String = row.try_get("email")?;
+        result.entry(id).or_default().push(email);
+    }
+
+    for event in events {
+        event.manager_recipients = Some(result.remove(event.id.get_ref()).unwrap_or_default());
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn write_event(
     pool: &PgPool,
     partial_event: PartialEvent,
@@ -414,6 +445,7 @@ async fn update_event(
     partial_event: PartialEvent,
 ) -> Result<(Event, Option<Vec<DateTime<Utc>>>)> {
     let mut tx = pool.begin().await?;
+    let manager_recipients = partial_event.manager_recipients.clone();
 
     if let Some(new_method) = &partial_event.payment_method {
         let row = query!(
@@ -584,6 +616,10 @@ async fn update_event(
         }
     }
 
+    if let Some(manager_recipients) = &manager_recipients {
+        save_event_manager_recipients(&mut tx, id, manager_recipients.clone()).await?;
+    }
+
     // archive events if the event has been closed
     if event_has_been_closed {
         archive_events(&mut tx).await?;
@@ -592,6 +628,11 @@ async fn update_event(
     let event = fetch_event(&mut tx, id, false)
         .await?
         .ok_or_else(|| anyhow!("Error fetching event with id '{}'", id))?;
+
+    let mut event = event;
+    if let Some(manager_recipients) = manager_recipients {
+        event.manager_recipients = Some(manager_recipients);
+    }
 
     tx.commit().await?;
 
@@ -619,6 +660,7 @@ where
 }
 
 async fn save_new_event(pool: &PgPool, partial_event: PartialEvent) -> Result<Event> {
+    let manager_recipients = partial_event.manager_recipients.clone();
     let closed = partial_event.closed;
     let event_type = partial_event
         .event_type
@@ -767,6 +809,11 @@ RETURNING id, created, closed, event_type AS "event_type: EventType", lifecycle_
     new_event.dates = save_event_dates(&mut tx, &new_event.id, dates).await?;
     new_event.custom_fields = get_event_custom_fields(&mut tx, &new_event.id).await?;
 
+    if let Some(manager_recipients) = manager_recipients {
+        save_event_manager_recipients(&mut tx, &new_event.id, manager_recipients.clone()).await?;
+        new_event.manager_recipients = Some(manager_recipients);
+    }
+
     tx.commit().await?;
 
     Ok(new_event)
@@ -819,6 +866,33 @@ async fn save_event_dates(
     .await?;
 
     Ok(dates)
+}
+
+async fn save_event_manager_recipients(
+    conn: &mut PgConnection,
+    event_id: &EventId,
+    manager_recipients: Vec<String>,
+) -> Result<()> {
+    query("DELETE FROM event_manager_recipients WHERE event_id = $1")
+        .bind(event_id.get_ref())
+        .execute(&mut *conn)
+        .await?;
+
+    if !manager_recipients.is_empty() {
+        let mut query_builder: QueryBuilder<Postgres> =
+            QueryBuilder::new("INSERT INTO event_manager_recipients (event_id, position, email) ");
+        query_builder.push_values(
+            manager_recipients.iter().enumerate(),
+            |mut row, (position, email)| {
+                row.push_bind(event_id.get_ref())
+                    .push_bind(position as i32)
+                    .push_bind(email);
+            },
+        );
+        query_builder.build().execute(&mut *conn).await?;
+    }
+
+    Ok(())
 }
 
 async fn get_event_custom_fields(
@@ -1070,6 +1144,115 @@ mod db_integration_tests {
     };
 
     use super::*;
+
+    #[sqlx::test]
+    async fn test_event_manager_recipients_persist_privately_and_delete(
+        pool: PgPool,
+    ) -> Result<()> {
+        let manager_recipients = vec![
+            "manager@example.com".to_string(),
+            "assistant@example.com".to_string(),
+        ];
+        let partial = PartialEvent {
+            event_type: Some(EventType::Events),
+            lifecycle_status: Some(LifecycleStatus::Draft),
+            name: Some("Manager Recipients Event".to_string()),
+            sort_index: Some(1),
+            short_description: Some("Short desc".to_string()),
+            description: Some("Full description".to_string()),
+            image: Some("test.png".to_string()),
+            light: Some(false),
+            duration_in_minutes: Some(120),
+            max_subscribers: Some(50),
+            max_waiting_list: Some(10),
+            price_member: Some("25.00".parse().unwrap()),
+            price_non_member: Some("30.00".parse().unwrap()),
+            location: Some("Gym".to_string()),
+            booking_template: Some("Template".to_string()),
+            payment_account: Some("Account".to_string()),
+            alt_email_address: Some("alt@example.com".to_string()),
+            external_operator: Some(false),
+            dates: Some(vec![Utc::now()]),
+            manager_recipients: Some(manager_recipients.clone()),
+            ..Default::default()
+        };
+
+        let (created, _) = write_event(&pool, partial).await?;
+        assert_eq!(created.manager_recipients, Some(manager_recipients.clone()));
+        assert_eq!(
+            created.alt_email_address.as_deref(),
+            Some("alt@example.com")
+        );
+
+        let public_events = get_events(
+            &pool,
+            false,
+            Some(vec![LifecycleStatus::Draft]),
+            false,
+            false,
+        )
+        .await?;
+        let public_json = serde_json::to_value(&public_events)?;
+        assert!(public_json[0].get("manager_recipients").is_none());
+        assert!(!public_json.to_string().contains("manager@example.com"));
+
+        let admin_events = get_events(
+            &pool,
+            false,
+            Some(vec![LifecycleStatus::Draft]),
+            false,
+            true,
+        )
+        .await?;
+        let admin_json = serde_json::to_value(&admin_events)?;
+        assert_eq!(
+            admin_json[0]["manager_recipients"],
+            serde_json::json!(manager_recipients)
+        );
+
+        let replacement_recipients = vec!["new-manager@example.com".to_string()];
+        let (updated, _) = write_event(
+            &pool,
+            PartialEvent {
+                id: Some(created.id),
+                manager_recipients: Some(replacement_recipients.clone()),
+                ..Default::default()
+            },
+        )
+        .await?;
+        assert_eq!(updated.manager_recipients, Some(replacement_recipients));
+
+        let (cleared, _) = write_event(
+            &pool,
+            PartialEvent {
+                id: Some(created.id),
+                manager_recipients: Some(Vec::new()),
+                ..Default::default()
+            },
+        )
+        .await?;
+        assert_eq!(cleared.manager_recipients, Some(Vec::new()));
+
+        let (before_delete, _) = write_event(
+            &pool,
+            PartialEvent {
+                id: Some(created.id),
+                manager_recipients: Some(manager_recipients),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let event_id = before_delete.id;
+        delete_event(&pool, event_id).await?;
+        let recipient_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM event_manager_recipients WHERE event_id = $1")
+                .bind(event_id.get_ref())
+                .fetch_one(&pool)
+                .await?;
+        assert_eq!(recipient_count, 0);
+
+        Ok(())
+    }
 
     #[sqlx::test]
     async fn test_write_and_get_event(pool: PgPool) -> Result<()> {

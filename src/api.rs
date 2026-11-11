@@ -504,6 +504,7 @@ async fn events(
         query.beta.take(),
         query.status.take(),
         Some(false), // Public endpoint never returns subscribers
+        false,       // Public endpoint never returns private manager recipients
     )
     .await?;
     Ok(Json(events))
@@ -518,6 +519,7 @@ async fn admin_events(
         query.beta,
         query.status.clone(),
         query.subscribers,
+        true,
     )
     .await?;
     Ok(Json(events))

@@ -34,6 +34,7 @@ pub(crate) async fn get_events(
     beta: Option<bool>,
     lifecycle_status: Option<Vec<LifecycleStatus>>,
     subscribers: Option<bool>,
+    manager_recipients: bool,
 ) -> Result<Vec<Event>> {
     let lifecycle_status_list;
     if let Some(beta) = beta {
@@ -46,6 +47,7 @@ pub(crate) async fn get_events(
         true,
         lifecycle_status_list,
         subscribers.unwrap_or(false),
+        manager_recipients,
     )
     .await
 }
